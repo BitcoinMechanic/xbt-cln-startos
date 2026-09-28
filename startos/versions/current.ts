@@ -14,27 +14,18 @@ const removeClboss = async ({ effects }: { effects: T.Effects }) => {
 }
 
 export const current = VersionInfo.of({
-  version: '#blake:26.6.7:3',
+  version: '#blake:26.6.8:0',
   releaseNotes: {
-    en_US: `Core Lightning with support for the 164-byte BLAKE2b block header, now with unified signatures.
+    en_US: `Core Lightning v26.06.8-blake2b.5, based on upstream v26.06.8. It includes upstream's security fixes, and we strongly recommend updating.
 
-The BLAKE2b hard fork activated on mainnet at block 961,640. From that block on, a header is 164 bytes rather than 80 and its block id is BLAKE2b rather than SHA256d. Core Lightning computes block ids itself while following the chain, so an unmodified node cannot parse the activation block and stops there.
+## Notes for operators
 
-This build adds SIGHASH_UNIFIED signing for the wallet and for new channels. A channel funded past activation, from coins that are themselves post-activation, is signed with hash type \`0x21\`, which is invalid under the SHA256d rules, and so cannot be replayed on the SHA256d chain.
+- Every Lightning node you connect to must also update. The feature bits moved, so this version and the previous one will not connect to each other.
+- Channels already open carry over: their stored channel type is updated when the database is upgraded.
+- Downgrading to the previous version is not possible.
+- Fund channels only from coins received past activation.
 
-The web interface now links transactions to an explorer that indexes this chain. It previously linked to one that indexes the SHA256d chain, where a transaction from this node does not exist.
-
-CLBOSS is no longer included. It buys inbound liquidity through a submarine swap service that settles on the SHA256d chain, so a swap here would pay a counterparty that never credits you. If you had it enabled, it is removed from your configuration on update and its settings are cleared.
-
-## Read this before opening channels
-
-The node signals a required feature bit, so it will not connect to a Lightning node still on the SHA256d rules. That is deliberate: it stops you opening a channel with a peer that cannot follow the chain past activation. It also means you cannot cooperatively close a channel opened before activation with a counterparty still on the SHA256d rules.
-
-The feature numbers are provisional and are expected to change. Channels opened now may have to be closed and reopened once they are settled. Fund channels only from coins received past activation.
-
-The web interface talks to the node over CLNrest. Earlier builds used commando, which rides the Lightning peer protocol, and this build refuses peers still on the SHA256d rules, so the dashboard could not connect.
-
-Your node's configuration does not otherwise change.`,
+Your node's configuration does not change.`,
   },
   migrations: {
     up: removeClboss,
@@ -44,7 +35,7 @@ Your node's configuration does not otherwise change.`,
     down: IMPOSSIBLE,
     other: {
       //Arriving from the unflavored build, or from the header-only flavor. Both are Core Lightning
-      //v26.06.7, so the wallet database is already at the schema this build expects.
+      //v26.06.7; lightningd upgrades the wallet database on its first start.
       ['^26']: {
         up: removeClboss,
       },
@@ -54,6 +45,10 @@ Your node's configuration does not otherwise change.`,
       },
       //Arriving from the flavor that shipped CLBOSS and linked to a SHA256d chain explorer.
       ['#blake:26.6.7:2']: {
+        up: removeClboss,
+      },
+      //Arriving from Core Lightning v26.06.7-blake2b.4.
+      ['#blake:26.6.7:3']: {
         up: removeClboss,
       },
     },

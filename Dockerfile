@@ -46,18 +46,17 @@ RUN cargo install --locked --path teos && \
 
 # lightningd, from the signed release tarballs.
 #
-# This is a fork of Core Lightning v26.06.7 that adds support for the 164-byte
+# This is a fork of Core Lightning v26.06.8 that adds support for the 164-byte
 # BLAKE2b block header. Without it a node cannot parse the activation block and
 # dies on the first one.
 #
-# The hashes come from SHA256SUMS-v26.06.7-blake2b.4 and its -arm64 companion,
-# both GPG-verified against A47D99B6DB0D715D40C59A2023AE8A8EA7E24E38.
+# The hashes come from SHA256SUMS-v26.06.8-blake2b.5, GPG-verified against A47D99B6DB0D715D40C59A2023AE8A8EA7E24E38.
 FROM base AS lightningd-dist
 ARG TARGETARCH
 ARG CLN_REPO=privkeyio/lightning
-ARG CLN_VERSION=v26.06.7-blake2b.4
-ARG CLN_SHA256_AMD64=35e7001747f7fdf1cb0b38e75c39366a933285aa2ae2c2612d289f8a65369bd2
-ARG CLN_SHA256_ARM64=d37f6be4ba8d29e3820b207a75fc7bfb5f264b0854dc5fafbb3f5d341d78780a
+ARG CLN_VERSION=v26.06.8-blake2b.5
+ARG CLN_SHA256_AMD64=c544ee2e719f238a8645f5de0f59414e43c44486cdb4d6d892b66033b59e49a7
+ARG CLN_SHA256_ARM64=661a89db0567c93f941e81eb49b39508c76e20735ef8c181012861dc7c2124f0
 RUN apt-get update -qq && \
     apt-get install -qq -y --no-install-recommends ca-certificates xz-utils && \
     rm -rf /var/lib/apt/lists/*

@@ -11,7 +11,7 @@
 
 [Core Lightning](https://github.com/ElementsProject/lightning) is a Lightning Network node implementation. This package builds it with three plugins built into the image, runs a web UI alongside it, and can act as, or subscribe to, a BOLT13 watchtower.
 
-This is the `#blake` flavor of the package. It builds a fork of Core Lightning v26.06.7 that parses the 164-byte BLAKE2b block header, which the stock build cannot: a stock node stops at the fork's activation block. It also signs wallet transactions and new channels with the fork's opt-in `SIGHASH_UNIFIED` digest, so channels funded past activation from post-activation coins are signed in a way the SHA256d rules reject, and cannot be replayed on the SHA256d chain.
+This is the `#blake` flavor of the package. It builds Core Lightning v26.06.8 with support for the 164-byte BLAKE2b block header, which the stock build cannot parse: a stock node stops at the activation block. It also signs wallet transactions and new channels with the opt-in `SIGHASH_UNIFIED` digest, so a channel funded past activation from coins received past activation is signed in a way a node that has not upgraded rejects.
 
 See [BLAKE2b Hard Fork Support](#blake2b-hard-fork-support) for what that changes, including the peers you can connect to and the coins you should fund channels from.
 
@@ -40,7 +40,7 @@ See [BLAKE2b Hard Fork Support](#blake2b-hard-fork-support) for what that change
 
 ## Image and Container Runtime
 
-Two images. The node's is built here: a signed release tarball is unpacked onto a slim Debian base and three extra plugins are added; the web UI's is pulled as published. lightningd comes from the `v26.06.7-blake2b` tarball published by the fork, with its checksum pinned in the `lightningd-dist` stage and taken from a GPG-verified manifest. `bitcoin-cli` is pinned and checksummed the same way in the `bitcoin-cli` stage: `plugin-bcli` and the `check-synced` health check both exec it, and the image it used to come with no longer supplies it.
+Two images. The node's is built here: a signed release tarball is unpacked onto a slim Debian base and three extra plugins are added; the web UI's is pulled as published. lightningd comes from the `v26.06.8-blake2b.5` release tarball of `privkeyio/lightning`, with its checksum pinned in the `lightningd-dist` stage and taken from a GPG-verified manifest. `bitcoin-cli` is pinned and checksummed the same way in the `bitcoin-cli` stage: `plugin-bcli` and the `check-synced` health check both exec it, and the image it used to come with no longer supplies it.
 
 | Property      | Value                                                                                             |
 | ------------- | ------------------------------------------------------------------------------------------------- |
