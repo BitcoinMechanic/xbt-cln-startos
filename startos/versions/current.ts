@@ -1,10 +1,9 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
-
 export const current = VersionInfo.of({
-  version: '0.1.0:0',
+  version: '0.1.0:1',
   releaseNotes: {
     en_US:
-      'Experimental XBT fresh-wallet observation package. Pins CLN 81ba4099a63e, checks the Knots activation checkpoint before starting, and exposes an XBT peer interface and read-only node information. Do not fund or migrate wallets yet. Restored backups are blocked from starting until recovery support is implemented.',
+      'Adds stopped-service backup and fresh-volume restore for empty XBT observation wallets. Restored identity is checked against the backup. Wallets with recorded activity and older backups without a receipt remain blocked. Do not fund or migrate wallets yet.',
   },
   migrations: { up: async () => {}, down: IMPOSSIBLE },
 })

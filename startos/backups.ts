@@ -1,9 +1,30 @@
-import { writeFile } from 'fs/promises'
 import { sdk } from './sdk'
+import { mainMounts, rootDir } from './utils'
+import { T } from '@start9labs/start-sdk'
 
-// Do not restore an old Lightning commitment database as a live wallet.
-// This observation release preserves keys/SCBs, but deliberately blocks startup
-// after restoration; channel recovery must be implemented and tested first.
+async function check(effects: T.Effects, mode: 'capture' | 'restore') {
+  await sdk.SubContainer.withTemp(
+    effects,
+    { imageId: 'lightning' },
+    mainMounts,
+    `empty-backup-${mode}`,
+    async (sub) => {
+      const result = await sub.exec([
+        '/opt/xbt-venv/bin/python',
+        '/usr/local/libexec/xbt-empty-backup.py',
+        mode,
+        rootDir,
+      ])
+      if (result.exitCode !== 0)
+        throw new Error(
+          'Empty-wallet backup/restore refused. Wallet must have no recorded activity; restore requires a fresh volume. Keep the original wallet and backup.',
+        )
+    },
+  )
+}
+
+// StartOS stops the service for the complete backup operation. Inspect the
+// quiescent database, but never include it in a restorable Lightning backup.
 export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
   sdk.Backups.ofVolumes('main')
     .setOptions({
@@ -15,11 +36,6 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
         'xbt/gossip_store',
       ],
     })
-    .setPostRestore(async () => {
-      await writeFile(
-        sdk.volumes.main.subpath('restore-blocked'),
-        'XBT observation build: backup recovery is not enabled. Do not delete this marker.\n',
-        { mode: 0o600 },
-      )
-    }),
+    .setPreBackup(async (effects) => check(effects, 'capture'))
+    .setPostRestore(async (effects) => check(effects, 'restore')),
 )

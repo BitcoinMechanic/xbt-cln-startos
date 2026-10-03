@@ -2,7 +2,7 @@ import { setupManifest } from '@start9labs/start-sdk'
 const short = { en_US: 'Experimental Lightning node for the XBT BLAKE2b chain' }
 const long = {
   en_US:
-    'Fresh-wallet observation build. Requires BLAKE2b Knots. Do not fund this package or migrate existing wallets yet. UI, swap coordinator roles and backup recovery are not enabled.',
+    'Fresh-wallet observation build. Requires BLAKE2b Knots. Do not fund this package or migrate existing wallets yet. UI and swap coordinator roles are not enabled. Only empty-wallet backup recovery is supported.',
 }
 const depBitcoindDescription = {
   en_US:

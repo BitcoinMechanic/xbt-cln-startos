@@ -78,4 +78,5 @@ COPY assets/xbt/image-check.sh /usr/local/bin/xbt-image-check
 RUN chmod 755 /usr/local/bin/xbt-image-check
 # Build validation does not start a node or create a wallet.
 RUN xbt-image-check
+COPY assets/xbt/empty_backup.py /usr/local/libexec/xbt-empty-backup.py
 CMD ["lightningd", "--version"]

@@ -1,6 +1,6 @@
 import { FileHelper } from '@start9labs/start-sdk'
 import { manifest as bitcoinManifest } from 'bitcoin-core-startos/startos/manifest'
-import { lstat } from 'fs/promises'
+import { lstat, readFile } from 'fs/promises'
 import { sdk } from './sdk'
 import {
   bitcoinDataDir,
@@ -24,6 +24,20 @@ export const main = sdk.setupMain(async ({ effects }) => {
     throw new Error(
       'Wallet import or restored backup detected; this observation build cannot start it',
     )
+  }
+  let restoredIdentity: string | undefined
+  try {
+    const receipt = JSON.parse(
+      await readFile(
+        sdk.volumes.main.subpath('restored-identity.json'),
+        'utf8',
+      ),
+    )
+    if (receipt.schema !== 1 || !/^0[23][0-9a-f]{64}$/.test(receipt.node_id))
+      throw new Error('Invalid restored identity record')
+    restoredIdentity = receipt.node_id
+  } catch (error: any) {
+    if (error.code !== 'ENOENT') throw error
   }
   const backend = await bitcoindRpcBridge(effects)
   if (!backend) throw new Error('Knots RPC bridge is not available')
@@ -111,7 +125,14 @@ export const main = sdk.setupMain(async ({ effects }) => {
               message: 'Waiting for XBT RPC',
             }
           try {
-            return nodeHealth(JSON.parse(String(res.stdout)))
+            const info = JSON.parse(String(res.stdout))
+            if (restoredIdentity && info.id !== restoredIdentity)
+              return {
+                result: 'failure',
+                message:
+                  'Restored node identity does not match backup; keep this wallet unfunded',
+              }
+            return nodeHealth(info)
           } catch {
             return { result: 'failure', message: 'Invalid XBT RPC response' }
           }

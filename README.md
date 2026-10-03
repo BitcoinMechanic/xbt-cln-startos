@@ -4,12 +4,12 @@ Experimental fresh-wallet observation package for StartOS 0.4, forked from
 Start9Labs/cln-startos at `6040fb4a8cfdaaa9ef8cd468e60c2e14a028c928`.
 
 **Do not fund this package or migrate existing wallets yet.** The runtime and
-package installation still require validation on StartOS. Backup restoration is
-intentionally blocked until XBT channel recovery is implemented and tested.
+package installation still require validation on StartOS. Only empty-wallet backup restoration is supported in this release; funded
+wallet and channel recovery remain blocked.
 
 ## Identity and source
 
-- Package: `xbt-cln`, initial wrapper version `0.1.0:0`.
+- Package: `xbt-cln`, wrapper version `0.1.0:1`.
 - Wrapper: https://github.com/BitcoinMechanic/xbt-cln-startos
 - Node: https://github.com/BitcoinMechanic/lightning
 - Pinned node commit: `81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`.
@@ -46,10 +46,29 @@ Cookie replacement triggers reconfiguration; temporary disappearance does not.
 
 ## Backups and observation limits
 
-Backups preserve the key and emergency recovery file but exclude the XBT live
-SQLite database, WAL/SHM, RPC socket and gossip store. A post-restore marker blocks
-startup. Do not remove that marker or import any existing wallet. Recovery support
-is not part of this release. A detected `bitcoin/` directory also blocks startup.
+StartOS stops the service for the duration of each backup. The pre-backup hook
+runs `assets/xbt/empty_backup.py` against the stopped SQLite database. It requires
+the pinned XBT identity and no rows in channels, channel_htlcs, outputs,
+transactions, payments or invoices. It refuses a nonempty WAL and missing schema.
+It does not prove that a never-scanned external deposit cannot exist: the operator
+must still keep this observation node unfunded.
+
+A private `empty-wallet-backup.json` records the node ID and SHA256 bindings of
+`xbt/hsm_secret` and `xbt/emergency.recover`. Both files remain in the backup.
+The database, WAL/SHM, socket and gossip store remain excluded. This is an
+integrity check for the observation workflow, not authentication against a party
+who can alter the backup and its receipt.
+
+Restore requires a fresh volume without a database. The post-restore hook writes
+`restore-blocked` first, verifies the receipt and its files, then writes
+`restored-identity.json` and clears the block. Every failed validation retains the
+block. Startup verifies the restored node ID against the saved identity before
+reporting green health. Older backups without a receipt remain blocked. Never
+remove a blocking marker by hand or copy an old channel database into the volume.
+
+Version 0.1.0:0 upgrades without moving wallet data. This does not implement
+funded-wallet recovery, emergency channel closure, rescanning, or migration of the
+tower's coordinators. No spending action is enabled.
 
 ## Local validation
 
@@ -57,6 +76,8 @@ is not part of this release. A detected `bitcoin/` directory also blocks startup
 npm ci --ignore-scripts
 npm run check
 npm run test:xbt
+python3 -m venv .venv
+.venv/bin/python tests/test_empty_backup.py -v
 npm run build
 npm run check:bundle
 ```
@@ -74,6 +95,42 @@ docker build -f Dockerfile.xbt --build-arg TARGETARCH=amd64 \
 docker run --rm --network none xbt-cln:81ba4099a63e xbt-image-check
 ```
 
-The image and four native self-tests already passed on the tower. The wrapper
-uses the same image without recompiling it for these TypeScript changes. Actual
-s9pk packing/install validation is the next step and requires StartOS `start-cli`.
+The source image and four native self-tests passed on the tower, and version
+0.1.0:0 started and retained its identity across service restarts on StartOS.
+This update adds one Python file to the runtime image, reusing the expensive
+compile layers. Build the package in the VM with:
+
+```sh
+BUILDX_BUILDER=startos-builder make x86
+```
+
+The empty-wallet StartOS backup/restore round-trip passed with the same node ID.
+The nine offline backup tests use synthetic SQLite fixtures; they do not claim
+real channel recovery coverage.
+
+## Packaged-image channel recovery fixture
+
+The empty-wallet StartOS backup/restore round-trip passed with the same node ID.
+`tests/image_recovery.py` now exercises a separate funded **regtest** wallet in
+an isolated Docker container. It opens a channel, pays, cleanly stops the owner,
+copies only `hsm_secret` and `emergency.recover` to a fresh directory, and asks
+the surviving peer to close. Success requires spending a confirmed recovered
+channel output into the peer's wallet. The original database is retained only
+as a diagnostic artifact and is never copied into the recovered node.
+
+Use the already-built package image and your BLAKE2b Knots executable:
+
+```sh
+docker image ls start9/xbt-cln/lightning
+bash scripts/test-image-recovery.sh IMAGE_ID ../bitcoind
+```
+
+This does not rebuild the package. The launcher publishes no ports and uses
+`--network none`; backend and Lightning traffic stays on container loopback.
+Only the executable, test script and a newly created temporary results directory
+are mounted. Logs and disposable regtest keys remain in that results directory.
+The executable must run on Debian bookworm, the image's runtime base.
+
+This fixture does not invoke StartOS backup hooks, permit funded backups, test
+an offline surviving peer, or cover unresolved HTLCs. Keep the StartOS wallet
+unfunded; production recovery policy is unchanged.
