@@ -1,361 +1,79 @@
-<p align="center">
-  <img src="icon.svg" alt="Core Lightning Logo" width="21%">
-</p>
-
-# Core Lightning on StartOS
-
-> Everything not listed in this document should behave the same as upstream
-> Core Lightning. If a feature, setting, or behavior is not mentioned here, the
-> upstream documentation is accurate and fully applicable — see the
-> Documentation section of `instructions.md` for links.
-
-[Core Lightning](https://github.com/ElementsProject/lightning) is a Lightning Network node implementation. This package builds it with three plugins built into the image, runs a web UI alongside it, and can act as — or subscribe to — a BOLT13 watchtower.
-
-- **Upstream repo:** <https://github.com/ElementsProject/lightning>
-- **Wrapper repo:** <https://github.com/Start9Labs/cln-startos>
-
----
-
-## Table of Contents
-
-- [Image and Container Runtime](#image-and-container-runtime)
-- [Volume and Data Layout](#volume-and-data-layout)
-- [File Models](#file-models)
-- [Dependencies](#dependencies)
-- [Network Access and Interfaces](#network-access-and-interfaces)
-- [Installation and First-Run Flow](#installation-and-first-run-flow)
-- [Actions](#actions)
-- [Tasks](#tasks)
-- [Health Checks](#health-checks)
-- [Backups and Restore](#backups-and-restore)
-- [Limitations and Differences](#limitations-and-differences)
-- [Quick Reference for AI Consumers](#quick-reference-for-ai-consumers)
-
----
-
-## Image and Container Runtime
-
-Two images. The node's is built here: upstream's signed release tarball is unpacked onto a slim Debian base and three extra plugins are added; the web UI's is pulled as published. lightningd comes from the tarball rather than the `elementsproject/lightningd` image because the tarball is signed: its checksum is pinned in the `lightningd-tarball` stage and taken from a GPG-verified manifest. For a release upstream published no arm64 tarball for, the arm64 image instead compiles lightningd in the `lightningd-source` stage from the release's source zip, whose checksum comes from the same manifest; `lightningd-dist` picks the stage per architecture. `bitcoin-cli` is pinned and checksummed the same way in the `bitcoin-cli` stage, because `plugin-bcli` and the `check-synced` health check both exec it.
-
-| Property      | Value                                                                                             |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| Images        | Built from `Dockerfile` on `debian:bookworm-slim`, plus `ghcr.io/elementsproject/cln-application` |
-| Architectures | x86_64, aarch64 — both images declare `emulateMissingAs: 'aarch64'`                               |
-| Entrypoint    | `lightningd` with an explicit config path; the UI runs its own server                             |
-
-The final stage also installs `wireguard-tools`, `iptables` and `iproute2` for the tunnel the hidden Clearnet VPN action brings up, and the manifest sets `virtualNetworking` so the container can create its interface. Three plugins are dropped into the plugin directory at build time: **CLBOSS** (automated channel management) and **watchtower-client**/**teosd** from rust-teos (BOLT13 watchtower, both client and server) are compiled from their git submodules, and **sling** (rebalancing) is an upstream release binary pinned by `SLING_VERSION` in the `Dockerfile`. Nothing is fetched at runtime, so the image is self-contained.
-
-| Subcontainer          | Purpose                                                                         |
-| --------------------- | ------------------------------------------------------------------------------- |
-| `lightning-sub`       | `lightningd`, the watchtower server, and every oneshot — the one to `attach` to |
-| `cln-application-sub` | The web UI, which talks to the node over its RPC and rune                       |
-
-## Volume and Data Layout
-
-One volume, holding everything.
-
-| Volume | Mount Point        | Purpose                                                                                                                                |
-| ------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `main` | `/root/.lightning` | The lightning directory: `config`, the node's `hsm_secret` and channel database, the UI's own data, the watchtower's, and `store.json` |
-
-Bitcoin's data directory is mounted **read-only** at `/mnt/bitcoin`, which is how both `lightningd` and the watchtower read its RPC cookie without a password ever being stored.
-
-The watchtower client's own database is deliberately relocated onto this volume. Upstream defaults it to the user's home directory, which is not persistent here, and the effect of leaving it there is silent: the client would re-key and forget every registered tower on each container rebuild.
-
-## File Models
-
-Four models. One is the node's own configuration, one is the web UI's, one is the watchtower's, and one is StartOS-side state.
-
-| File                    | Format | Modelled                | Written by                                                          |
-| ----------------------- | ------ | ----------------------- | ------------------------------------------------------------------- |
-| `/config`               | INI    | Yes — `FileHelper.raw`  | Every init, the config actions, and `watchHosts` on address changes |
-| `/store.json`           | JSON   | Yes — `FileHelper.json` | Every init, the watchtower and rescan actions, `main`, and restore  |
-| `/data/app/config.json` | JSON   | Yes — `FileHelper.json` | Every init, and the Reset UI Password action                        |
-| `/.teos/teos.toml`      | TOML   | Yes — `FileHelper.toml` | Every init                                                          |
-
-### config
-
-**Enforced** — rewritten whenever the package writes the file: `network`, `bitcoin-datadir`, `bind-addr`, `grpc-port`, `grpc-host`, and `clnrest-protocol`. `bitcoin-rpcuser` and `bitcoin-rpcpassword` are modelled as "must be absent" and deleted if present, because authentication is by the cookie read through the mount.
-
-`clnrest-protocol` is the one enforced value that is an override rather than a constant: **upstream defaults CLNrest to HTTPS, and this package forces plaintext.** A Tor onion address already encrypts, and wallets reaching the node that way cannot validate a StartOS-issued certificate; LAN and clearnet callers still get TLS, terminated by StartOS at the edge. See [Network Access and Interfaces](#network-access-and-interfaces).
-
-**Derived, and rewritten whenever the underlying address changes:** `proxy` (Tor's SOCKS address), `announce-addr` (the onion and public addresses published on the peer interface, or your custom external host in place of the IPs), and `bitcoin-rpcconnect` / `bitcoin-rpcport`. Editing any of these by hand does not stick.
-
-Everything else — alias, colour, fee policy, channel minimums, the Bitcoin retry timeout, the plugin selection, CLBOSS's tuning, the experimental flags — is yours, through the config actions. The only override install makes is switching `clnrest` on.
-
-Two interactions are worth knowing because they produce a state neither setting explains alone. A **custom external host is dropped rather than written while Tor Only is enabled**: `always-use-proxy` disables lightningd's DNS resolution, and an `announce-addr` it cannot resolve is a fatal startup error rather than a warning — so the package omits it and raises a health check saying so. And **enabling the Clams websocket adds a second `ws::` bind address** rather than replacing the first.
-
-### store.json
-
-`watchtowerServer`, `watchtowerClients` and `watchtowerLabels` are the watchtower configuration — the labels are kept apart from the tower URIs, keyed by tower id, so renaming a tower does not restart the node — `customExternalHosts` the user-managed announced address overrides, `clearnetVpn` the Clearnet VPN's WireGuard configuration and companion-managed public address (kept verbatim; `vpn/wg0.conf` is generated from it on every start and never hand-edited), and `rescan` and `restore` are one-shot request flags.
-
-Those two flags are deliberately **not** cleared when `main` reads them. A session where `lightningd` never comes up must not consume a request, or it vanishes silently — which is how a rescan requested during a crash loop used to be lost. A oneshot clears them only once the node answers RPC, and `main` ignores that clearing write so it does not bounce the service.
-
-### config.json and teos.toml
-
-The web UI's `config.json` carries its display preferences and its password hash. `teos.toml` is entirely enforced apart from Bitcoin's address, which is derived like the node's: every port, bind address, and subscription parameter is a fixed value, so the watchtower is not configurable from here.
-
-## Dependencies
-
-One, and it is required.
-
-| Dependency | Kind      | Health checks               | Mount                     | Why                            |
-| ---------- | --------- | --------------------------- | ------------------------- | ------------------------------ |
-| Bitcoin    | `running` | `bitcoind`, `sync-progress` | `/mnt/bitcoin`, read-only | Chain data, and the RPC cookie |
-
-Both health checks are required, not just "running": a node that is up but still syncing cannot serve a Lightning node correctly, and the sync state is surfaced again in this package's own [`check-synced`](#health-checks).
-
-Bitcoin's RPC address is resolved from its own binding over the service bridge, so nothing is configured by hand and a Bitcoin update does not move it. When Bitcoin is absent the address keys are cleared rather than left stale, and `lightningd` fails to connect until it returns.
-
-The node additionally **restarts when Bitcoin writes a replacement RPC cookie**, but not when the cookie merely disappears — an absent cookie means Bitcoin is down, and stopping `lightningd` at that moment hangs its shutdown.
-
-## Network Access and Interfaces
-
-Four interfaces always, and three more depending on what is enabled.
-
-| Interface       | Id           | Type | Port | Present                                     |
-| --------------- | ------------ | ---- | ---- | ------------------------------------------- |
-| Web UI          | `ui`         | ui   | 4500 | always                                      |
-| RPC             | `rpc`        | api  | 8080 | always                                      |
-| Peer            | `peer`       | p2p  | 9735 | always                                      |
-| gRPC            | `grpc`       | api  | 2106 | always                                      |
-| CLNrest         | `clnrest`    | api  | 3010 | when CLNrest is enabled (it is, at install) |
-| Clams Websocket | `websocket`  | api  | 7272 | when the Clams remote websocket is enabled  |
-| TEOS Watchtower | `watchtower` | api  | 9814 | when the watchtower server is enabled       |
-
-**gRPC is forwarded as a plain TCP port, with no StartOS TLS listener in front of it.** The plugin performs its own mutual TLS, and its certificate names only `cln` and `localhost`, so every client that verifies it sends `cln` as the TLS server name whatever address it dials. A terminating listener would present the device certificate and strip the client's; a passthrough listener routes by server name and refuses one that is not an address of the interface, which `cln` never is. The binding is a raw forward deliberately — either TLS arrangement would look correct and refuse every client.
-
-**CLNrest carries its own credential in the address.** The interface's URL includes the rune the package generated, and its scheme is overridden to `clnrest+https` or `clnrest+http` so that a wallet reading the scheme knows which transport to use — a bare `clnrest://` is assumed to be TLS, which would be wrong for the Tor address.
-
-## Installation and First-Run Flow
-
-Install seeds the four models and switches CLNrest on — there is no wizard, and no credential is asked for. The service remains stopped until the user starts it; `lightningd` then creates `hsm_secret` on its first start.
-
-The one piece of setup the package performs is the web UI's credential. A oneshot creates a rune scoped to the application and records it alongside the node's public key, regenerating it only if the node's identity changes or the rune is missing. The UI cannot start until that has happened.
-
-The ordering that matters is Bitcoin's: the node starts, but `check-synced` reports Bitcoin's progress and then its own until both are caught up, which on a fresh Bitcoin node is the length of an initial block download.
-
-## Actions
-
-Twenty actions. Three configure the node, three concern the watchtower, four drive CLBOSS, two handle payments, one is hidden and exists for a companion package, and the rest are recovery and information.
-
-### Configuration — General Settings, Plugins, Experimental Features
-
-Three actions writing `/config`, grouped together. Each writes only the fields it presents, costs seconds plus a restart, and is safe to re-run — the forms are pre-filled from the current file.
-
-- **General Settings** carries node identity, fee policy, channel minimums, Tor Only, the custom external host, the Clams toggle, and `bitcoin-retry-timeout` — how long `plugin-bcli` retries a failing `bitcoin-cli` call before `lightningd` exits with `The Bitcoin backend died` (upstream default 60 seconds, which also raises the RPC client timeout to match). Two combinations produce a visible consequence rather than an error: Tor Only with a custom external host drops the host and raises a health check, and the Clams toggle changes the bind addresses.
-- **Plugins** selects which of the built-in plugins load, and carries CLBOSS's tuning.
-- **Experimental Features** exposes upstream's experimental flags, which are not standardized across implementations and may break between releases. Its dual-funding amounts are written to the `funder-*` options as bare numbers, which the funder plugin reads as satoshis; the lease's `channel-fee-max-base-msat` is the one amount in millisatoshis.
-
-### Watchtower Server, Watchtower Info, Watchtower Client Info
-
-**Watchtower Server** turns this node into a BOLT13 tower for others, which starts the `teosd` daemon and publishes an interface. It also registers and de-registers the towers **this** node subscribes to: a tower removed from the list is abandoned on the next start. Once the client has been enabled, `watchtower-client` stays in the config's `plugin` list even after the last tower is removed — it is the only source of `abandontower`, so removing it would strand the registrations it still holds in `watchtowers_db.sql3`.
-
-Each subscribed tower is stored as the user typed it and parsed by `startos/actions/watchtower/towerUri.ts` into the tower id, host, and port that the `watchtower-client` oneshot passes to `registertower` as three arguments. The host keeps any `https://` prefix, which is what makes the plugin talk TLS to that tower; `lightning-cli` would send a bare IPv4 host as a JSON number, so the host is passed pre-quoted. The same module reconstructs the address `listtowers` reports a tower under, so that an entry written without a port or scheme matches the tower already registered instead of being abandoned and re-registered on every start.
-
-Each tower takes an optional label, stored in `watchtowerLabels` against the tower id parsed from its URI and shown by Watchtower Client Info and the `watchtowers` health check. A label change alone does not restart the node.
-
-- **What it changes:** `watchtowerServer`, `watchtowerClients` and `watchtowerLabels` in `store.json`, and through the first two the daemon chain and the exported interfaces.
-- **Cost:** seconds, then a restart.
-- **Repeat safety:** safe both ways.
-
-**Watchtower Info** and **Watchtower Client Info** are read-only, available only while running, and each is hidden unless the corresponding side is enabled: the first reports this node's tower identity, the second the towers it is subscribed to.
-
-### Create Rune, Revoke All Runes
-
-**Create Rune** mints an access credential for an external application, with the restrictions you specify. Available only while running; each run produces a new rune and does not affect existing ones.
-
-**Revoke All Runes** invalidates every rune this node has issued **including the web UI's**, which is regenerated automatically on the next start. Run it when a credential may have been exposed. It is not selective — that is the point of it — so anything you have connected must be re-authorized afterwards.
-
-### Display BIP-39 Seed
-
-Shows the seed words backing the on-chain wallet, for disaster recovery. Note what it is not: the seed alone cannot recover channel funds.
-
-- **Visibility:** hidden entirely when no wallet exists yet, and shown as disabled with an explanation on a node whose wallet predates BIP-39 seeds — such a wallet cannot be given one, and moving the funds to a fresh install is the only route.
-- **Repeat safety:** read-only.
-
-### Rescan Blockchain
-
-Re-scans the chain for wallet outputs. Run it after a restore, or when an on-chain balance is missing.
-
-- **Input:** a depth from the tip, or an absolute block height written with a leading hyphen.
-- **What it changes:** sets the `rescan` request flag, which the next start turns into a `lightningd` argument and then clears.
-- **Cost:** hours. `check-synced` stays red for the duration; leave the node and Bitcoin running.
-- **Repeat safety:** safe to re-run. Because the flag is only consumed once the node answers RPC, a request survives a failed start rather than being silently dropped.
-
-### Reset UI Password
-
-Sets a new password for the web UI, writing its `config.json`. It does not touch the node, its runes, or any external application's access.
-
-### Delete Gossip Store
-
-Deletes the network gossip database, which the node rebuilds from peers. Run it if gossip is suspected corrupt.
-
-- **Availability:** only while stopped, since the file is open in use.
-- **Cost:** the node re-learns the network graph after starting, which takes time and affects routing until it does.
-- **Repeat safety:** idempotent.
-
-### Clearnet VPN — hidden
-
-Not user-facing, and raised as a task by a companion package with its tunnel configuration and public address filled in. Its only known uses are the TunnelSats community package and running it by hand with some other WireGuard configuration, which is unsupported. It is not how a node is made reachable or routed: inbound reachability comes from addresses on the node's StartOS interfaces, and outbound traffic leaves through the gateway StartOS selects for it. It stores the companion-managed address separately from `customExternalHosts`; `watchHosts` announces both without overwriting addresses the user configured. It also turns Tor Only off, since Tor Only would suppress the announcement and proxy the clearnet peers the tunnel exists for. Costs a restart. A new configuration replaces the tunnel; an empty one turns it off and drops only the address it had advertised. Safe to repeat.
-
-### Pay Invoice, Receive Payment
-
-Grouped under Payments. **Pay Invoice** pays a BOLT11 invoice from the node's own funds: paste the invoice, whether its amount is stated in it or entered here — an invoice that leaves the amount open requires one, one that states it refuses one — and the most it may spend in routing fees as a percentage. Every payment requires confirmation that the amount and destination were verified. A task-prefilled invoice is decoded before the prompt opens, displays its amount, destination, and description, and cannot be edited; execution rejects an invoice that differs from the reviewed one. It then pays with a 60-second retry window and returns the amount, fee, description, destination and preimage; a failure returns lightningd's reason. Only while running. Not idempotent — running it twice pays twice if the invoice allows it, which a single-use BOLT11 does not. A companion service can raise it as a task with the invoice filled in, so a payment it needs is one reviewed prompt; the node never hands out a rune for it.
-
-**Receive Payment** creates a BOLT11 invoice for this node: an optional amount (none makes an amount-less invoice the payer fills in), an optional description carried in the invoice, and an expiry in hours, default 24. Runs `lightning-cli invoice` under a generated `startos-<uuid>` label; lightningd chooses the route hints. Returns the invoice as text and QR code, plus the payment hash. Only while running. Safe to repeat — each run registers a new invoice and nothing is charged.
-
-### Node Info
-
-Read-only, running only: the node's identity and current state.
-
-### CLBOSS — Status, Ignore On-chain Funds, Resume On-chain Management, Unmanage Peer
-
-Grouped under CLBOSS, running only, and disabled with a reason unless CLBOSS is enabled in Plugins. Each runs one `clboss-*` RPC command and changes nothing outside CLBOSS's own database.
-
-- **CLBOSS Status** summarizes `clboss-status`: version, connectivity, its low/high fee judgment, whether on-chain funds are being ignored and until when, the channel-candidate count, the unmanaged peers with their tags, and the swap totals from `swap_report`. Read-only.
-- **Ignore On-chain Funds** runs `clboss-ignore-onchain` for a number of hours (default 24), so on-chain funds can be spent or put into channels by hand. CLBOSS resumes by itself when the time runs out; re-running extends it.
-- **Resume On-chain Management** runs `clboss-notice-onchain`. Idempotent.
-- **Unmanage Peer** runs `clboss-unmanage` with a node id and any of the `lnfee`, `open`, `close` and `balance` tags; selecting none returns the peer to full management. It replaces that peer's tags rather than adding to them, and CLBOSS Status is where the current set is read back.
-
-## Tasks
-
-The package raises one task after a restore; a companion package can raise the hidden Clearnet VPN action as another.
-
-| Task              | Severity    | Raised when                                                            | Cleared when                                              |
-| ----------------- | ----------- | ---------------------------------------------------------------------- | --------------------------------------------------------- |
-| Rescan Blockchain | `important` | Immediately after a backup restore                                     | The action runs                                           |
-| Clearnet VPN      | `important` | Only when a companion package raises it with a tunnel for this node | The stored configuration matches what the companion package proposes |
-
-The reason is that a restored node reports an **on-chain balance of zero** until the chain is rescanned, and nothing else in the interface explains why. `important` rather than `critical`: the node should keep running — indeed it must, for the rescan to proceed.
-
-## Health Checks
-
-Three checks are always present, with five more for conditional features or recovery states.
-
-| Check                  | Displayed                     | Method                                               | Present                                   |
-| ---------------------- | ----------------------------- | ---------------------------------------------------- | ----------------------------------------- |
-| `lightningd`           | "RPC Interface"               | `lightning-cli getinfo` succeeds                     | always                                    |
-| `cln-application`      | "Web Interface"               | The UI's port is listening                           | always                                    |
-| `check-synced`         | "Synced"                      | `getinfo`'s sync warnings, and Bitcoin's block count | always                                    |
-| `watchtower-server`    | "TEOS Watchtower Server"      | `teos-cli gettowerinfo` succeeds                     | while the watchtower server is enabled    |
-| `watchtowers`          | "Watchtowers"                 | `listtowers` status of every subscribed tower        | while towers are subscribed               |
-| `custom-external-host` | "Custom External Host"        | Always fails, with an explanation                    | while Tor Only and a custom host conflict |
-| `vpn-tunnel`           | "Clearnet VPN"                | Age of the tunnel's last WireGuard handshake         | while a tunnel is configured  |
-| `restored`             | "Backup Restoration Detected" | Always fails, with an explanation                    | after an emergency recovery               |
-
-**`check-synced` distinguishes three states**, which is what makes it worth reading: Bitcoin not yet synced, the node catching up to Bitcoin (reported as a block count against Bitcoin's own), and synced. It fails only when `lightning-cli` itself errors, so a red check here is the node, not the chain.
-
-**`watchtowers` reports the towers this node subscribes to**, by label where one is set. It runs after the registration oneshots, succeeds when every tower is `reachable`, is `loading` while any is `temporary_unreachable` (the client is retrying and queuing appointments), and fails when any is `unreachable`, `misbehaving`, `subscription_error`, or not registered at all — typically an onion tower with Tor not running. Whether other nodes can reach this node's own tower cannot be checked from inside; `watchtower-server` only confirms `teosd` answers.
-
-**`vpn-tunnel` reads the tunnel's last handshake.** `starting` until the first one, `failure` once it is more than three minutes old — WireGuard rekeys about every two minutes under traffic. A failing tunnel does not leak: the routing rules the package installs send clearnet traffic nowhere but the tunnel, and drop it if the tunnel's interface goes away, so it is never sent over the ISP connection. The `vpn` oneshot that brings the tunnel up runs before `lightningd` and blocks it if the tunnel cannot be created.
-
-**Two checks are deliberate permanent failures**, used as a way to say something the interface has nowhere else to put. `custom-external-host` reports that an announced address is being suppressed by Tor Only, and names both settings to change. `restored` reports that an emergency recovery has happened and that the node should be drained and reinstalled rather than kept in service — a state that is not a fault in the running software but is a serious one for the operator.
-
-## Backups and Restore
-
-The `main` volume is copied wholesale — `sdk.Backups.ofVolumes('main')` — but the exclusions are the substance, because **the channel database is deliberately not backed up.**
-
-- **Excluded:** `lightningd.sqlite3` and its write-ahead sidecars, the RPC socket, the gossip store, and the application log.
-- **Included:** `hsm_secret`, `config`, `store.json`, the emergency-recovery file, the watchtower's data, and the UI's settings.
-
-Restoring a Lightning node's channel database is dangerous — a stale copy claims a channel state the network has moved past — so this package does not restore one. What comes back is the node's identity and enough to recover funds, not a resumable node.
-
-**What a restore therefore does, automatically:**
-
-1. The emergency-recovery file is copied aside before anything runs. Upstream's own plugin rewrites that file to describe the _current_ channel set, so the restored copy is the last record able to reconstruct the pre-backup channels, and the copy is never touched again.
-2. `emergencyrecover` runs, and a permanently-failing health check appears saying what that means: **all channels will be force-closed**, funds swept on-chain, and the node should be drained and reinstalled afterwards rather than kept.
-3. Ten thousand wallet addresses are pre-generated. A restored database restarts the address counter at zero, and the node only recognises addresses within a fixed window past the highest known-used index — so without this, a rescan silently misses outputs beyond the first gap. The window this widens applies to every later rescan too.
-4. The [Rescan Blockchain](#tasks) task is raised, because until it runs the on-chain balance reads zero.
-
-## Limitations and Differences
-
-1. **A restore is a recovery, not a resumption.** Channels are force-closed by design; plan to sweep the funds and reinstall.
-2. **The channel database is excluded from backups**, deliberately.
-3. **CLNrest is served as plaintext by the node**, with TLS added at the edge for LAN and clearnet only.
-4. **gRPC cannot be reached through a StartOS TLS listener**, terminating or passthrough, because the plugin authenticates clients with their own certificates and its own certificate names only `cln` and `localhost`.
-5. **A custom external host is incompatible with Tor Only** and is dropped while both are set.
-6. **The watchtower is not configurable.** Its ports, bind addresses, and subscription parameters are fixed.
-7. **Plugins are those built into the image.** Adding another means changing the image, not dropping a file on the volume.
-8. **No riscv64 build**, and on hardware without a native image the aarch64 build runs emulated.
-9. **An `hsm_secret` protected by a passphrase cannot be used.** `hsm-passphrase` (formerly `encrypted-hsm`) prompts on a terminal at startup, which the service does not have. A legacy encrypted secret must be decrypted with `lightning-hsmtool decrypt` before it is copied in.
-
----
-
-## Quick Reference for AI Consumers
-
-```yaml
-package_id: c-lightning
-image: ./Dockerfile # on debian:bookworm-slim; plus ghcr.io/elementsproject/cln-application
-architectures:
-  - x86_64
-  - aarch64
-subcontainers:
-  - lightning-sub # lightningd, teosd, and every oneshot; the one to attach to
-  - cln-application-sub # the web UI
-volumes:
-  main: /root/.lightning
-file_models:
-  - /root/.lightning/config
-  - /root/.lightning/store.json
-  - /root/.lightning/data/app/config.json
-  - /root/.lightning/.teos/teos.toml
-  - /root/.lightning/vpn/wg0.conf # generated from store.json's clearnetVpn on every start
-startos_managed_env_vars:
-  - TOWERS_DATA_DIR # lightningd
-  - BITCOIN_NETWORK # web UI
-  - LIGHTNING_DATA_DIR # web UI
-  - APP_PROTOCOL # web UI
-  - APP_HOST # web UI
-  - APP_PORT # web UI
-  - APP_CONFIG_FILE # web UI
-  - APP_LOG_FILE # web UI
-  - LIGHTNING_VARS_FILE # web UI
-  - LIGHTNING_WS_PORT # web UI
-  - LIGHTNING_REST_PORT # web UI
-  - LIGHTNING_REST_PROTOCOL # web UI
-  - LIGHTNING_GRPC_PORT # web UI
-dependencies:
-  - bitcoind # required; mounted read-only at /mnt/bitcoin
-interfaces:
-  ui: { type: ui, port: 4500 }
-  rpc: { type: api, port: 8080 }
-  peer: { type: p2p, port: 9735 }
-  grpc: { type: api, port: 2106 } # raw TCP forward; the plugin's own mutual TLS
-  clnrest: { type: api, port: 3010 } # when enabled; URL carries the rune
-  websocket: { type: api, port: 7272 } # when the Clams websocket is enabled
-  watchtower: { type: api, port: 9814 } # when the watchtower server is enabled
-actions:
-  - config
-  - plugins
-  - experimental
-  - watchtower
-  - watchtower-info # hidden unless the server is enabled
-  - watchtower-client-info # hidden unless clients are registered
-  - createrune
-  - revoke-runes
-  - display-seed # hidden with no wallet; disabled on a pre-BIP-39 wallet
-  - rescan-blockchain
-  - reset-password
-  - delete-gossip-store # only-stopped
-  - node-info
-  - clboss-status # only-running; disabled unless CLBOSS is enabled
-  - clboss-ignore-onchain # only-running; disabled unless CLBOSS is enabled
-  - clboss-notice-onchain # only-running; disabled unless CLBOSS is enabled
-  - clboss-unmanage # only-running; disabled unless CLBOSS is enabled
-  - pay-invoice # only-running; a companion service may raise it as a task
-  - receive-payment # only-running
-  - clearnet-vpn # hidden; raised as a task by a companion package
-tasks:
-  - { action: rescan-blockchain, severity: important } # raised after a restore
-  - { action: clearnet-vpn, severity: important } # only when a companion package raises it
-health_checks:
-  - lightningd # displayed "RPC Interface"
-  - cln-application # displayed "Web Interface"
-  - check-synced # displayed "Synced"
-  - watchtower-server # when the watchtower server is enabled
-  - watchtowers # while towers are subscribed; per-tower listtowers status
-  - custom-external-host # only while Tor Only conflicts with a custom host
-  - vpn-tunnel # displayed "Clearnet VPN"; only while a tunnel is configured; last-handshake age
-  - restored # only after an emergency recovery
+# XBT Core Lightning for StartOS
+
+Experimental fresh-wallet observation package for StartOS 0.4, forked from
+Start9Labs/cln-startos at `6040fb4a8cfdaaa9ef8cd468e60c2e14a028c928`.
+
+**Do not fund this package or migrate existing wallets yet.** The runtime and
+package installation still require validation on StartOS. Backup restoration is
+intentionally blocked until XBT channel recovery is implemented and tested.
+
+## Identity and source
+
+- Package: `xbt-cln`, initial wrapper version `0.1.0:0`.
+- Wrapper: https://github.com/BitcoinMechanic/xbt-cln-startos
+- Node: https://github.com/BitcoinMechanic/lightning
+- Pinned node commit: `81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`.
+- Binary version: `xbt-81ba4099a63e`.
+- Image definition: `Dockerfile.xbt`; source/contract record: `assets/xbt/source-lock.json`.
+
+Source is pinned; apt packages and base image tags are not a claim of bit-for-bit
+reproducibility. The inherited `Dockerfile` and unregistered legacy action/config
+sources remain as porting references. They are not the active XBT runtime.
+The original CLBOSS and TEOS submodule pins remain unchanged.
+
+## Runtime and backend contract
+
+The sole `main` volume mounts at `/root/.lightning`; CLN's XBT wallet lives in its
+`xbt/` subdirectory. CLI calls explicitly select `--network=xbt`.
+`--conf=/dev/null` prevents inherited Bitcoin/plugin settings from being loaded.
+Only the peer interface (TCP 9735) and read-only Node Info action are registered.
+No web UI, remote wallet RPC interface, swap role, CLBOSS, Sling, watchtower,
+custom VPN, or automatic public address announcement is enabled in this stage.
+Start Tunnel and Tor operation will be validated separately.
+
+The local backend dependency still has ID `bitcoind`, with host `rpc`, internal
+port 8332, volume `main`, and cookie at its root. This matches Retropex/knots-startos
+commit `813da42c9308e027f0c193e650142bcf37b2cd62` (`#knots:29.4.2:3`).
+The bitcoin-core-startos TypeScript dependency supplies the structurally identical
+mount type and RPC constants; it does not establish the backend's chain identity.
+
+Before starting lightningd, an RPC preflight requires synced, unpruned mainnet,
+active BLAKE2b at height 961640, and the pinned block hash
+`0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb`.
+The fork's bcli plugin independently enforces XBT identity during operation.
+Backend credentials come from a read-only cookie mount, never from package inputs.
+Cookie replacement triggers reconfiguration; temporary disappearance does not.
+
+## Backups and observation limits
+
+Backups preserve the key and emergency recovery file but exclude the XBT live
+SQLite database, WAL/SHM, RPC socket and gossip store. A post-restore marker blocks
+startup. Do not remove that marker or import any existing wallet. Recovery support
+is not part of this release. A detected `bitcoin/` directory also blocks startup.
+
+## Local validation
+
+```sh
+npm ci --ignore-scripts
+npm run check
+npm run test:xbt
+npm run build
+npm run check:bundle
 ```
+
+The policy checks are offline. The bundle check verifies the exported package ID,
+version, image, dependency and action set. They do not emulate StartOS.
+
+Build the source image on the amd64 tower (explicit TARGETARCH also works with the
+legacy Docker builder):
+
+```sh
+docker build -f Dockerfile.xbt --build-arg TARGETARCH=amd64 \
+  --build-arg BUILD_JOBS=28 --build-arg RUST_BUILD_JOBS=4 \
+  -t xbt-cln:81ba4099a63e .
+docker run --rm --network none xbt-cln:81ba4099a63e xbt-image-check
+```
+
+The image and four native self-tests already passed on the tower. The wrapper
+uses the same image without recompiling it for these TypeScript changes. Actual
+s9pk packing/install validation is the next step and requires StartOS `start-cli`.

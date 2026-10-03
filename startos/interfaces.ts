@@ -1,81 +1,24 @@
-import { clnConfig } from './fileModels/config'
-import { parse } from 'dotenv'
-import { storeJson } from './fileModels/store.json'
-import { i18n } from './i18n'
 import { sdk } from './sdk'
-import {
-  uiPort,
-  rpcPort,
-  peerPort,
-  clnrestPort,
-  commandoEnv,
-  watchtowerPort,
-  grpcPort,
-  websocketPort,
-} from './utils'
-import { FileHelper } from '@start9labs/start-sdk'
+import { peerPort } from './utils'
 
-// Host ids (the `sdk.MultiHost.of` groups) for the hosts we look up via
-// `sdk.host.getOwn`; distinct from the interface ids exported on them.
 export const peerHostId = 'peer'
-export const watchtowerHostId = 'watchtower'
-
 export const peerInterfaceId = 'peer'
+// Retained for the unregistered legacy action sources only.
+export const watchtowerHostId = 'watchtower'
 export const teosInterfaceId = 'watchtower'
 
 export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
-  const receipts = []
-
-  // UI
-  const uiMulti = sdk.MultiHost.of(effects, 'web-ui')
-  const uiMultiOrigin = await uiMulti.bindPort(uiPort, {
-    protocol: 'http',
-  })
-  const ui = sdk.createInterface(effects, {
-    name: i18n('Web UI'),
-    id: 'ui',
-    description: i18n('The web interface of CLN'),
-    type: 'ui',
-    masked: false,
-    schemeOverride: null,
-    username: null,
-    path: '',
-    query: {},
-  })
-  const uiReceipt = await uiMultiOrigin.export([ui])
-  receipts.push(uiReceipt)
-
-  // RPC
-  const rpcMulti = sdk.MultiHost.of(effects, 'rpc')
-  const rpcMultiOrigin = await rpcMulti.bindPort(rpcPort, {
-    protocol: 'http',
-  })
-  const rpc = sdk.createInterface(effects, {
-    name: i18n('RPC'),
-    id: 'rpc',
-    description: i18n('Listens for JSON-RPC commands over HTTP.'),
-    type: 'api',
-    masked: false,
-    schemeOverride: null,
-    username: null,
-    path: '',
-    query: {},
-  })
-  const rpcReceipt = await rpcMultiOrigin.export([rpc])
-  receipts.push(rpcReceipt)
-
-  // Peer
-  const peerMulti = sdk.MultiHost.of(effects, peerHostId)
-  const peerMultiOrigin = await peerMulti.bindPort(peerPort, {
+  const host = sdk.MultiHost.of(effects, peerHostId)
+  const origin = await host.bindPort(peerPort, {
     protocol: null,
     addSsl: null,
     preferredExternalPort: peerPort,
     secure: { ssl: false },
   })
   const peer = sdk.createInterface(effects, {
-    name: i18n('Peer'),
+    name: 'XBT Lightning Peer',
     id: peerInterfaceId,
-    description: i18n('Listens for incoming connections from lightning peers.'),
+    description: 'Encrypted Lightning peer connections on the XBT chain.',
     type: 'p2p',
     masked: false,
     schemeOverride: null,
@@ -83,153 +26,5 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
     path: '',
     query: {},
   })
-  const peerReceipt = await peerMultiOrigin.export([peer])
-  receipts.push(peerReceipt)
-
-  // gRPC
-  const grpcMulti = sdk.MultiHost.of(effects, 'grpc')
-  // cln-grpc terminates its own mutual TLS, and its certificate names only
-  // `cln` and `localhost`, so every client that verifies it sends `cln` as the
-  // TLS server name whatever address it dials. No StartOS TLS listener can sit
-  // in front of that: terminating (addSsl, or protocol 'https', for which the
-  // SDK synthesizes one) strips the client cert, and a passthrough
-  // (secure.ssl: true) routes by SNI and refuses a name that is not one of the
-  // binding's addresses. secure.ssl: false forwards the port as raw TCP, the
-  // way the peer port is, leaving the handshake to the plugin.
-  const grpcMultiOrigin = await grpcMulti.bindPort(grpcPort, {
-    protocol: null,
-    addSsl: null,
-    preferredExternalPort: grpcPort,
-    secure: { ssl: false },
-  })
-  const grpc = sdk.createInterface(effects, {
-    name: i18n('grpc'),
-    id: 'grpc',
-    description: i18n(
-      'gRPC is a Rust-based plugin that provides a standardized API that apps, plugins, and other tools could use to interact with Core Lightning securely.',
-    ),
-    type: 'api',
-    masked: false,
-    schemeOverride: null,
-    username: null,
-    path: '',
-    query: {},
-  })
-  const grpcReceipt = await grpcMultiOrigin.export([grpc])
-  receipts.push(grpcReceipt)
-
-  const conf = await clnConfig
-    .read((c) => ({
-      clnrest: c.clnrest,
-      'clams-remote-websocket': c['clams-remote-websocket'],
-    }))
-    .const(effects)
-
-  // clnrest
-  if (conf?.clnrest) {
-    const clnrestMulti = sdk.MultiHost.of(effects, 'clnrest')
-    // clnrest is forced to plaintext (clnrest-protocol=http in the config) so
-    // that a plain-HTTP endpoint exists for Tor onion services — Tor already
-    // encrypts, and wallets like Zeus can't validate StartOS-issued certs.
-    // LAN/clearnet still gets HTTPS via the StartOS-terminated SSL listener.
-    const clnrestMultiOrigin = await clnrestMulti.bindPort(clnrestPort, {
-      protocol: 'http',
-      preferredExternalPort: clnrestPort,
-      addSsl: {
-        preferredExternalPort: clnrestPort,
-        addXForwardedHeaders: false,
-      },
-    })
-
-    // Revoke Runes deletes .commando-env before the commando-config oneshot
-    // mints a replacement, so an absent file is a gap, not a removal.
-    const contents = await FileHelper.string(commandoEnv)
-      .read(
-        (env) => env,
-        (prev, next) => next === null || prev === next,
-      )
-      .const(effects)
-
-    if (contents) {
-      const rune = parse(contents)['LIGHTNING_RUNE']
-
-      const clnrest = sdk.createInterface(effects, {
-        name: i18n('CLNrest'),
-        id: 'clnrest',
-        description: i18n(
-          'CLNRest is a lightweight Python-based built-in Core Lightning plugin (from v23.08) that transforms RPC calls into a REST service.',
-        ),
-        type: 'api',
-        masked: false,
-        // Zeus's clnrest parser reads the transport protocol from the scheme:
-        // clnrest+https:// / clnrest+http://. A bare clnrest:// is treated as
-        // https, so the http (Tor) URL must carry the +http marker.
-        schemeOverride: { ssl: 'clnrest+https', noSsl: 'clnrest+http' },
-        username: null,
-        path: '',
-        query: { rune: rune ? rune : 'Error parsing Rune' },
-      })
-      const clnrestReceipt = await clnrestMultiOrigin.export([clnrest])
-      receipts.push(clnrestReceipt)
-    } else {
-      console.log('Rune not found')
-    }
-  }
-
-  // websocket (clams)
-  if (conf?.['clams-remote-websocket']) {
-    const websocketMulti = sdk.MultiHost.of(effects, 'websocket')
-    const websocketMultiOrigin = await websocketMulti.bindPort(websocketPort, {
-      protocol: 'http',
-      preferredExternalPort: websocketPort,
-    })
-    const websocket = sdk.createInterface(effects, {
-      name: i18n('Clams Websocket'),
-      id: 'websocket',
-      description: i18n('Websocket endpoint for Clams Remote.'),
-      type: 'api',
-      masked: false,
-      schemeOverride: null,
-      username: null,
-      path: '',
-      query: {},
-    })
-    const websocketReceipt = await websocketMultiOrigin.export([websocket])
-    receipts.push(websocketReceipt)
-  }
-
-  const watchtowerServerEnabled = await storeJson
-    .read((e) => e.watchtowerServer)
-    .const(effects)
-
-  // watchtower
-  if (watchtowerServerEnabled) {
-    const watchtowerMulti = sdk.MultiHost.of(effects, watchtowerHostId)
-    const watchtowerMultiOrigin = await watchtowerMulti.bindPort(
-      watchtowerPort,
-      {
-        protocol: null,
-        addSsl: null,
-        preferredExternalPort: watchtowerPort,
-        secure: { ssl: false },
-      },
-    )
-    const watchtower = sdk.createInterface(effects, {
-      name: i18n('TEOS Watchtower'),
-      id: teosInterfaceId,
-      description: i18n(
-        'The Eye of Satoshi is a Lightning watchtower compliant with BOLT13, written in Rust.',
-      ),
-      type: 'api',
-      masked: false,
-      schemeOverride: null,
-      username: null,
-      path: '',
-      query: {},
-    })
-    const watchtowerReceipt = await watchtowerMultiOrigin.export([watchtower])
-    receipts.push(watchtowerReceipt)
-  }
-
-  return receipts
+  return [await origin.export([peer])]
 })

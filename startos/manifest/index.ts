@@ -1,13 +1,21 @@
 import { setupManifest } from '@start9labs/start-sdk'
-import { depBitcoindDescription, long, short } from './i18n'
+const short = { en_US: 'Experimental Lightning node for the XBT BLAKE2b chain' }
+const long = {
+  en_US:
+    'Fresh-wallet observation build. Requires BLAKE2b Knots. Do not fund this package or migrate existing wallets yet. UI, swap coordinator roles and backup recovery are not enabled.',
+}
+const depBitcoindDescription = {
+  en_US:
+    'BLAKE2b Knots is required; the shared bitcoind package ID does not establish chain identity.',
+}
 
 export const manifest = setupManifest({
-  id: 'c-lightning',
-  title: 'Core Lightning',
+  id: 'xbt-cln',
+  title: 'XBT Core Lightning',
   license: 'mit',
-  packageRepo: 'https://github.com/Start9Labs/cln-startos',
-  upstreamRepo: 'https://github.com/ElementsProject/lightning',
-  marketingUrl: 'https://blockstream.com/lightning',
+  packageRepo: 'https://github.com/BitcoinMechanic/xbt-cln-startos',
+  upstreamRepo: 'https://github.com/BitcoinMechanic/lightning',
+  marketingUrl: 'https://github.com/BitcoinMechanic/lightning',
   donationUrl: null,
   description: { short, long },
   volumes: ['main'],
@@ -16,17 +24,9 @@ export const manifest = setupManifest({
     lightning: {
       source: {
         dockerBuild: {
-          dockerfile: 'Dockerfile',
+          dockerfile: 'Dockerfile.xbt',
           workdir: '.',
         },
-      },
-      arch: ['x86_64', 'aarch64'],
-      emulateMissingAs: 'aarch64',
-    },
-    ui: {
-      source: {
-        dockerTag:
-          'ghcr.io/elementsproject/cln-application:26.09@sha256:27684e8e495d077ce661793f74b25d50c2e40f68552cb1ba57d6750dd2585798',
       },
       arch: ['x86_64', 'aarch64'],
       emulateMissingAs: 'aarch64',
@@ -37,7 +37,7 @@ export const manifest = setupManifest({
       description: depBitcoindDescription,
       optional: false,
       metadata: {
-        title: 'Bitcoin',
+        title: 'Bitcoin Knots (BLAKE2b)',
         icon: 'https://raw.githubusercontent.com/Start9Labs/bitcoin-core-startos/feec0b1dae42961a257948fe39b40caf8672fce1/dep-icon.svg',
       },
     },

@@ -1,0 +1,18 @@
+{
+  "format": "xbt-startos-build-v1",
+  "intended_package_id": "xbt-cln",
+  "network": "xbt",
+  "cln_repository": "https://github.com/BitcoinMechanic/lightning",
+  "cln_commit": "81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe",
+  "wrapper_base_commit": "6040fb4a8cfdaaa9ef8cd468e60c2e14a028c928",
+  "backend": {
+    "repository": "https://github.com/Retropex/knots-startos",
+    "verified_commit": "813da42c9308e027f0c193e650142bcf37b2cd62",
+    "observed_package_version": "#knots:29.4.2:3",
+    "package_id": "bitcoind",
+    "rpc_host_id": "rpc",
+    "rpc_internal_port": 8332,
+    "volume_id": "main",
+    "cookie_relative_path": ".cookie"
+  }
+}

@@ -1,0 +1,81 @@
+# Experimental XBT image build. This is not yet wired into the s9pk manifest.
+# Full CLN source pin: xbt-live-routed-receive-checkpoint-1.
+FROM rust:1.92.0-bookworm AS xbt-build
+ARG BUILD_JOBS=8
+ARG RUST_BUILD_JOBS=4
+ENV PATH="/opt/build-venv/bin:$PATH" \
+    CARGO_BUILD_JOBS=${RUST_BUILD_JOBS} \
+    PYTHON=/opt/build-venv/bin/python \
+    PYTEST=/opt/build-venv/bin/pytest
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf automake build-essential ca-certificates gettext git jq \
+    libgmp-dev libpq-dev libsodium-dev libsqlite3-dev libssl-dev libtool \
+    lowdown pkg-config protobuf-compiler python3 python3-venv zlib1g-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m venv /opt/build-venv && \
+    python -m pip install --no-cache-dir Mako==1.3.10 MarkupSafe==3.0.2 pytest==8.3.5
+WORKDIR /src/lightning
+RUN git init && \
+    git remote add origin https://github.com/BitcoinMechanic/lightning.git && \
+    git fetch --depth=1 origin 81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe && \
+    git checkout --detach FETCH_HEAD && \
+    test "$(git rev-parse HEAD)" = 81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe && \
+    git submodule update --init --recursive
+RUN ./configure --prefix=/usr/local --disable-valgrind --enable-rust && \
+    make -j"${BUILD_JOBS}" install-program DESTDIR=/dist RUST_PROFILE=release \
+      VERSION=xbt-81ba4099a63e && \
+    make -j"${BUILD_JOBS}" bitcoin/test/run-block_blake2b \
+      bitcoin/test/run-bitcoin_block_from_hex bitcoin/test/run-xbt-chainparams \
+      common/test/run-xbt-maturity RUST_PROFILE=release VERSION=xbt-81ba4099a63e && \
+    ./bitcoin/test/run-block_blake2b && \
+    ./bitcoin/test/run-bitcoin_block_from_hex && \
+    ./bitcoin/test/run-xbt-chainparams && \
+    ./common/test/run-xbt-maturity && \
+    mkdir -p /dist/usr/local/libexec/xbt-selftest && \
+    cp bitcoin/test/run-block_blake2b bitcoin/test/run-bitcoin_block_from_hex \
+       bitcoin/test/run-xbt-chainparams common/test/run-xbt-maturity \
+       /dist/usr/local/libexec/xbt-selftest/
+
+FROM debian:bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# bitcoin-cli, which CLN's own plugin-bcli and our check-synced health check
+# both exec; without it lightningd dies at startup with "The Bitcoin backend
+# died". Checksums are from bitcoincore.org's SHA256SUMS.
+FROM base AS bitcoin-cli
+ARG TARGETARCH
+ARG BITCOIN_VERSION=31.1
+ARG BITCOIN_SHA256_AMD64=b80d9c3e04da78fb6f0569685673418cf686fadba9042d926d13fb87ff503f9e
+ARG BITCOIN_SHA256_ARM64=dcf1873f2208ba4f962f3398d47e154c39c0084be8f4553e05c940d0ace3d004
+RUN apt-get update -qq && \
+    apt-get install -qq -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) SHA="$BITCOIN_SHA256_AMD64"; ARCH=x86_64 ;; \
+      arm64) SHA="$BITCOIN_SHA256_ARM64"; ARCH=aarch64 ;; \
+      *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    TARBALL="bitcoin-${BITCOIN_VERSION}-${ARCH}-linux-gnu.tar.gz"; \
+    curl -fsSLO "https://bitcoincore.org/bin/bitcoin-core-${BITCOIN_VERSION}/${TARBALL}"; \
+    echo "${SHA}  ${TARBALL}" | sha256sum -c -; \
+    tar -xf "$TARBALL" "bitcoin-${BITCOIN_VERSION}/bin/bitcoin-cli"; \
+    install -m 755 "bitcoin-${BITCOIN_VERSION}/bin/bitcoin-cli" /usr/bin/bitcoin-cli
+
+FROM debian:bookworm-slim AS xbt-runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libgmp10 libpq5 libsodium23 libsqlite3-0 libssl3 zlib1g \
+    python3 python3-venv && rm -rf /var/lib/apt/lists/* && \
+    python3 -m venv /opt/xbt-venv
+ENV PATH="/opt/xbt-venv/bin:$PATH"
+COPY --from=xbt-build /dist/usr/local/ /usr/local/
+COPY --from=xbt-build /src/lightning/tests/data/blake2b/ /usr/local/share/xbt-cln/tests/data/blake2b/
+COPY --from=xbt-build /src/lightning/LICENSE /usr/local/share/xbt-cln/LICENSE
+COPY --from=bitcoin-cli /usr/bin/bitcoin-cli /usr/bin/bitcoin-cli
+COPY assets/xbt/source-lock.json /usr/local/share/xbt-cln/source-lock.json
+COPY assets/xbt/image-check.sh /usr/local/bin/xbt-image-check
+RUN chmod 755 /usr/local/bin/xbt-image-check
+# Build validation does not start a node or create a wallet.
+RUN xbt-image-check
+CMD ["lightningd", "--version"]

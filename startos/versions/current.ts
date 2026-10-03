@@ -1,16 +1,10 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '26.6.8:5',
+  version: '0.1.0:0',
   releaseNotes: {
-    en_US: `Removes the Splicing option from Experimental Features. Splicing is always enabled in Core Lightning.`,
-    es_ES: `Elimina la opción Splicing de Funciones experimentales. El splicing siempre está habilitado en Core Lightning.`,
-    de_DE: `Entfernt die Option Splicing aus den experimentellen Funktionen. Splicing ist in Core Lightning immer aktiviert.`,
-    pl_PL: `Usuwa opcję Splicing z funkcji eksperymentalnych. Splicing jest w Core Lightning zawsze włączony.`,
-    fr_FR: `Supprime l'option Splicing des fonctionnalités expérimentales. Le splicing est toujours activé dans Core Lightning.`,
+    en_US:
+      'Experimental XBT fresh-wallet observation package. Pins CLN 81ba4099a63e, checks the Knots activation checkpoint before starting, and exposes an XBT peer interface and read-only node information. Do not fund or migrate wallets yet. Restored backups are blocked from starting until recovery support is implemented.',
   },
-  migrations: {
-    up: async () => {},
-    down: IMPOSSIBLE,
-  },
+  migrations: { up: async () => {}, down: IMPOSSIBLE },
 })

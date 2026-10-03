@@ -30,7 +30,7 @@ export const nodeInfo = sdk.Action.withoutInput(
       mainMounts,
       'getinfo',
       async (subc) => {
-        const res = await subc.execFail(['lightning-cli', 'getinfo'], {
+        const res = await subc.execFail(['lightning-cli', '--network=xbt', 'getinfo'], {
           cwd: rootDir,
         })
 
