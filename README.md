@@ -1,15 +1,15 @@
 # XBT Core Lightning for StartOS
 
-Experimental fresh-wallet observation package for StartOS 0.4, forked from
+Experimental fresh-wallet on-chain pilot package for StartOS 0.4, forked from
 Start9Labs/cln-startos at `6040fb4a8cfdaaa9ef8cd468e60c2e14a028c928`.
 
-**Do not fund this package or migrate existing wallets yet.** The runtime and
-package installation still require validation on StartOS. Bounded force-close recovery is implemented for testing in this release; validate
-the integration before funding the StartOS node.
+**Do not migrate existing wallets.** Version 0.1.0:6 adds a bounded on-chain
+pilot (at most 100,000 sats total) after empty-wallet recovery validation.
+Run the packaged wallet-action regtest before a small live deposit.
 
 ## Identity and source
 
-- Package: `xbt-cln`, wrapper version `0.1.0:4`.
+- Package: `xbt-cln`, wrapper version `0.1.0:6`.
 - Wrapper: https://github.com/BitcoinMechanic/xbt-cln-startos
 - Node: https://github.com/BitcoinMechanic/lightning
 - Pinned node commit: `81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`.
@@ -26,7 +26,8 @@ The original CLBOSS and TEOS submodule pins remain unchanged.
 The sole `main` volume mounts at `/root/.lightning`; CLN's XBT wallet lives in its
 `xbt/` subdirectory. CLI calls explicitly select `--network=xbt`.
 `--conf=/dev/null` prevents inherited Bitcoin/plugin settings from being loaded.
-Only the peer interface (TCP 9735) and read-only Node Info action are registered.
+The peer interface (TCP 9735), Node Info, recovery actions and bounded on-chain
+wallet actions are registered.
 No web UI, remote wallet RPC interface, swap role, CLBOSS, Sling, watchtower,
 custom VPN, or automatic public address announcement is enabled in this stage.
 Start Tunnel and Tor operation will be validated separately.
@@ -55,7 +56,8 @@ Older empty-wallet receipts from 0.1.0:1 remain supported.
 The initial profile allows at most eight normal channels, no pending HTLCs,
 no inflight funding, no reserved or unconfirmed wallet outputs, and wallet
 address counters at most 50. Other states are refused rather than silently
-claiming coverage. Capture during an existing recovery is also refused. Historical
+claiming coverage. Capture during unfinished recovery is refused. Finished empty-wallet recovery
+permits subsequent bounded backups. Historical
 settled HTLC rows are allowed. These restrictions bound the tested recovery path;
 they are not a general CLN backup policy.
 
@@ -70,11 +72,10 @@ An imported marker prevents re-import after a resolved channel disappears.
 The recovery health check stays pending for peer closure and on-chain processing;
 it never equates ONCHAIN or an empty channel list with proven fund recovery.
 A stale status or worker failure is not green health. Keep the backup throughout.
-Completion needs manual output/funds verification; this version intentionally
-has no button to clear the recovery marker or return the restored wallet to
-normal channel operation. An unavailable peer may delay recovery indefinitely.
+Funded recovery completion needs manual output/funds verification. Only
+never-funded recovery has a completion action. An unavailable peer may delay recovery indefinitely.
 
-The wrapper has no spending UI or wallet migration. Do not run the original and
+The wrapper has no general wallet UI or wallet migration. Do not run the original and
 restored wallet concurrently. The packaged regtest uses disposable keys and a
 surviving peer; it now invokes the same capture, restore and recovery-step code
 used by StartOS, including a repeat step. StartOS lifecycle execution still needs
@@ -144,8 +145,8 @@ are mounted. Logs and disposable regtest keys remain in that results directory.
 The executable must run on Debian bookworm, the image's runtime base.
 
 This fixture calls the hook helpers but does not emulate StartOS lifecycle, test
-an offline surviving peer, or cover unresolved HTLCs. Keep the StartOS wallet
-unfunded until this integration is validated.
+an offline surviving peer, or cover unresolved HTLCs. Live on-chain testing
+is bounded separately below.
 
 
 ## Recovery scan start (0.1.0:3)
@@ -209,3 +210,45 @@ payment or invoice activity. It retains the database, key, backup and recovery
 records. A durable `finished-empty` intent stops further recovery-worker starts
 and permits subsequent backups under the existing bounded backup policy.
 This action does not finish recovery of a previously funded wallet.
+
+## Bounded on-chain pilot (0.1.0:6)
+
+Before live funding, run `tests/test_wallet_actions.py` and the packaged regtest:
+
+```sh
+bash scripts/test-image-recovery.sh xbt-cln:recovery-test ../bitcoind --wallet-actions
+```
+
+Use Actions → **XBT Deposit Address** after recovery is finished and node health
+is green. The address is reused for this pilot. Send a small XBT deposit,
+for example 20,000 sats, and keep the total wallet balance at or below 100,000
+sats. XBT and BTC share address prefixes: use the XBT chain, not BTC.
+
+1. Use **Confirmed Wallet Funds** and wait for confirmation.
+2. Generate a return address in your external XBT wallet.
+3. Use **Prepare Test Withdrawal** with that address, an explicit fee rate
+   (default 2 sat/vbyte) and total fee cap (default 2,000 sats). This reserves
+   inputs and returns the entire confirmed on-chain balance minus the fee.
+4. Review the destination, recipient amount and exact fee. Nothing has been
+   broadcast. Keep the service running between preparation and submission.
+5. Use **Send Prepared Withdrawal**, paste the review code and confirm review.
+6. Use **Withdrawal Status** until confirmed; verify receipt in the other wallet.
+
+**Cancel Prepared Withdrawal** discards a still-prepared transaction. This first
+pilot retains one withdrawal record, including after cancellation or confirmation.
+It does not create a second withdrawal. Repeating preparation with the same inputs
+returns status; a different request is refused. No automatic resubmission occurs.
+The review transaction and private destination remain in the local volume.
+
+Requires no channels, one to ten confirmed native SegWit wallet outputs, and no
+reserved, immature or unconfirmed outputs. A lost reply, service restart between
+prepare/send, or validation failure can require local inspection: retain the
+record and do not use another withdrawal command blindly. The CLN prepared
+transaction is held in plugin memory and does not survive a node restart.
+
+The helper persists `preparing`, `submitting` or `cancelling` before each mutation.
+It verifies exact transaction inputs, the single destination output and integer
+fee before submission. A tracked but unconfirmed transaction does not prove an
+uncertain submission succeeded. Status reconciles a confirmed transaction without
+resending. No PSBT conversion is required. The explicit fee works around the
+previous fixture's relay-fee underestimate; it does not fix that upstream issue.

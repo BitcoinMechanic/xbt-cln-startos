@@ -83,3 +83,7 @@ CMD ["lightningd", "--version"]
 
 COPY assets/xbt/empty_backup.py /usr/local/libexec/empty_backup.py
 COPY assets/xbt/recovery.py /usr/local/libexec/xbt-recovery.py
+
+COPY assets/xbt/wallet_actions.py /usr/local/libexec/wallet_actions.py
+COPY assets/xbt/recovery.py /usr/local/libexec/recovery.py
+RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import wallet_actions'

@@ -123,6 +123,48 @@ def main():
 
         alice, original, identity = node('alice', 19735)
         bob, _, bob_id = node('bob', 19736)
+        if sys.argv[1:] == ['--wallet-actions']:
+            from wallet_actions import Wallet
+            wallet = Wallet(root / 'alice', 'xbt-regtest')
+            until(lambda: not any(k.startswith('warning_') for k in rpc(alice, 'getinfo')), 'pilot node sync')
+            address = wallet.execute('address')['address']
+            check(wallet.execute('address')['address'] == address, 'Deposit address not reused')
+            rpc(btc, 'sendtoaddress', address, '0.0005')
+            mine(1)
+            until(lambda: wallet.execute('funds')['confirmed_unreserved_sats'] == 50000, 'pilot confirmed deposit')
+            destination = rpc(bob, 'newaddr', 'p2tr')['p2tr']
+            prepared = wallet.execute('prepare', destination=destination, fee_rate=2, max_fee_sats=2000)
+            state = recovery.load(root / 'alice', 'wallet-pilot-withdrawal.json')
+            check(state['txid'] not in rpc(btc, 'getrawmempool'), 'Preparation broadcast unexpectedly')
+            decoded = rpc(btc, 'decoderawtransaction', state['unsigned_tx'])
+            check(len(decoded['vout']) == 1 and decoded['vout'][0]['scriptPubKey']['address'] == destination,
+                  'Prepared destination differs')
+            check(prepared['amount_sats'] + prepared['fee_sats'] == 50000, 'Review accounting mismatch')
+            check(wallet.execute('prepare', destination=destination, fee_rate=2, max_fee_sats=2000) ==
+                  {**prepared, 'automatic_retry': False}, 'Repeat preparation changed review')
+            print('PASS: confirmed deposit; exact destination and fee reviewed; repeated preparation did not broadcast', flush=True)
+            sent = wallet.execute('send', review_code=prepared['review_code'])
+            check(sent['phase'] == 'broadcast', 'Submission failed')
+            until(lambda: state['txid'] in rpc(btc, 'getrawmempool'), 'pilot withdrawal broadcast')
+            # Fresh helper reconciles the same record and never calls txsend again.
+            fresh = Wallet(root / 'alice', 'xbt-regtest')
+            check(fresh.execute('send', review_code=prepared['review_code'])['phase'] == 'broadcast', 'Repeat submission changed phase')
+            mine(1)
+            until(lambda: any(o['txid'] == state['txid'] and o['status'] == 'confirmed'
+                              and o['amount_msat'] == prepared['amount_sats'] * 1000
+                              for o in rpc(bob, 'listfunds')['outputs']), 'pilot recipient funds')
+            check(fresh.execute('status')['phase'] == 'confirmed', 'Withdrawal not confirmed')
+            check(fresh.execute('funds')['confirmed_unreserved_sats'] == 0, 'Pilot sweep left funds')
+            print('PASS: reviewed withdrawal confirmed in recipient wallet; repeat send did not resend; payer balance zero', flush=True)
+            receiver = Wallet(root / 'bob', 'xbt-regtest')
+            review = receiver.execute('prepare', destination=address, fee_rate=2, max_fee_sats=2000)
+            cancelled = receiver.execute('cancel', review_code=review['review_code'])
+            check(cancelled['phase'] == 'cancelled', 'Cancellation failed')
+            check(receiver.execute('cancel', review_code=review['review_code'])['phase'] == 'cancelled', 'Cancellation repeat failed')
+            check(receiver.execute('funds')['confirmed_unreserved_sats'] == prepared['amount_sats'], 'Cancellation did not release inputs')
+            print('PASS: recipient prepared then cancelled a return; confirmed funds unreserved; cancellation repeat safe', flush=True)
+            print('Packaged wallet actions OK (regtest; explicit fee; reviewed on-chain sweep)', flush=True)
+            return
         if sys.argv[1:] == ['--empty-scan']:
             rpc(alice, 'stop')
             original.wait(timeout=30)

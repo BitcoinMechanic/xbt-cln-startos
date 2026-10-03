@@ -33,6 +33,6 @@ export function nodeHealth(info: any) {
     }
   return {
     result: 'success' as const,
-    message: 'XBT RPC ready; fresh-wallet observation only',
+    message: 'XBT RPC ready; bounded on-chain pilot',
   }
 }

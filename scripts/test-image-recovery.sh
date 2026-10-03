@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
-    echo "Usage: bash scripts/test-image-recovery.sh IMAGE PATH_TO_KNOTS_BITCOIND [--empty-scan]" >&2
+    echo "Usage: bash scripts/test-image-recovery.sh IMAGE PATH_TO_KNOTS_BITCOIND [--empty-scan|--wallet-actions]" >&2
     exit 2
 fi
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)

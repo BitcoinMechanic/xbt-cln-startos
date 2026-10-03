@@ -4,5 +4,9 @@ import { recoveryScanStart } from './recoveryScanStart'
 
 import { finishEmptyRecovery } from './finishEmptyRecovery'
 
-// No spending actions; stopped-service scan adjustment is restricted to empty restores.
+import { depositAddress, walletFunds, withdrawalStatus, prepareWithdrawal, sendWithdrawal, cancelWithdrawal } from './wallet'
+
+// Bounded on-chain pilot; no channel-opening or Lightning-spending actions.
 export const actions = sdk.Actions.of().addAction(nodeInfo).addAction(recoveryScanStart).addAction(finishEmptyRecovery)
+  .addAction(depositAddress).addAction(walletFunds).addAction(withdrawalStatus)
+  .addAction(prepareWithdrawal).addAction(sendWithdrawal).addAction(cancelWithdrawal)
