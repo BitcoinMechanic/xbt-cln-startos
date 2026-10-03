@@ -39,6 +39,25 @@ export const main = sdk.setupMain(async ({ effects }) => {
   } catch (error: any) {
     if (error.code !== 'ENOENT') throw error
   }
+  let recovery: { phase: string; scan_start?: number; channels?: string[]; node_id?: string; completion_scope?: string } | undefined
+  try {
+    recovery = JSON.parse(await readFile(
+      sdk.volumes.main.subpath('recovery-intent.json'), 'utf8',
+    ))
+    if (!recovery || !['prepared', 'importing', 'imported', 'finished-empty'].includes(recovery.phase))
+      throw new Error('Invalid recovery intent')
+    if (recovery.scan_start !== undefined && (!Number.isSafeInteger(recovery.scan_start) || recovery.scan_start < 1 || recovery.scan_start > 2147483647))
+      throw new Error('Invalid recovery scan starting height')
+    if (recovery.phase === 'finished-empty') {
+      if (!restoredIdentity || recovery.node_id !== restoredIdentity ||
+          !Array.isArray(recovery.channels) || recovery.channels.length !== 0 ||
+          recovery.completion_scope !== 'operator-confirmed-never-funded')
+        throw new Error('Invalid empty-wallet completion record')
+      recovery = undefined // Keep the audit record; no further rescan or worker.
+    }
+  } catch (error: any) {
+    if (error.code !== 'ENOENT') throw error
+  }
   const backend = await bitcoindRpcBridge(effects)
   if (!backend) throw new Error('Knots RPC bridge is not available')
   const sub = sdk.SubContainer.of(
@@ -84,7 +103,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       )
     return String(res.stdout).trim()
   }
-  return sdk.Daemons.of(effects)
+  const daemons = sdk.Daemons.of(effects)
     .addOneshot('xbt-backend-identity', {
       subcontainer: sub,
       exec: {
@@ -93,6 +112,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
           const deployments = JSON.parse(await rpc('getdeploymentinfo'))
           const checkpoint = await rpc('getblockhash', String(activationHeight))
           verifyBackend(chain, deployments, checkpoint)
+          if (recovery && (recovery.scan_start ?? 1) > chain.blocks)
+            throw new Error('Recovery scan starting height exceeds the backend tip')
+          const birth = await sub.exec([
+            '/opt/xbt-venv/bin/python', '/usr/local/libexec/xbt-recovery.py',
+            'record-birth', rootDir, String(chain.blocks),
+          ])
+          if (birth.exitCode !== 0) throw new Error('Wallet birth record check failed')
           return null
         },
       },
@@ -107,6 +133,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           '--conf=/dev/null',
           '--network=xbt',
           '--database-upgrade=true',
+          ...(recovery && recovery.phase !== 'imported' ? [`--rescan=-${recovery.scan_start ?? 1}`] : []),
           `--bitcoin-rpcconnect=${backend.host}`,
           `--bitcoin-rpcport=${backend.port}`,
           `--bitcoin-datadir=${bitcoinDataDir}`,
@@ -132,7 +159,10 @@ export const main = sdk.setupMain(async ({ effects }) => {
                 message:
                   'Restored node identity does not match backup; keep this wallet unfunded',
               }
-            return nodeHealth(info)
+            const health = nodeHealth(info)
+            if (health.result === 'loading' && recovery)
+              return { ...health, message: `Recovery scan: block ${info.blockheight}; configured start ${recovery.scan_start ?? 1}. Waiting for sync.` }
+            return health
           } catch {
             return { result: 'failure', message: 'Invalid XBT RPC response' }
           }
@@ -140,4 +170,34 @@ export const main = sdk.setupMain(async ({ effects }) => {
       },
       requires: ['xbt-backend-identity'],
     })
+  if (recovery) {
+    return daemons.addDaemon('xbt-recovery', {
+      subcontainer: sub,
+      exec: { command: ['/opt/xbt-venv/bin/python', '/usr/local/libexec/xbt-recovery.py', 'run', rootDir] },
+      requires: ['lightningd'],
+      ready: {
+        display: 'XBT Recovery',
+        fn: async () => {
+          try {
+            const status = JSON.parse(await readFile(
+              sdk.volumes.main.subpath('recovery-status.json'), 'utf8',
+            ))
+            if (!Number.isFinite(status.checked_at) || Date.now() / 1000 - status.checked_at > 90)
+              return { result: 'loading', message: 'Waiting for fresh recovery status' }
+            if (status.phase === 'attention')
+              return { result: 'failure', message: 'Recovery needs inspection; retain the original backup' }
+            return {
+              result: 'loading',
+              message: status.phase === 'monitoring'
+                ? `Recovery active (scan start ${status.scan_start ?? 1}): ${status.waiting_for_close} awaiting peer close, ${status.onchain_channels} on-chain. Manual funds verification required.`
+                : 'Recovery is scanning the chain or importing channel backups',
+            }
+          } catch {
+            return { result: 'loading', message: 'Waiting for recovery status' }
+          }
+        },
+      },
+    })
+  }
+  return daemons
 })

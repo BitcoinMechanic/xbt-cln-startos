@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import shutil
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 
@@ -20,7 +21,7 @@ class EmptyBackupTests(unittest.TestCase):
         (self.root / b.KEY).write_bytes(b'fixture key - not a real wallet')
         (self.root / b.SCB).write_bytes(b'fixture empty recovery file')
         self.node = bytes.fromhex('02' + '12' * 32)
-        with sqlite3.connect(self.root / b.DB) as con:
+        with closing(sqlite3.connect(self.root / b.DB)) as con, con:
             con.execute('CREATE TABLE vars (name TEXT, blobval BLOB)')
             con.executemany('INSERT INTO vars VALUES (?,?)', [('genesis_hash', b.CHAIN), ('node_id', self.node)])
             for t in b.TABLES:
@@ -46,22 +47,22 @@ class EmptyBackupTests(unittest.TestCase):
     def test_each_activity_table_refuses_and_invalidates_old_receipt(self):
         for table in b.TABLES:
             b.capture(self.root)
-            with sqlite3.connect(self.root / b.DB) as con:
+            with closing(sqlite3.connect(self.root / b.DB)) as con, con:
                 con.execute('INSERT INTO ' + table + ' VALUES (1)')
             with self.assertRaises(ValueError):
                 b.capture(self.root)
             self.assertFalse((self.root / b.RECEIPT).exists())
-            with sqlite3.connect(self.root / b.DB) as con:
+            with closing(sqlite3.connect(self.root / b.DB)) as con, con:
                 con.execute('DELETE FROM ' + table)
 
     def test_wrong_chain_refused(self):
-        with sqlite3.connect(self.root / b.DB) as con:
+        with closing(sqlite3.connect(self.root / b.DB)) as con, con:
             con.execute("UPDATE vars SET blobval=? WHERE name='genesis_hash'", (bytes(32),))
         with self.assertRaises(ValueError):
             b.capture(self.root)
 
     def test_missing_schema_refused(self):
-        with sqlite3.connect(self.root / b.DB) as con:
+        with closing(sqlite3.connect(self.root / b.DB)) as con, con:
             con.execute('DROP TABLE outputs')
         with self.assertRaises(sqlite3.Error):
             b.capture(self.root)

@@ -7,17 +7,17 @@ async function check(effects: T.Effects, mode: 'capture' | 'restore') {
     effects,
     { imageId: 'lightning' },
     mainMounts,
-    `empty-backup-${mode}`,
+    `recovery-backup-${mode}`,
     async (sub) => {
       const result = await sub.exec([
         '/opt/xbt-venv/bin/python',
-        '/usr/local/libexec/xbt-empty-backup.py',
+        '/usr/local/libexec/xbt-recovery.py',
         mode,
         rootDir,
       ])
       if (result.exitCode !== 0)
         throw new Error(
-          'Empty-wallet backup/restore refused. Wallet must have no recorded activity; restore requires a fresh volume. Keep the original wallet and backup.',
+          'Bounded recovery backup/restore refused. Pending HTLCs, non-normal channels, reserved outputs, or address indices beyond 50 require separate recovery support. Keep the original wallet and backup.',
         )
     },
   )

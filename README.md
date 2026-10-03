@@ -4,12 +4,12 @@ Experimental fresh-wallet observation package for StartOS 0.4, forked from
 Start9Labs/cln-startos at `6040fb4a8cfdaaa9ef8cd468e60c2e14a028c928`.
 
 **Do not fund this package or migrate existing wallets yet.** The runtime and
-package installation still require validation on StartOS. Only empty-wallet backup restoration is supported in this release; funded
-wallet and channel recovery remain blocked.
+package installation still require validation on StartOS. Bounded force-close recovery is implemented for testing in this release; validate
+the integration before funding the StartOS node.
 
 ## Identity and source
 
-- Package: `xbt-cln`, wrapper version `0.1.0:1`.
+- Package: `xbt-cln`, wrapper version `0.1.0:4`.
 - Wrapper: https://github.com/BitcoinMechanic/xbt-cln-startos
 - Node: https://github.com/BitcoinMechanic/lightning
 - Pinned node commit: `81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`.
@@ -44,31 +44,42 @@ The fork's bcli plugin independently enforces XBT identity during operation.
 Backend credentials come from a read-only cookie mount, never from package inputs.
 Cookie replacement triggers reconfiguration; temporary disappearance does not.
 
-## Backups and observation limits
+## Bounded backup and force-close recovery
 
-StartOS stops the service for the duration of each backup. The pre-backup hook
-runs `assets/xbt/empty_backup.py` against the stopped SQLite database. It requires
-the pinned XBT identity and no rows in channels, channel_htlcs, outputs,
-transactions, payments or invoices. It refuses a nonempty WAL and missing schema.
-It does not prove that a never-scanned external deposit cannot exist: the operator
-must still keep this observation node unfunded.
+Version 0.1.0:2 wires `assets/xbt/recovery.py` into the stopped-service backup
+and fresh-volume restore hooks. SQLite/WAL/SHM, RPC sockets and gossip remain
+excluded. The receipt binds the XBT node identity, key, encrypted SCB and expected
+channel IDs. This is an integrity check, not authentication of a malicious backup.
+Older empty-wallet receipts from 0.1.0:1 remain supported.
 
-A private `empty-wallet-backup.json` records the node ID and SHA256 bindings of
-`xbt/hsm_secret` and `xbt/emergency.recover`. Both files remain in the backup.
-The database, WAL/SHM, socket and gossip store remain excluded. This is an
-integrity check for the observation workflow, not authentication against a party
-who can alter the backup and its receipt.
+The initial profile allows at most eight normal channels, no pending HTLCs,
+no inflight funding, no reserved or unconfirmed wallet outputs, and wallet
+address counters at most 50. Other states are refused rather than silently
+claiming coverage. Capture during an existing recovery is also refused. Historical
+settled HTLC rows are allowed. These restrictions bound the tested recovery path;
+they are not a general CLN backup policy.
 
-Restore requires a fresh volume without a database. The post-restore hook writes
-`restore-blocked` first, verifies the receipt and its files, then writes
-`restored-identity.json` and clears the block. Every failed validation retains the
-block. Startup verifies the restored node ID against the saved identity before
-reporting green health. Older backups without a receipt remain blocked. Never
-remove a blocking marker by hand or copy an old channel database into the volume.
+Restore writes a blocking marker before validation. It refuses an existing wallet
+database, verifies key/SCB bindings and writes a durable recovery intent. Startup uses a fresh database and the saved absolute scan height. Old backups
+without a saved height default to block one. Once RPC reports no sync warnings, the recovery worker checks
+identity and backed-up channel IDs, then invokes `emergencyrecover`. CLN asks peers
+to force-close. It does not resume old channels or restore an old database.
 
-Version 0.1.0:0 upgrades without moving wallet data. This does not implement
-funded-wallet recovery, emergency channel closure, rescanning, or migration of the
-tower's coordinators. No spending action is enabled.
+An interrupted import is reconciled against channels already in the fresh DB.
+An imported marker prevents re-import after a resolved channel disappears.
+The recovery health check stays pending for peer closure and on-chain processing;
+it never equates ONCHAIN or an empty channel list with proven fund recovery.
+A stale status or worker failure is not green health. Keep the backup throughout.
+Completion needs manual output/funds verification; this version intentionally
+has no button to clear the recovery marker or return the restored wallet to
+normal channel operation. An unavailable peer may delay recovery indefinitely.
+
+The wrapper has no spending UI or wallet migration. Do not run the original and
+restored wallet concurrently. The packaged regtest uses disposable keys and a
+surviving peer; it now invokes the same capture, restore and recovery-step code
+used by StartOS, including a repeat step. StartOS lifecycle execution still needs
+separate validation. The default regtest withdrawal underestimated relay fees;
+the fixture uses an explicit 2000perkb fee while that separate issue is unresolved.
 
 ## Local validation
 
@@ -78,6 +89,7 @@ npm run check
 npm run test:xbt
 python3 -m venv .venv
 .venv/bin/python tests/test_empty_backup.py -v
+.venv/bin/python tests/test_recovery.py -v
 npm run build
 npm run check:bundle
 ```
@@ -131,6 +143,69 @@ Only the executable, test script and a newly created temporary results directory
 are mounted. Logs and disposable regtest keys remain in that results directory.
 The executable must run on Debian bookworm, the image's runtime base.
 
-This fixture does not invoke StartOS backup hooks, permit funded backups, test
+This fixture calls the hook helpers but does not emulate StartOS lifecycle, test
 an offline surviving peer, or cover unresolved HTLCs. Keep the StartOS wallet
-unfunded; production recovery policy is unchanged.
+unfunded until this integration is validated.
+
+
+## Recovery scan start (0.1.0:3)
+
+Before creating a brand-new key/database, backend preflight records a starting
+height 144 blocks behind the verified tip in `wallet-birth.json`. Existing wallets
+or restored identities do not get an inferred birthday. Capture includes that
+height in its receipt; old receipts default to 1. This is an optimization for keys
+created by this package, not a claim that all imported keys are new.
+
+For a legacy restore of a wallet the operator knows has NEVER been funded, the
+stopped-service **Set Empty-Wallet Recovery Scan Start** action accepts a positive
+height safely before wallet creation and explicit confirmation. It refuses an
+imported recovery, any expected channels, or recorded activity in the fresh
+restored database. Database bytes and backup files are preserved. Startup refuses
+a selected height above the verified backend tip. Do not use the action to skip
+history for a funded wallet; an empty restored database is not proof of no funds.
+
+Recovery health displays the scan starting height and current CLN block height.
+The worker still never declares completion automatically. SQLite test fixtures
+now close their connections explicitly (including on Python 3.13).
+
+```sh
+.venv/bin/python tests/test_recovery.py -v
+.venv/bin/python tests/test_empty_backup.py -v
+bash scripts/test-image-recovery.sh xbt-cln:recovery-test ../bitcoind --empty-scan
+```
+
+The added Docker mode stops an empty restored node during an early scan, advances
+its configured scan start to 1900, restarts the same database and verifies sync to
+2000, unchanged identity and pending manual-review status. No database is deleted.
+
+
+## Recovery daemon registration fix (0.1.0:4)
+
+The SDK daemon builder is immutable. Versions 0.1.0:2 and 0.1.0:3 discarded the
+return value when adding the conditional recovery daemon, so CLN started and
+scanned but the worker and its health check were absent. Version 0.1.0:4 returns
+the extended chain. Existing intent and scan-start records are preserved.
+`scripts/test-recovery-topology.cjs` executes the wrapper factory against the
+actual SDK builder, mocking only files, container access and backend discovery.
+It asserts the recovery daemon is present for prepared/importing/imported states,
+waits for lightningd, and reports pending or attention rather than completed
+recovery. The test fails with the original registration bug and runs under
+`npm run test:xbt`. This is not an emulation of the StartOS UI.
+
+## Finish a never-funded wallet restore
+
+Version 0.1.0:5 adds **Finish Empty-Wallet Recovery** under Actions. Use it only
+when your own records confirm this wallet has NEVER received funds or opened a
+channel. An empty restored database does not establish that fact.
+
+Let the node finish syncing and the recovery check reach monitoring with zero
+channels. Stop the service, run the action within ten minutes, confirm the
+never-funded statement, then start the service. If monitoring is stale, start
+the service to refresh it, then stop and retry.
+
+The action requires the recovery worker to be stopped, verifies the key and
+database identity, and refuses recorded channel, HTLC, output, transaction,
+payment or invoice activity. It retains the database, key, backup and recovery
+records. A durable `finished-empty` intent stops further recovery-worker starts
+and permits subsequent backups under the existing bounded backup policy.
+This action does not finish recovery of a previously funded wallet.

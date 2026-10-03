@@ -11,6 +11,9 @@ import socket
 import subprocess
 import tempfile
 import time
+import sys
+sys.path.insert(0, "/recovery")
+import recovery
 
 
 def check(condition, message):
@@ -83,7 +86,7 @@ def main():
         until(lambda: rpc(btc, 'getblockchaininfo'), 'backend RPC')
         rpc(btc, 'createwallet', 'fixture')
         mining = rpc(btc, 'getnewaddress')
-        rpc(btc, 'generatetoaddress', 101, mining)
+        rpc(btc, 'generatetoaddress', 2000 if sys.argv[1:] == ['--empty-scan'] else 101, mining)
         active = []
 
         def node(name, port, restore=False):
@@ -97,7 +100,8 @@ def main():
                     '--autoconnect-seeker-peers=0', '--autolisten=false',
                     f'--bind-addr=127.0.0.1:{port}', '--log-level=debug']
             if restore:
-                args.append('--rescan=-1')
+                intent = recovery.load(directory, recovery.INTENT)
+                args.append(f"--rescan=-{intent.get('scan_start', 1)}")
             proc = start(name, args)
             cli = ['lightning-cli', f'--lightning-dir={directory}',
                    '--network=xbt-regtest', '--json', '--notifications=none']
@@ -119,6 +123,60 @@ def main():
 
         alice, original, identity = node('alice', 19735)
         bob, _, bob_id = node('bob', 19736)
+        if sys.argv[1:] == ['--empty-scan']:
+            rpc(alice, 'stop')
+            original.wait(timeout=30)
+            check(original.returncode == 0, 'Original stop failed')
+            processes.remove(original)
+            active.remove(alice)
+            recovery.capture(root / 'alice', 'xbt-regtest')
+            target = root / 'restored' / 'xbt-regtest'
+            target.mkdir(parents=True)
+            for name in ('hsm_secret', 'emergency.recover'):
+                shutil.copyfile(root / 'alice' / 'xbt-regtest' / name, target / name)
+            shutil.copyfile(root / 'alice' / recovery.RECEIPT, target.parent / recovery.RECEIPT)
+            recovery.restore(target.parent, 'xbt-regtest')
+            restored, process, _ = node('restored', 19735, restore=True)
+            check(rpc(restored, 'getinfo')['blockheight'] < 1900, 'Fixture scanned too far before stop')
+            rpc(restored, 'stop')
+            process.wait(timeout=30)
+            check(process.returncode == 0, 'Restored stop failed')
+            processes.remove(process)
+            active.remove(restored)
+            database = target / 'lightningd.sqlite3'
+            before = database.read_bytes()
+            recovery.set_empty_scan_start(target.parent, 1900, True, 'xbt-regtest')
+            check(database.read_bytes() == before, 'Scan adjustment modified database')
+            restored, process, restored_id = node('restored', 19735, restore=True)
+            check(restored_id == identity, 'Identity changed')
+            until(lambda: rpc(restored, 'getinfo')['blockheight'] >= 2000, 'short scan sync')
+            result = until(lambda: (out if (out := recovery.step(target.parent, 'xbt-regtest'))['phase'] == 'monitoring' else None), 'empty recovery worker')
+            check(result['scan_start'] == 1900 and result['expected_channels'] == 0
+                  and result['complete'] is False, 'Unexpected empty recovery status')
+            print('PASS: never-funded restored database preserved; scan start advanced to 1900; identity unchanged', flush=True)
+            recovery.atomic_json(target.parent, recovery.STATUS, {**result, 'checked_at': time.time()})
+            rpc(restored, 'stop')
+            process.wait(timeout=30)
+            check(process.returncode == 0, 'Stop before finish failed')
+            processes.remove(process)
+            active.remove(restored)
+            before = database.read_bytes()
+            recovery.finish_empty(target.parent, True, 'xbt-regtest')
+            recovery.finish_empty(target.parent, True, 'xbt-regtest')
+            check(database.read_bytes() == before, 'Finish modified database')
+            restored, process, restored_id = node('restored', 19735)
+            check(restored_id == identity, 'Finish changed identity')
+            until(lambda: rpc(restored, 'getinfo')['blockheight'] >= 2000, 'finished wallet sync')
+            rpc(restored, 'stop')
+            process.wait(timeout=30)
+            check(process.returncode == 0, 'Finished wallet stop failed')
+            processes.remove(process)
+            active.remove(restored)
+            recovery.capture(target.parent, 'xbt-regtest')
+            print('PASS: empty recovery finished; database and identity preserved; restart and new backup succeeded', flush=True)
+            print('Empty restore scan and completion OK (real regtest nodes; no wallet/database deletion)', flush=True)
+            return
+        check(not sys.argv[1:], 'Unknown test mode')
         deposit = rpc(btc, 'sendtoaddress', rpc(alice, 'newaddr', 'bech32')['bech32'], '0.02')
         mine(1)
         until(lambda: any(o['txid'] == deposit and o['status'] == 'confirmed'
@@ -142,6 +200,7 @@ def main():
         check(original.returncode == 0, 'Original node did not stop cleanly')
         processes.remove(original)
         active.remove(alice)
+        recovery.capture(root / 'alice', 'xbt-regtest')
         target = root / 'restored' / 'xbt-regtest'
         target.mkdir(parents=True)
         for name in ('hsm_secret', 'emergency.recover'):
@@ -150,11 +209,16 @@ def main():
             shutil.copyfile(source, target / name)
         check(sorted(p.name for p in target.iterdir()) == ['emergency.recover', 'hsm_secret'],
               'Restore must contain only key and channel backup')
+        shutil.copyfile(root / 'alice' / recovery.RECEIPT, target.parent / recovery.RECEIPT)
+        recovery.restore(target.parent, 'xbt-regtest')
+        print('PASS: stopped-wallet receipt and fresh-volume recovery intent verified', flush=True)
         print('PASS: settled funded wallet stopped; only key and SCB copied to fresh directory', flush=True)
-        restored, _, restored_id = node('restored', 19735, restore=True)
+        restored, process, restored_id = node('restored', 19735, restore=True)
         check(restored_id == identity, 'Restored identity changed')
-        check(funding['channel_id'] in rpc(restored, 'emergencyrecover')['stubs'],
-              'Original channel stub not recovered')
+        until(lambda: recovery.step(target.parent, 'xbt-regtest')['phase'] == 'monitoring', 'recovery worker import')
+        check(recovery.step(target.parent, 'xbt-regtest')['complete'] is False,
+              'Worker must not declare funds recovered')
+        print('PASS: recovery worker imported original channel; repeat step reconciled without declaring completion', flush=True)
         # Recovery may already have connected automatically using its stored address.
         rpc(restored, 'connect', bob_id, '127.0.0.1', 19736)
         until(lambda: rpc(btc, 'getrawmempool'), 'peer recovery close')

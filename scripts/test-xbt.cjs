@@ -12,3 +12,5 @@ try {
 } finally {
   rmSync(out, { recursive: true, force: true })
 }
+
+execFileSync(process.execPath, ['scripts/test-recovery-topology.cjs'], { stdio: 'inherit' })

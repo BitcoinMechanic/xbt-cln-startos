@@ -80,3 +80,6 @@ RUN chmod 755 /usr/local/bin/xbt-image-check
 RUN xbt-image-check
 COPY assets/xbt/empty_backup.py /usr/local/libexec/xbt-empty-backup.py
 CMD ["lightningd", "--version"]
+
+COPY assets/xbt/empty_backup.py /usr/local/libexec/empty_backup.py
+COPY assets/xbt/recovery.py /usr/local/libexec/xbt-recovery.py
