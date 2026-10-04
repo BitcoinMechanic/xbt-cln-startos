@@ -1,3 +1,4 @@
+import { coordinatorStatus, prepareCoordinator } from './coordinator'
 import { createInvoice, invoiceStatus, reviewPayment, payInvoice, paymentStatus } from './lightning'
 import { sdk } from '../sdk'
 import { nodeInfo } from './nodeInfo'
@@ -17,3 +18,5 @@ export const actions = sdk.Actions.of().addAction(nodeInfo).addAction(recoverySc
   .addAction(connectPeer).addAction(channelStatus).addAction(openChannel).addAction(closeChannel).addAction(archiveChannel)
 
   .addAction(createInvoice).addAction(invoiceStatus).addAction(reviewPayment).addAction(payInvoice).addAction(paymentStatus)
+
+  .addAction(coordinatorStatus).addAction(prepareCoordinator)

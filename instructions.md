@@ -229,3 +229,24 @@ be confirmed and spend the pinned funding output. Unrecognized historical
 channels, pending HTLCs, unresolved closes, and archive mismatches block a new
 attempt. Do not delete records to work around these checks. Lost close replies
 without a saved close transaction still require local inspection.
+
+
+## Coordinator preparation (0.1.0:12)
+
+The default remains an ordinary XBT Lightning node. The image now includes the
+swap modules from CLN commit `81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`
+in an inert directory outside plugin discovery. No swap gate, controller,
+quote API or network listener is started by this addition.
+
+**Coordinator Readiness** checks the bundle, node identity, synchronization,
+recovery state and absence of pending HTLCs. **Prepare Coordinator** requires
+explicit confirmation and saves a local preparation receipt tied to this node,
+network and source revision. Repeating preparation preserves the same receipt.
+Neither action sends payments or changes channels. The readiness action only
+reads node RPCs; its action lock may be created locally.
+
+This is preparation only, not live swap authorization. A future controller
+pairing step must bind both operators and their policy before enabling gates.
+The receipt is not a substitute for that activation check, and is not included
+in key/SCB recovery backups. Recovered nodes must be prepared and paired again.
+Existing wallet and channel actions continue unchanged.

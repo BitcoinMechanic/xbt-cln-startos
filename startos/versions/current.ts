@@ -1,9 +1,9 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 export const current = VersionInfo.of({
-  version: '0.1.0:11',
+  version: '0.1.0:12',
   releaseNotes: {
     en_US:
-      'Allows sequential private channel attempts after verified cooperative-close archival; preserves historical funding records and blocks stale funding requests',
+      'Adds inert pinned swap modules and identity-bound coordinator preparation; live gates remain inactive',
   },
   migrations: { up: async () => {}, down: IMPOSSIBLE },
 })

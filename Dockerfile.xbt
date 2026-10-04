@@ -93,3 +93,10 @@ RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libe
 
 COPY assets/xbt/lightning_actions.py /usr/local/libexec/lightning_actions.py
 RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import lightning_actions'
+
+# Inert source bundle; never installed in CLN's plugin discovery directory.
+COPY --from=xbt-build /src/lightning/tools/blake2b/ /usr/local/libexec/xbt-swap/
+RUN printf '%s\n' '81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe' > /usr/local/libexec/xbt-swap/SOURCE_COMMIT && \
+    PYTHONPATH=/usr/local/libexec/xbt-swap /opt/xbt-venv/bin/python -c 'import reverse_gate, quote_plugin, reverse_activation'
+COPY assets/xbt/coordinator.py /usr/local/libexec/coordinator.py
+RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); from coordinator import check_bundle; check_bundle("/usr/local/libexec/xbt-swap")'
