@@ -25,7 +25,7 @@ async function invoke(effects: T.Effects, request: object): Promise<T.ActionResu
       }
       const result = JSON.parse(String(response.stdout))
       const labels: Record<string, string> = {
-        phase: 'Saved attempt state', channel_state: 'CLN channel state', channel_sats: 'Channel XBT sats',
+        next_channel_code: 'Next channel code', phase: 'Saved attempt state', channel_state: 'CLN channel state', channel_sats: 'Channel XBT sats',
         listed_channels: 'Listed channels', peer_connected: 'Peer connected', private: 'Private channel',
         pending_htlcs: 'Pending HTLCs', local_balance_sats: 'Local channel XBT sats',
         funding_pin_saved: 'Funding identity verified and saved', automatic_retry: 'Automatic retry',
@@ -39,7 +39,7 @@ async function invoke(effects: T.Effects, request: object): Promise<T.ActionResu
           : 'CHANNELD_NORMAL means the channel is ready. Funding and close requests are never automatically repeated. Closing uses the exact saved channel; no timeout-triggered force close is requested.',
         result: { type: 'group', value: Object.entries(result).filter(([k]) => k in labels).map(([k, v]) => ({
           name: labels[k], description: null, type: 'single' as const, value: String(v),
-          masked: k === 'close_review_code', copyable: k === 'close_review_code', qr: false,
+          masked: ['close_review_code', 'next_channel_code'].includes(k), copyable: ['close_review_code', 'next_channel_code'].includes(k), qr: false,
         })) },
       }
     })
@@ -56,6 +56,7 @@ export const channelStatus = sdk.Action.withoutInput('channel-status',
   metadata('Channel Status', 'Reconcile the saved pilot funding or close attempt and show channel readiness. No funding or close RPC is sent.'),
   async ({ effects }) => invoke(effects, { operation: 'status' }))
 const openSpec = sdk.InputSpec.of({
+  previous: sdk.Value.text({ name: 'Previous close code', description: 'Leave blank for the first channel. Otherwise archive the confirmed close and copy Next channel code from Channel Status.', required: false, default: null, placeholder: null }),
   peer: text('Connected XBT peer node ID', 'Verify this public key belongs to your intended peer.'),
   amount: sdk.Value.number({ name: 'Channel amount', description: 'A private channel; no funds are gifted to the peer. Pilot range 20,000–80,000 sats.', required: true, default: 50000, min: 20000, max: 80000, integer: true, units: 'XBT sats', placeholder: null }),
   feeRate: sdk.Value.number({ name: 'Funding fee rate', description: 'Funding fees are additional to the channel amount. Keep at least 10,000 sats extra in the wallet. Larger wallet balances are accepted; excess funds return as change. Fee rate is limited to 2–10 sat/vbyte.', required: true, default: 2, min: 2, max: 10, integer: true, units: 'sat/vbyte', placeholder: null }),
@@ -64,7 +65,7 @@ const openSpec = sdk.InputSpec.of({
 export const openChannel = sdk.Action.withInput('channel-open-private',
   metadata('Open Private Test Channel', 'Fund one private channel with the connected peer. This submits a real on-chain transaction.'),
   openSpec, async () => {}, async ({ effects, input }) => invoke(effects, {
-    operation: 'open', peer: input.peer, amount_sats: input.amount, fee_rate: input.feeRate, confirmed: input.confirmed,
+    operation: 'open', peer: input.peer, amount_sats: input.amount, fee_rate: input.feeRate, confirmed: input.confirmed, previous_close_code: input.previous || '',
   }))
 const closeSpec = sdk.InputSpec.of({
   code: text('Close review code', 'Copy from Channel Status for this saved channel.'),
@@ -74,4 +75,10 @@ export const closeChannel = sdk.Action.withInput('channel-close-private',
   metadata('Cooperatively Close Test Channel', 'Close the exact saved channel. No automatic force-close timeout; peer cooperation is required.'),
   closeSpec, async () => {}, async ({ effects, input }) => invoke(effects, {
     operation: 'close', review_code: input.code, confirmed: input.confirmed,
+  }))
+
+export const archiveChannel = sdk.Action.withInput('channel-archive-closed',
+  metadata('Archive Confirmed Channel Close', 'Preserve the completed attempt and enable review of another channel. Does not fund or close anything.'),
+  sdk.InputSpec.of({ code: text('Close review code', 'Copy from Channel Status for the confirmed close.'), confirmed: sdk.Value.toggle({ name: 'Archive this completed channel attempt', description: 'Preserves its funding and close record; a new channel requires separate authorization.', default: false }) }), async () => {}, async ({ effects, input }) => invoke(effects, {
+    operation: 'archive', review_code: input.code, confirmed: input.confirmed,
   }))

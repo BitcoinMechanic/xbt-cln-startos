@@ -152,7 +152,7 @@ The 10,000-sat headroom is a funds requirement, not an absolute fee cap. Excess
 input value returns as change. The separate on-chain sweep action retains its
 100,000-sat cap. Use a peer you control for
 the initial test. Peer identity and host stay local; status omits channel and
-transaction IDs. There is no Lightning invoice/payment UI in this patch.
+transaction IDs. Lightning invoice and payment actions are described below.
 
 1. Obtain the other XBT node's public key, reachable IP/DNS host and Lightning
    port. Use **Connect XBT Peer**. This alone does not fund anything.
@@ -188,3 +188,44 @@ Both pilots retain their attempt records. The existing one-shot withdrawal
 pilot is not reset by closing a channel. Do not delete these records to bypass
 an uncertain outcome. Tor, public announcements, larger balances and swap
 coordinator services remain separate development steps.
+
+## Lightning invoice and payment actions (0.1.0:10)
+
+Create XBT Invoice accepts 1–10,000 sats and a unique label. It expires after one
+hour; repeating that label returns the original invoice, including after a lost
+reply. Use XBT Invoice Status to check receipt. A new invoice needs a new label.
+
+Review Lightning Payment saves a fixed-amount XBT BOLT11 invoice and a routing
+fee cap of 0–100 sats. Review the destination, amount and fee; retain the payment
+reference and review code. Pay Reviewed Lightning Invoice requires that code
+and explicit confirmation. CLN may try routes for 30 seconds, with a 144-block
+maximum delay. This pilot does not support amountless or description-hash invoices.
+
+The helper saves submission before calling pay. Repeated payment actions only
+query CLN, even after failure or a lost reply. Missing payment records remain
+unknown; never delete the saved record to retry. Payment Status checks the
+original invoice, label, destination, amount, fee cap and preimage for completion.
+Reviews are stored per payment hash, so separate invoices can be paid separately.
+Do not concurrently pay the same invoice using another tool. These actions need
+channel liquidity and do not open channels or perform swaps.
+
+The underlying backup restrictions are unchanged: these are experimental pilots,
+and backup is not a mechanism for resuming live channels after rollback.
+
+## Starting another channel (0.1.0:11)
+
+After a cooperative close, wait for Channel Status to report close-confirmed
+and for the returned wallet output to be confirmed and unreserved. Use Archive
+Confirmed Channel Close with its close review code. This preserves the original
+record and returns a Next channel code; it does not submit a transaction.
+
+Open Private Test Channel accepts that code in Previous close code, together
+with the new peer, amount, fee rate and explicit funding confirmation. Leave
+this field blank only for the first channel. Old funding requests cannot reopen
+a channel. Opening is still limited to one active pilot channel at a time.
+
+Archives retain the exact funding and close identities. The close must currently
+be confirmed and spend the pinned funding output. Unrecognized historical
+channels, pending HTLCs, unresolved closes, and archive mismatches block a new
+attempt. Do not delete records to work around these checks. Lost close replies
+without a saved close transaction still require local inspection.

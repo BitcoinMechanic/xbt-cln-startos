@@ -170,12 +170,31 @@ def main():
             change = wallet.execute('funds')['confirmed_unreserved_sats']
             check(840000 <= change < 850000, 'Large wallet change or funding fee incorrect')
             print('PASS: 900,000-sat wallet opened only a 50,000-sat channel; excess returned as confirmed change', flush=True)
-            invoice = rpc(bob, 'invoice', '1000000msat', 'channel-pilot', 'Disposable channel pilot')
-            check(rpc(alice, 'pay', invoice['bolt11'])['status'] == 'complete', 'Channel payment failed')
+            from lightning_actions import Lightning
+            payments = {'pay': 0}
+            def payment_rpc(method, **params):
+                reply = wallet.call(method, **params)
+                if method == 'pay':
+                    payments['pay'] += 1
+                    raise RuntimeError('fixture lost pay reply')
+                return reply
+            payer = Lightning(root / 'alice', 'xbt-regtest', payment_rpc)
+            receiver = Lightning(root / 'bob', 'xbt-regtest')
+            for label in ('first-payment', 'second-payment'):
+                invoice = receiver.execute('invoice', label=label, amount_sats=1000)
+                check(receiver.execute('invoice', label=label, amount_sats=1000)['invoice'] == invoice['invoice'], 'Invoice repeat changed')
+                reviewed = payer.execute('review', invoice=invoice['invoice'], max_fee_sats=1)
+                args_pay = dict(reference=reviewed['reference'], review_code=reviewed['review_code'], confirmed=True)
+                check(payer.execute('pay', **args_pay)['phase'] == 'complete', 'Reviewed payment did not complete')
+                payer = Lightning(root / 'alice', 'xbt-regtest', payment_rpc)
+                check(payer.execute('pay', **args_pay)['phase'] == 'complete', 'Repeat did not reconcile')
+                received = receiver.execute('invoice_status', label=label)
+                check(received['phase'] == 'paid' and received['received_msat'] == 1000000, 'Receipt mismatch')
+            check(payments['pay'] == 2, 'Payment was submitted more than once')
             until(lambda: helper.execute('status')['pending_htlcs'] == 0, 'settled channel pilot payment')
             review = helper.execute('status')
-            check(review['local_balance_sats'] == 49000 and counts['fundchannel'] == 1, 'Restart or payment accounting mismatch')
-            print('PASS: node restart preserved funding pin; private channel paid 1,000 sats; no pending HTLCs', flush=True)
+            check(review['local_balance_sats'] == 48000 and counts['fundchannel'] == 1, 'Restart or payment accounting mismatch')
+            print('PASS: two reviewed 1,000-sat payments; lost replies reconciled; original invoices paid; no resubmission', flush=True)
             helper.execute('close', review_code=review['close_review_code'], confirmed=True)
             helper.execute('close', review_code=review['close_review_code'], confirmed=True)
             check(counts['close'] == 1, 'Repeated close RPC')
@@ -186,7 +205,39 @@ def main():
             until(lambda: any(o['txid'] == state['close_txid'] and o['status'] == 'confirmed'
                               for o in rpc(alice, 'listfunds')['outputs']), 'returned channel funds')
             print('PASS: exact pinned channel cooperatively closed once; close and returned wallet funds confirmed', flush=True)
-            print('Packaged channel actions OK (regtest; private funding; restart; payment; mutual close)', flush=True)
+            old_state = recovery.load(root / 'alice', CHANNEL_STATE)
+            archived = helper.execute('archive', review_code=review['close_review_code'], confirmed=True)
+            archive_path = root / 'alice' / helper.archive_name(old_state)
+            archive_bytes = archive_path.read_bytes()
+            helper.execute('archive', review_code=review['close_review_code'], confirmed=True)
+            try:
+                helper.execute('open', **args)
+                raise AssertionError('Stale open request was accepted')
+            except ValueError:
+                pass
+            helper.execute('connect', peer=bob_id, host='127.0.0.1', port=19736)
+            next_args = {**args, 'previous_close_code': archived['next_channel_code']}
+            try:
+                helper.execute('open', **next_args)
+                raise AssertionError('Second lost reply fixture did not fire')
+            except RuntimeError as error:
+                check(str(error) == 'fixture lost funding reply', 'Unexpected second funding failure')
+            until(lambda: helper.execute('status')['funding_pin_saved'], 'second funding reconciliation')
+            helper.execute('open', **next_args)
+            mine(6)
+            until(lambda: helper.execute('status')['channel_state'] == 'CHANNELD_NORMAL', 'second channel lock-in')
+            check(counts['fundchannel'] == 2 and archive_path.read_bytes() == archive_bytes, 'Archive changed or duplicate funding')
+            second = recovery.load(root / 'alice', CHANNEL_STATE)
+            check(second['channel_id'] != old_state['channel_id'], 'Second channel reused original pin')
+            review2 = helper.execute('status')
+            helper.execute('close', review_code=review2['close_review_code'], confirmed=True)
+            second = recovery.load(root / 'alice', CHANNEL_STATE)
+            until(lambda: second['close_txid'] in rpc(btc, 'getrawmempool'), 'second cooperative close broadcast')
+            mine(6)
+            until(lambda: helper.execute('status')['phase'] == 'close-confirmed', 'second close confirmation')
+            check(counts['close'] == 2, 'Duplicate second close')
+            print('PASS: confirmed close archived unchanged; stale request refused; second channel funded once and closed', flush=True)
+            print('Packaged sequential channel actions OK (regtest; two payments; lost replies; preserved history)', flush=True)
             return
         if sys.argv[1:] == ['--wallet-actions']:
             from wallet_actions import Wallet

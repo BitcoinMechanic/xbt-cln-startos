@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One bounded private channel: durable funding/close intent, no mutation retries."""
+"""Sequential bounded private channels: durable funding/close intent, no mutation retries."""
 import fcntl
 import hashlib
 import ipaddress
@@ -95,15 +95,88 @@ class Channels:
                 'Funding amount does not match intent')
         return {'channel_id': cid, 'funding_txid': txid, 'funding_outnum': outnum}
 
+    def archive_name(self, state):
+        cid = state.get('channel_id', '')
+        require(re.fullmatch('[0-9a-f]{64}', cid), 'Invalid archived channel identity')
+        return 'channel-history-' + cid + '.json'
+
+    def confirmed_close(self, state):
+        require(state['node_id'] == self.wallet.ready() and state['network'] == self.network,
+                'Archived channel wallet identity changed')
+        require(state.get('phase') == 'close-confirmed' and state.get('close_txid'),
+                'Only a recorded confirmed cooperative close can be archived')
+        txs = [t for t in self.rpc('listtransactions')['transactions'] if t['hash'] == state['close_txid']]
+        require(len(txs) == 1 and txs[0]['blockheight'] > 0, 'Cooperative close is not currently confirmed')
+        require(any(i['txid'] == state['funding_txid'] and i['index'] == state['funding_outnum']
+                    for i in txs[0].get('inputs', [])), 'Close does not spend the pinned channel funding output')
+
+    def history(self):
+        records = {}
+        for path in sorted(self.root.glob('channel-history-*.json')):
+            state = load(self.root, path.name)
+            require(path.name == self.archive_name(state), 'Archive filename does not match channel')
+            self.confirmed_close(state)
+            records[state['channel_id']] = state
+        return records
+
+    def only_archived_channels(self, records):
+        for c in self.rpc('listpeerchannels')['channels']:
+            old = records.get(c.get('channel_id'))
+            require(old is not None, 'An unarchived channel still exists')
+            require(c['state'] in ('ONCHAIN', 'CLOSINGD_COMPLETE') and not c.get('htlcs'),
+                    'Historical channel remains active or has pending HTLCs')
+            self.validate_channel(old, c)
+        for c in self.rpc('listclosedchannels')['closedchannels']:
+            old = records.get(c.get('channel_id'))
+            require(old is not None and c.get('funding_txid') == old['funding_txid']
+                    and c.get('funding_outnum') == old['funding_outnum'],
+                    'Unrecognized historical channel; inspect locally')
+
+    def archive(self, review_code, confirmed):
+        require(confirmed is True, 'Archive confirmation required')
+        self.status()
+        state = self.record()
+        require(review_code == close_code(state), 'Close review code does not match')
+        name = self.archive_name(state)
+        if state['phase'] == 'archived':
+            old = load(self.root, name)
+            require({**old, 'phase': 'archived'} == state, 'Archived record changed')
+            self.confirmed_close(old)
+            return self.status()
+        self.confirmed_close(state)
+        records = self.history()
+        records[state['channel_id']] = state
+        self.only_archived_channels(records)
+        outputs = self.rpc('listfunds')['outputs']
+        require(any(o['txid'] == state['close_txid'] and o['status'] == 'confirmed'
+                    and o['reserved'] is False for o in outputs),
+                'Wait for confirmed unreserved wallet funds from this close')
+        if os.path.lexists(self.root / name):
+            require(load(self.root, name) == state, 'Existing archive differs; nothing overwritten')
+        else:
+            atomic_json(self.root, name, state)
+        # Copy is durable first; a crash here can resume without losing the original.
+        atomic_json(self.root, STATE, {**state, 'phase': 'archived'})
+        return self.status()
+
     def status(self):
         self.wallet.ready()
         channels = self.rpc('listpeerchannels')['channels']
         if not os.path.lexists(self.root / STATE):
             return {'phase': 'not-started', 'listed_channels': len(channels), 'automatic_retry': False}
         state = self.record()
+        if state['phase'] == 'archived':
+            old = load(self.root, self.archive_name(state))
+            require({**old, 'phase': 'archived'} == state, 'Archived record changed')
+            self.confirmed_close(old)
+            return {'phase': 'archived', 'next_channel_code': close_code(state),
+                    'automatic_retry': False, 'channel_funding_attempted': False}
         matches = [c for c in channels if c['peer_id'] == state['peer_id']]
         if 'channel_id' in state:
             matches = [c for c in matches if c.get('channel_id') == state['channel_id']]
+        else:
+            archived_ids = set(self.history())
+            matches = [c for c in matches if c.get('channel_id') not in archived_ids]
         require(len(matches) <= 1, 'Ambiguous pilot channel; inspect locally')
         if matches and all(k in matches[0] for k in ('channel_id', 'funding_txid', 'funding_outnum')):
             state.update(self.validate_channel(state, matches[0]))
@@ -127,20 +200,25 @@ class Channels:
             result['inspection_required'] = True
         return result
 
-    def open(self, peer, amount_sats, fee_rate, confirmed):
+    def open(self, peer, amount_sats, fee_rate, confirmed, previous_close_code=""):
         require(confirmed is True, 'Funding confirmation required')
         peer_id(peer); integer(amount_sats, 20000, 80000); integer(fee_rate, 2, 10)
         node = self.wallet.ready()
         require(node != peer, 'Cannot fund a channel to self')
         if os.path.lexists(self.root / STATE):
             state = self.record()
-            require((state['peer_id'], state['amount_sats'], state['fee_rate']) == (peer, amount_sats, fee_rate),
-                    'An existing pilot funding attempt differs; inspect Channel Status')
-            return self.status()  # All repetitions reconcile; never originate again.
+            if state['phase'] != 'archived':
+                require((state['peer_id'], state['amount_sats'], state['fee_rate'], state.get('previous_close_code', ''))
+                        == (peer, amount_sats, fee_rate, previous_close_code),
+                        'An existing pilot funding attempt differs; inspect Channel Status')
+                return self.status()  # No repeat can originate funding again.
+            self.status()
+            require(previous_close_code == close_code(state), 'Copy the next channel code from the archived Channel Status')
+        else:
+            require(previous_close_code == '', 'No previous archived channel exists')
         if os.path.lexists(self.root / WITHDRAWAL):
             require(self.wallet.status()['phase'] in ('confirmed', 'cancelled'), 'Resolve the prior withdrawal first')
-        require(self.rpc('listpeerchannels')['channels'] == [], 'Pilot requires no existing channels')
-        require(self.rpc('listclosedchannels')['closedchannels'] == [], 'Pilot requires no historical channels')
+        self.only_archived_channels(self.history())
         require(any(p['id'] == peer and p.get('connected') is True for p in self.rpc('listpeers')['peers']),
                 'Connect the selected peer first')
         outputs = self.rpc('listfunds')['outputs']
@@ -150,7 +228,8 @@ class Channels:
         require(amount_sats + 10000 <= total, 'Keep at least 10,000 confirmed unreserved sats above the channel amount')
         state = {'schema': 1, 'network': self.network, 'node_id': node, 'peer_id': peer,
                  'amount_sats': amount_sats, 'fee_rate': fee_rate, 'inputs': outputs,
-                 'phase': 'funding-submitted', 'created_at': int(time.time())}
+                 'phase': 'funding-submitted', 'created_at': int(time.time()),
+                 'previous_close_code': previous_close_code}
         atomic_json(self.root, STATE, state)
         reply = self.rpc('fundchannel', id=peer, amount=f'{amount_sats}sat', feerate=f'{fee_rate*1000}perkb',
                          announce=False, minconf=1, mindepth=3, push_msat=0,
@@ -189,7 +268,7 @@ class Channels:
         # Shared with wallet actions, so funding cannot race withdrawal preparation.
         with (self.root / 'wallet-pilot.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            require(operation in ('connect', 'status', 'open', 'close'), 'Unknown channel action')
+            require(operation in ('connect', 'status', 'open', 'close', 'archive'), 'Unknown channel action')
             return getattr(self, operation)(**params)
 
 

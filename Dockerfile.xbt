@@ -90,3 +90,6 @@ RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libe
 
 COPY assets/xbt/channel_actions.py /usr/local/libexec/channel_actions.py
 RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import channel_actions'
+
+COPY assets/xbt/lightning_actions.py /usr/local/libexec/lightning_actions.py
+RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import lightning_actions'

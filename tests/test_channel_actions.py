@@ -187,5 +187,74 @@ class ChannelTests(unittest.TestCase):
         with self.assertRaises(ValueError): Wallet(self.root, 'xbt-regtest', self.rpc).execute('prepare', destination=ADDRESS, fee_rate=2, max_fee_sats=2000)
         self.assertEqual(self.count('txprepare'), 0)
 
+    def completed(self):
+        r = self.open()
+        self.helper.execute('close', review_code=r['close_review_code'], confirmed=True)
+        self.txs[-1].update(blockheight=110, inputs=[{'txid': FUNDING, 'index': 0}])
+        self.channels[0]['state'] = 'ONCHAIN'
+        self.outputs.append({'txid': CLOSE, 'output': 0, 'status': 'confirmed', 'reserved': False, 'amount_msat': 49000000})
+        return r['close_review_code']
+
+    def test_archive_preserves_record_and_repeat_never_funds(self):
+        code = self.completed()
+        before = self.helper.execute('status')
+        state = c.load(self.root, c.STATE)
+        result = self.helper.execute('archive', review_code=code, confirmed=True)
+        self.assertEqual(result['phase'], 'archived')
+        self.assertEqual(c.load(self.root, self.helper.archive_name(state)), state)
+        self.helper.execute('archive', review_code=code, confirmed=True)
+        with self.assertRaises(ValueError): self.open()
+        self.assertEqual(self.count('fundchannel'), 1)
+
+    def test_archive_blocks_unconfirmed_wrong_spend_and_reserved_return(self):
+        code = self.completed()
+        for mutate, undo in [
+            (lambda: self.txs[-1].update(blockheight=0), lambda: self.txs[-1].update(blockheight=110)),
+            (lambda: self.txs[-1].update(inputs=[]), lambda: self.txs[-1].update(inputs=[{'txid': FUNDING, 'index': 0}])),
+            (lambda: self.outputs[-1].update(reserved=True), lambda: self.outputs[-1].update(reserved=False)),
+            (lambda: self.channels[0].update(htlcs=[{}]), lambda: self.channels[0].update(htlcs=[])),
+        ]:
+            mutate()
+            with self.assertRaises(ValueError): self.helper.execute('archive', review_code=code, confirmed=True)
+            undo()
+        self.assertFalse(list(self.root.glob('channel-history-*')))
+
+    def test_archive_crash_between_copy_and_marker_resumes(self):
+        code = self.completed();self.helper.execute('status');state=c.load(self.root,c.STATE)
+        c.atomic_json(self.root,self.helper.archive_name(state),state)
+        self.assertEqual(self.helper.execute('archive',review_code=code,confirmed=True)['phase'],'archived')
+        self.assertEqual(self.count('fundchannel'),1)
+
+    def test_archive_mismatch_and_reorg_block_new_attempt(self):
+        code=self.completed();self.helper.execute('archive',review_code=code,confirmed=True)
+        self.txs[-1]['blockheight']=0
+        with self.assertRaises(ValueError):self.open(previous_close_code=code)
+        self.txs[-1]['blockheight']=110
+        old=c.load(self.root,'channel-history-'+CID+'.json');old['amount_sats']=60000
+        c.atomic_json(self.root,'channel-history-'+CID+'.json',old)
+        with self.assertRaises(ValueError):self.open(previous_close_code=code)
+        self.assertEqual(self.count('fundchannel'),1)
+
+    def test_second_attempt_retains_archive_and_stale_requests_refused(self):
+        code=self.completed();self.helper.execute('archive',review_code=code,confirmed=True)
+        original=self.rpc; old_txs=copy.deepcopy(self.txs); old_channel=copy.deepcopy(self.channels[0])
+        self.outputs=self.outputs[:1]
+        def second_rpc(method, **params):
+            reply=original(method,**params)
+            if method=='fundchannel':
+                self.channels[0].update(channel_id='aa'*32,funding_txid='bb'*32)
+                self.txs[0]['hash']='bb'*32
+                self.channels.append(old_channel);self.txs.extend(old_txs)
+                raise RuntimeError('lost second funding reply')
+            return reply
+        self.helper=c.Channels(self.root,'xbt-regtest',second_rpc)
+        with self.assertRaises(RuntimeError):self.open(previous_close_code=code)
+        self.assertTrue(self.helper.execute('status')['funding_pin_saved'])
+        self.open(previous_close_code=code)
+        with self.assertRaises(ValueError):self.open()
+        with self.assertRaises(ValueError):self.helper.execute('archive',review_code=code,confirmed=True)
+        self.assertEqual(self.count('fundchannel'),2)
+        self.assertTrue((self.root/('channel-history-'+CID+'.json')).exists())
+
 
 if __name__ == '__main__': unittest.main()

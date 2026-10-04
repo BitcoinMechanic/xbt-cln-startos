@@ -2,7 +2,7 @@ import { setupManifest } from '@start9labs/start-sdk'
 const short = { en_US: 'Experimental Lightning node for the XBT BLAKE2b chain' }
 const long = {
   en_US:
-    'Experimental fresh-wallet XBT on-chain pilot. Requires BLAKE2b Knots. Limit deposits to 100,000 sats; no existing-wallet migration. Includes reviewed on-chain withdrawal and bounded private-channel actions. Web UI and swap coordinator roles are not enabled. Bounded recovery remains experimental.',
+    'Experimental fresh-wallet XBT on-chain pilot. Requires BLAKE2b Knots. Limit deposits to 100,000 sats; no existing-wallet migration. Includes reviewed on-chain withdrawal, bounded private-channel actions, and reviewed Lightning payments up to 10,000 sats. Web UI and swap coordinator roles are not enabled. Bounded recovery remains experimental.',
 }
 const depBitcoindDescription = {
   en_US:
