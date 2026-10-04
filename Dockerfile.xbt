@@ -87,3 +87,6 @@ COPY assets/xbt/recovery.py /usr/local/libexec/xbt-recovery.py
 COPY assets/xbt/wallet_actions.py /usr/local/libexec/wallet_actions.py
 COPY assets/xbt/recovery.py /usr/local/libexec/recovery.py
 RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import wallet_actions'
+
+COPY assets/xbt/channel_actions.py /usr/local/libexec/channel_actions.py
+RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import channel_actions'

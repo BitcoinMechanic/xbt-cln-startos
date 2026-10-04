@@ -29,7 +29,7 @@ async function invoke(effects: T.Effects, request: object): Promise<T.ActionResu
         message: result.phase === 'prepared'
           ? 'No transaction broadcast. Verify the destination, recipient amount and exact fee. To send, enter this review code in Send Prepared Withdrawal. Keep the service running between preparation and send or cancellation.'
           : result.address
-            ? 'Use the XBT BLAKE2b chain only. The address prefix is shared with BTC. For this pilot, fund at most 100,000 sats total. The address is reused for this test.'
+            ? 'Use the XBT BLAKE2b chain only. The address prefix is shared with BTC. For this pilot, fund at most 100,000 sats total. A fresh address is generated each time; earlier addresses remain valid.'
             : result.phase === 'submitting'
               ? 'Submission outcome is uncertain. Status only checks for confirmation; it never resends. Retain the record and inspect locally.'
               : 'Broadcast means submitted; confirmed means mined. This pilot supports one withdrawal record. Keep private addresses and review codes local.',

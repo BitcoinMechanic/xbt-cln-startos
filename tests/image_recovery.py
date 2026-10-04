@@ -123,15 +123,81 @@ def main():
 
         alice, original, identity = node('alice', 19735)
         bob, _, bob_id = node('bob', 19736)
+        if sys.argv[1:] == ['--channel-actions']:
+            from channel_actions import Channels, STATE as CHANNEL_STATE
+            from wallet_actions import Wallet
+            wallet = Wallet(root / 'alice', 'xbt-regtest')
+            until(lambda: not any(k.startswith('warning_') for k in rpc(alice, 'getinfo')), 'pilot node sync')
+            address = wallet.execute('address')['address']
+            rpc(btc, 'sendtoaddress', address, '0.009')
+            mine(1)
+            until(lambda: wallet.execute('funds')['confirmed_unreserved_sats'] == 900000, 'channel pilot deposit')
+            counts = {'fundchannel': 0, 'close': 0}
+            def pilot_rpc(method, **params):
+                reply = wallet.call(method, **params)
+                if method in counts:
+                    counts[method] += 1
+                if method == 'fundchannel':
+                    raise RuntimeError('fixture lost funding reply')
+                return reply
+            helper = Channels(root / 'alice', 'xbt-regtest', pilot_rpc)
+            helper.execute('connect', peer=bob_id, host='127.0.0.1', port=19736)
+            args = {'peer': bob_id, 'amount_sats': 50000, 'fee_rate': 2, 'confirmed': True}
+            try:
+                helper.execute('open', **args)
+                raise AssertionError('Lost reply fixture did not fire')
+            except RuntimeError as error:
+                check(str(error) == 'fixture lost funding reply', 'Unexpected fixture error')
+            check('channel_id' not in recovery.load(root / 'alice', CHANNEL_STATE), 'Fixture already saved funding reply')
+            helper = Channels(root / 'alice', 'xbt-regtest', pilot_rpc)
+            until(lambda: helper.execute('status')['funding_pin_saved'], 'funding reconciliation')
+            helper.execute('open', **args)
+            check(counts['fundchannel'] == 1, 'Repeated funding RPC')
+            mine(6)
+            until(lambda: helper.execute('status')['channel_state'] == 'CHANNELD_NORMAL', 'private channel lock-in')
+            check(helper.execute('status')['private'] is True, 'Pilot channel announced')
+            print('PASS: private channel funded once; lost reply reconciled against exact funding inputs; no duplicate attempt', flush=True)
+            rpc(alice, 'stop')
+            original.wait(timeout=30)
+            check(original.returncode == 0, 'Channel node stop failed')
+            processes.remove(original); active.remove(alice)
+            alice, original, restarted_id = node('alice', 19735)
+            check(restarted_id == identity, 'Restart changed identity')
+            until(lambda: not any(k.startswith('warning_') for k in rpc(alice, 'getinfo')), 'restarted channel node sync')
+            helper.execute('connect', peer=bob_id, host='127.0.0.1', port=19736)
+            until(lambda: helper.execute('status').get('peer_connected'), 'peer reconnection')
+            helper.execute('open', **args)
+            change = wallet.execute('funds')['confirmed_unreserved_sats']
+            check(840000 <= change < 850000, 'Large wallet change or funding fee incorrect')
+            print('PASS: 900,000-sat wallet opened only a 50,000-sat channel; excess returned as confirmed change', flush=True)
+            invoice = rpc(bob, 'invoice', '1000000msat', 'channel-pilot', 'Disposable channel pilot')
+            check(rpc(alice, 'pay', invoice['bolt11'])['status'] == 'complete', 'Channel payment failed')
+            until(lambda: helper.execute('status')['pending_htlcs'] == 0, 'settled channel pilot payment')
+            review = helper.execute('status')
+            check(review['local_balance_sats'] == 49000 and counts['fundchannel'] == 1, 'Restart or payment accounting mismatch')
+            print('PASS: node restart preserved funding pin; private channel paid 1,000 sats; no pending HTLCs', flush=True)
+            helper.execute('close', review_code=review['close_review_code'], confirmed=True)
+            helper.execute('close', review_code=review['close_review_code'], confirmed=True)
+            check(counts['close'] == 1, 'Repeated close RPC')
+            state = recovery.load(root / 'alice', CHANNEL_STATE)
+            until(lambda: state['close_txid'] in rpc(btc, 'getrawmempool'), 'cooperative close broadcast')
+            mine(6)
+            until(lambda: helper.execute('status')['phase'] == 'close-confirmed', 'cooperative close confirmation')
+            until(lambda: any(o['txid'] == state['close_txid'] and o['status'] == 'confirmed'
+                              for o in rpc(alice, 'listfunds')['outputs']), 'returned channel funds')
+            print('PASS: exact pinned channel cooperatively closed once; close and returned wallet funds confirmed', flush=True)
+            print('Packaged channel actions OK (regtest; private funding; restart; payment; mutual close)', flush=True)
+            return
         if sys.argv[1:] == ['--wallet-actions']:
             from wallet_actions import Wallet
             wallet = Wallet(root / 'alice', 'xbt-regtest')
             until(lambda: not any(k.startswith('warning_') for k in rpc(alice, 'getinfo')), 'pilot node sync')
             address = wallet.execute('address')['address']
-            check(wallet.execute('address')['address'] == address, 'Deposit address not reused')
+            check(wallet.execute('address')['address'] != address, 'Deposit address reused')
             rpc(btc, 'sendtoaddress', address, '0.0005')
             mine(1)
             until(lambda: wallet.execute('funds')['confirmed_unreserved_sats'] == 50000, 'pilot confirmed deposit')
+            print('PASS: successive deposit addresses differ; earlier address still receives confirmed funds', flush=True)
             destination = rpc(bob, 'newaddr', 'p2tr')['p2tr']
             prepared = wallet.execute('prepare', destination=destination, fee_rate=2, max_fee_sats=2000)
             state = recovery.load(root / 'alice', 'wallet-pilot-withdrawal.json')

@@ -4,7 +4,8 @@ This is an experimental XBT (BLAKE2b) Lightning node, distinct from Bitcoin Core
 Lightning. It requires a synced, unpruned BLAKE2b Knots service on the same StartOS
 box. A service called `bitcoind` is not sufficient: startup checks its chain.
 
-Use a fresh installation. Do not import an existing node or open channels yet.
+Use a fresh installation. Do not import an existing node. Use only the bounded
+private-channel action below when testing channels.
 Version 0.1.0:6 supports a small on-chain deposit/return pilot, limited to
 100,000 sats total. Follow the wallet-action procedure below.
 
@@ -101,7 +102,8 @@ bash scripts/test-image-recovery.sh xbt-cln:recovery-test ../bitcoind --wallet-a
 ```
 
 Use Actions → **XBT Deposit Address** after recovery is finished and node health
-is green. The address is reused for this pilot. Send a small XBT deposit,
+is green. Each invocation generates a fresh address. Earlier addresses remain valid.
+Address generation does not change the existing bounded-backup limits. Send a small XBT deposit,
 for example 20,000 sats, and keep the total wallet balance at or below 100,000
 sats. XBT and BTC share address prefixes: use the XBT chain, not BTC.
 
@@ -133,3 +135,56 @@ fee before submission. A tracked but unconfirmed transaction does not prove an
 uncertain submission succeeded. Status reconciles a confirmed transaction without
 resending. No PSBT conversion is required. The explicit fee works around the
 previous fixture's relay-fee underestimate; it does not fix that upstream issue.
+
+## Private-channel pilot (0.1.0:7)
+
+Run the packaged disposable test before live funding:
+
+```sh
+.venv/bin/python tests/test_channel_actions.py -v
+bash scripts/test-image-recovery.sh xbt-cln:recovery-test ../bitcoind --channel-actions
+```
+
+The pilot permits **one** private channel, 20,000–80,000 XBT sats, with no upper
+wallet-balance limit for channel funding. The channel amount remains capped at
+80,000 sats and the funding fee rate at 10 sat/vbyte, using at most ten inputs.
+The 10,000-sat headroom is a funds requirement, not an absolute fee cap. Excess
+input value returns as change. The separate on-chain sweep action retains its
+100,000-sat cap. Use a peer you control for
+the initial test. Peer identity and host stay local; status omits channel and
+transaction IDs. There is no Lightning invoice/payment UI in this patch.
+
+1. Obtain the other XBT node's public key, reachable IP/DNS host and Lightning
+   port. Use **Connect XBT Peer**. This alone does not fund anything.
+2. Complete any prior wallet withdrawal and check its status is confirmed.
+3. Have at least 60,000 XBT sats for a default 50,000-sat channel. Wait for confirmed
+   unreserved funds. All outputs must be confirmed and unreserved; at most ten
+   inputs are supported. At least 10,000 sats above the channel amount are
+   required for fees/reserves; CLN can enforce a larger reserve.
+4. Use **Open Private Test Channel**, verify the peer and amount, choose an
+   explicit funding fee rate (default 2 sat/vbyte), and confirm. This broadcasts
+   funding, sets `announce=false`, and gifts no balance to the peer. Funding
+   fees are additional; the fee-rate control is not an exact total-fee quote.
+5. Check **Channel Status** until `CHANNELD_NORMAL` and connected.
+6. When finished testing, copy the close review code from Channel Status and
+   use **Cooperatively Close Test Channel**. It requires a normal connected
+   channel with no pending HTLCs and targets the exact saved channel.
+7. Wait for `close-confirmed`, then check Confirmed Wallet Funds.
+
+Funding intent is saved before the funding RPC. Repetition only reconciles the
+original attempt. A lost reply is matched against the peer, amount, privacy,
+local opener, funding outpoint and exact wallet inputs. A missing or ambiguous
+attempt remains for local inspection; it never creates a second channel.
+The same stable lock serializes channel funding with wallet actions.
+
+Close intent is also saved before RPC submission. The RPC uses
+`unilateraltimeout=0`: no automatic timeout-triggered force close. Peer
+misbehavior or other CLN conditions can still cause unilateral closure.
+Cooperative close uses the configured funding fee rate as its requested fee
+range. Repeats do not issue another close; an uncertain close result requires
+inspection if no confirmed closing transaction was recorded.
+
+Both pilots retain their attempt records. The existing one-shot withdrawal
+pilot is not reset by closing a channel. Do not delete these records to bypass
+an uncertain outcome. Tor, public announcements, larger balances and swap
+coordinator services remain separate development steps.

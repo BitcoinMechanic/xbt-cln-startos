@@ -135,17 +135,10 @@ class Wallet:
 
     def address(self):
         self.ready()
-        # Reuse the pilot address: repeated UI clicks do not exhaust the backup key bound.
-        name = 'wallet-pilot-address.json'
-        if os.path.lexists(self.root / name):
-            record = load(self.root, name)
-            require(record['node_id'] == self.ready(), 'Deposit identity mismatch')
-            script_for(record['address'], self.network)
-            return {'address': record['address'], 'network': self.network}
+        # CLN persists the address index; leave legacy address records untouched.
         reply = self.rpc('newaddr', addresstype='bech32')
         address = reply['bech32']
         script_for(address, self.network)
-        atomic_json(self.root, name, {'node_id': self.ready(), 'address': address})
         return {'address': address, 'network': self.network}
 
     def funds(self):
@@ -186,6 +179,7 @@ class Wallet:
             require((state['destination'], state['fee_rate'], state['max_fee_sats']) ==
                     (destination, fee_rate, max_fee_sats), 'Existing withdrawal differs; use Withdrawal Status')
             return self.status()  # Never prepare twice, even after an ambiguous reply.
+        require(not os.path.lexists(self.root / 'channel-pilot.json'), 'Channel pilot exists; do not prepare a separate pilot withdrawal')
         require(self.rpc('listpeerchannels')['channels'] == [], 'This pilot requires a wallet with no channels')
         outputs = self.rpc('listfunds')['outputs']
         require(1 <= len(outputs) <= 10 and all(o['status'] == 'confirmed' and o['reserved'] is False for o in outputs),

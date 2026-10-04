@@ -1,9 +1,9 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 export const current = VersionInfo.of({
-  version: '0.1.0:6',
+  version: '0.1.0:9',
   releaseNotes: {
     en_US:
-      'Adds bounded on-chain pilot actions: deposit address, confirmed funds, withdrawal preparation, explicit review and submission, cancellation and status. No automatic transaction retry; maximum pilot wallet balance is 100,000 sats',
+      'Allows bounded private-channel funding from larger wallets and reports local validation failures. Channel-size, fee-rate, input-count and no-resubmission guards remain in place',
   },
   migrations: { up: async () => {}, down: IMPOSSIBLE },
 })

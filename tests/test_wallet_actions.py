@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'assets/xbt'))
 import wallet_actions as w
 
 ADDRESS = 'bcrt1qsxdxcrmq7rqp2e2l690k0rgc722yzkv49exkx2uwkkk6yevxlygq3lv4xs'
+SECOND_ADDRESS = 'bcrt1qr4pftsergepzf2jrkzvyw5evsspdl7kyxplp6chv7226xwnszjnsy0rzpl'
 SCRIPT = bytes.fromhex('0020819a6c0f60f0c015655fd15f678d18f2944159952e4d632b8eb5ada26586f910')
 NODE = '02' + '12' * 32
 
@@ -40,7 +41,8 @@ class WalletTests(unittest.TestCase):
         if method == 'listfunds': return {'outputs': copy.deepcopy(self.outputs)}
         if method == 'listpeerchannels': return {'channels': self.channels}
         if method == 'listtransactions': return {'transactions': self.transactions}
-        if method == 'newaddr': return {'bech32': ADDRESS}
+        if method == 'newaddr':
+            return {'bech32': ADDRESS if self.methods('newaddr') == 1 else SECOND_ADDRESS}
         if method == 'txprepare':
             self.assertEqual(params['minconf'], 1)
             self.assertEqual(params['feerate'], '2000perkb')
@@ -62,13 +64,21 @@ class WalletTests(unittest.TestCase):
     def methods(self, name):
         return sum(m == name for m, _ in self.calls)
 
-    def test_address_reused_and_funds_private(self):
+    def test_fresh_addresses_and_funds_private(self):
         self.assertEqual(self.wallet.execute('address')['address'], ADDRESS)
-        self.wallet.execute('address')
-        self.assertEqual(self.methods('newaddr'), 1)
+        self.assertEqual(self.wallet.execute('address')['address'], SECOND_ADDRESS)
+        self.assertEqual(self.methods('newaddr'), 2)
         result = self.wallet.execute('funds')
         self.assertEqual(result['confirmed_unreserved_sats'], 10000)
         self.assertNotIn('34'*32, json.dumps(result))
+
+    def test_legacy_address_record_preserved_but_not_reused(self):
+        path = self.root / 'wallet-pilot-address.json'
+        old = json.dumps({'node_id': NODE, 'address': SECOND_ADDRESS})
+        path.write_text(old)
+        self.assertEqual(self.wallet.execute('address')['address'], ADDRESS)
+        self.assertEqual(path.read_text(), old)
+        self.assertEqual(self.methods('newaddr'), 1)
 
     def test_prepare_review_send_confirm_and_no_resend(self):
         result = self.prepare()
