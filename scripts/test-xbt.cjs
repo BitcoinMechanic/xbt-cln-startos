@@ -14,3 +14,5 @@ try {
 }
 
 execFileSync(process.execPath, ['scripts/test-recovery-topology.cjs'], { stdio: 'inherit' })
+
+execFileSync(process.execPath, ['scripts/test-controller-interface.cjs'], { stdio: 'inherit' })

@@ -8,6 +8,7 @@ import {
   mainMounts,
   rootDir,
   peerPort,
+  clnrestPort,
 } from './utils'
 import { activationHeight, verifyBackend, nodeHealth } from './xbt-policy'
 
@@ -138,6 +139,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
           `--bitcoin-rpcport=${backend.port}`,
           `--bitcoin-datadir=${bitcoinDataDir}`,
           `--bind-addr=0.0.0.0:${peerPort}`,
+          '--clnrest-host=0.0.0.0',
+          `--clnrest-port=${clnrestPort}`,
+          '--clnrest-protocol=http',
           '--autolisten=false',
           '--announce-addr-discovered=false',
         ],

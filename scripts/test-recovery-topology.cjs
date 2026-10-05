@@ -35,7 +35,7 @@ async function fixture(intent) {
       },
     },
     './sdk': { sdk },
-    './utils': { bitcoinDataDir: '/mnt/bitcoin', rootDir: '/root/.lightning', peerPort: 9735,
+    './utils': { bitcoinDataDir: '/mnt/bitcoin', rootDir: '/root/.lightning', peerPort: 9735, clnrestPort: 3010,
       bitcoindRpcBridge: async () => ({ host: 'fixture', port: 8332 }),
       mainMounts: { mountDependency: () => ({}) } },
     './xbt-policy': { activationHeight: 961640, verifyBackend: () => {}, nodeHealth: () => ({ result: 'success' }) },
@@ -52,6 +52,9 @@ async function fixture(intent) {
 async function run() {
   const fresh = await fixture(null)
   assert.deepEqual(fresh.entries.map(e => e.id), ['xbt-backend-identity', 'lightningd'])
+  assert.ok(fresh.entries[1].exec.command.includes('--clnrest-port=3010'))
+  assert.ok(fresh.entries[1].exec.command.includes('--clnrest-protocol=http'))
+  assert.ok(fresh.entries[1].exec.command.includes('--clnrest-host=0.0.0.0'))
   for (const phase of ['prepared', 'importing', 'imported']) {
     const f = await fixture({ phase, scan_start: 974000 })
     assert.deepEqual(f.entries.map(e => e.id), ['xbt-backend-identity', 'lightningd', 'xbt-recovery'])

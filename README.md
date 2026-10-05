@@ -413,3 +413,47 @@ bash scripts/test-image-recovery.sh \
 The disposable test uses real XBT regtest preparation and credentials, verified
 HTTPS reads, server-side denial of newaddr, and repeated revocation. It neither
 uses live wallets nor changes the installed StartOS package.
+
+
+## Controller RPC interface (0.1.0:14)
+
+The XBT Controller RPC interface exports CLN REST on internal port 3010,
+with host/interface ID `controller-rpc`. It has no rune, username, or query
+parameters in its URL. The Lightning peer interface retains its existing ID
+and port. Use the HTTPS address shown by StartOS rather than assuming an
+external port: StartOS may assign a different port when one is occupied.
+
+StartOS terminates HTTPS at its edge and forwards HTTP to CLN REST inside
+the service network. The SDK's HTTP binding uses `secure: null` and an
+`addSsl` listener; the package does not mark plaintext as safe for untrusted
+networks. Local/bridge HTTP may still be available to trusted paths. Use only
+verified HTTPS for off-box controller credentials. Reachability and enabled
+addresses remain under the operator's StartOS interface settings; this patch
+does not configure Tor or public exposure.
+
+CLN REST uses Rune authentication for RPC. The dedicated controller rune
+restricts requests to getinfo and listpeerchannels without parameters. The
+endpoint itself is not a read-only filter: another rune carries its own
+permissions. Do not substitute an unrestricted rune. Public CLN REST metadata
+or documentation routes are not proof of authenticated RPC access.
+
+For an off-box client, obtain the server's root CA through the authenticated
+StartOS certificate download flow and trust it explicitly when verifying the
+HTTPS URL. This package's pinned SDK does not provide getRootCa, so no custom
+certificate-export action is included. Do not disable certificate or hostname
+verification to work around a connection failure.
+
+```sh
+npm run check
+npm run test:xbt
+npm run build
+npm run check:bundle
+BUILDX_BUILDER=startos-builder make x86
+```
+
+The interface test executes the factory with the installed SDK's real
+MultiHost/Origin implementation and verifies the generated TLS binding and
+credential-free URL. The daemon topology test verifies the matching CLN REST
+port, host and HTTP protocol flags. These checks do not exercise a live StartOS
+edge proxy: verify external HTTPS and denied unauthenticated RPC after updating.
+Existing credential records are reused; no swap gate or controller is activated.

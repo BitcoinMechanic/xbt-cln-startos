@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const { manifest, actions } = require('../javascript/index.js')
 assert.equal(manifest.id, 'xbt-cln')
-assert.equal(manifest.version, '0.1.0:13')
+assert.equal(manifest.version, '0.1.0:14')
 assert.deepEqual(Object.keys(manifest.images), ['lightning'])
 assert.equal(manifest.images.lightning.source.dockerBuild.dockerfile, 'Dockerfile.xbt')
 assert.deepEqual(Object.keys(manifest.dependencies), ['bitcoind'])
