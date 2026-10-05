@@ -368,3 +368,48 @@ pairing step must bind both operators and their policy before enabling gates.
 The receipt is not a substitute for that activation check, and is not included
 in key/SCB recovery backups. Recovered nodes must be prepared and paired again.
 Existing wallet and channel actions continue unchanged.
+
+
+## Read-only controller credential (0.1.0:13)
+
+Coordinator Preparation includes Controller Credential Status, Create or Show
+Read-only Controller Credential, and Revoke Read-only Controller Credential.
+Run Prepare Coordinator first. Creation/export requires the existing XBT
+identity, synchronization and recovery checks to pass. The rune is masked and
+copyable; status never returns it. It permits only `getinfo` and
+`listpeerchannels`, with zero parameters. No payment methods are authorized.
+
+Repeated creation returns the same active rune. A durable creation intent
+prevents another mint after a lost reply; an interrupted creation requires
+inspection, not deletion of its record. Revocation targets only the saved rune
+ID and reconciles a lost reply. Repeated revocation is safe, and revoked runes
+are not automatically replaced in this version.
+
+The private controller-read-only.json record stays on the main volume and is
+included in backups. Its saved phase is not proof of credential validity after
+a database restore: the helper checks CLN's stored rune and blacklist before
+export/status/revocation. Missing, changed or unexpectedly unrevoked credentials
+are refused. Restored credentials require inspection; preserving CLN revocation
+history through restoration is outside this patch's guarantees.
+
+No REST listener or StartOS interface is added here. A later transport step
+will pair the controller using verified HTTPS; never transmit this rune over
+unencrypted HTTP. Existing peer connectivity remains as configured.
+
+Validate on the packaging VM:
+
+```sh
+python3 tests/test_controller_credential.py -v
+npm run check
+npm run test:xbt
+npm run build
+npm run check:bundle
+docker buildx build --builder startos-builder --load \
+  -f Dockerfile.xbt -t xbt-cln:recovery-test .
+bash scripts/test-image-recovery.sh \
+  xbt-cln:recovery-test ../bitcoind --controller-credential
+```
+
+The disposable test uses real XBT regtest preparation and credentials, verified
+HTTPS reads, server-side denial of newaddr, and repeated revocation. It neither
+uses live wallets nor changes the installed StartOS package.

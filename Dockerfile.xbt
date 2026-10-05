@@ -100,3 +100,6 @@ RUN printf '%s\n' '81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe' > /usr/local/libexe
     PYTHONPATH=/usr/local/libexec/xbt-swap /opt/xbt-venv/bin/python -c 'import reverse_gate, quote_plugin, reverse_activation'
 COPY assets/xbt/coordinator.py /usr/local/libexec/coordinator.py
 RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); from coordinator import check_bundle; check_bundle("/usr/local/libexec/xbt-swap")'
+
+COPY assets/xbt/read_only_rpc.py assets/xbt/controller_credential.py /usr/local/libexec/
+RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import controller_credential'

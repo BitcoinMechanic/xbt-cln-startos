@@ -99,6 +99,9 @@ def main():
                     '--disable-plugin=cln-grpc',
                     '--autoconnect-seeker-peers=0', '--autolisten=false',
                     f'--bind-addr=127.0.0.1:{port}', '--log-level=debug']
+            if sys.argv[1:] == ['--controller-credential']:
+                args += ['--clnrest-host=127.0.0.1', '--clnrest-port=3010',
+                         '--clnrest-protocol=https', '--clnrest-certs='+str(directory/'rest-certs')]
             if restore:
                 intent = recovery.load(directory, recovery.INTENT)
                 args.append(f"--rescan=-{intent.get('scan_start', 1)}")
@@ -122,6 +125,44 @@ def main():
             return blocks
 
         alice, original, identity = node('alice', 19735)
+        if sys.argv[1:] == ['--controller-credential']:
+            from coordinator import Preparation
+            from controller_credential import Credentials, Blocked
+            from read_only_rpc import Client, ProbeError
+            until(lambda: not any(k.startswith('warning_') for k in rpc(alice, 'getinfo')), 'credential node sync')
+            preparation=Preparation(root/'alice','xbt-regtest')
+            preparation.prepare(True)
+            worker=Credentials(root/'alice',preparation=preparation,network='xbt-regtest')
+            first=worker.create(True)
+            check(worker.create(True)==first,'Repeated credential changed')
+            ca=root/'alice/rest-certs/ca.pem'
+            until(lambda: ca.exists(),'REST CA')
+            client=Client('https://127.0.0.1:3010',first['rune'],str(ca))
+            until(lambda: client.inspect(identity,'xbt-regtest'),'HTTPS read-only probe')
+            check(worker.status()['phase']=='active' and 'rune' not in worker.status(),'Credential status')
+            # A real denied method demonstrates server-side restrictions too.
+            import urllib.request, urllib.error, ssl
+            opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),
+                urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=str(ca))))
+            request=urllib.request.Request('https://127.0.0.1:3010/v1/newaddr',data=b'{}',
+                headers={'Rune':first['rune'],'Content-Type':'application/json'})
+            try:
+                with opener.open(request,timeout=10): pass
+            except urllib.error.HTTPError as error:
+                body=json.loads(error.read());error.close()
+                check(error.code==401 and body.get('code')==1502,'Write rejection')
+            else: raise RuntimeError('Restricted rune allowed newaddr')
+            check(worker.revoke(True)['phase']=='revoked','Revocation')
+            check(worker.revoke(True)['phase']=='revoked','Repeated revocation')
+            try: client.call('getinfo')
+            except ProbeError: pass
+            else: raise RuntimeError('Revoked rune accepted')
+            try: worker.create(True)
+            except Blocked: pass
+            else: raise RuntimeError('Revoked rune replaced automatically')
+            print('PASS: prepared XBT identity; same restricted credential reused; verified HTTPS reads; write refused; exact revocation and repeats safe',flush=True)
+            print('Packaged XBT controller credential OK (regtest; no live listener changes)',flush=True)
+            return
         bob, _, bob_id = node('bob', 19736)
         if sys.argv[1:] == ['--channel-actions']:
             from channel_actions import Channels, STATE as CHANNEL_STATE

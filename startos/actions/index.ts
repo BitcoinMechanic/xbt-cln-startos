@@ -1,3 +1,4 @@
+import { controllerCredentialStatus, controllerCredentialCreate, controllerCredentialRevoke } from './controllerCredential'
 import { coordinatorStatus, prepareCoordinator } from './coordinator'
 import { createInvoice, invoiceStatus, reviewPayment, payInvoice, paymentStatus } from './lightning'
 import { sdk } from '../sdk'
@@ -20,3 +21,5 @@ export const actions = sdk.Actions.of().addAction(nodeInfo).addAction(recoverySc
   .addAction(createInvoice).addAction(invoiceStatus).addAction(reviewPayment).addAction(payInvoice).addAction(paymentStatus)
 
   .addAction(coordinatorStatus).addAction(prepareCoordinator)
+
+  .addAction(controllerCredentialStatus).addAction(controllerCredentialCreate).addAction(controllerCredentialRevoke)
