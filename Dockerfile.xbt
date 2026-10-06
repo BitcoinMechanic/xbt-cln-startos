@@ -103,3 +103,9 @@ RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libe
 
 COPY assets/xbt/read_only_rpc.py assets/xbt/controller_credential.py /usr/local/libexec/
 RUN /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); import controller_credential'
+
+# Explicit opt-in gate wrapper; never automatically discovered as a CLN plugin.
+COPY assets/xbt/gate.py assets/xbt/gate_credential.py /usr/local/libexec/
+COPY assets/xbt/gate_plugin /usr/local/libexec/xbt-gate-plugin
+RUN chmod 755 /usr/local/libexec/xbt-gate-plugin && \
+    /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); from gate import source_check; source_check()'

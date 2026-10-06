@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/xbt-venv/bin/python /usr/local/libexec/gate.py plugin

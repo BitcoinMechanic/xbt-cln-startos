@@ -129,6 +129,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: sub,
       exec: {
         command: [
+          '/opt/xbt-venv/bin/python', '/usr/local/libexec/gate.py', 'launch', rootDir,
           'lightningd',
           `--lightning-dir=${rootDir}`,
           '--conf=/dev/null',

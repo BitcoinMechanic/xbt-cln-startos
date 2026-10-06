@@ -52,6 +52,7 @@ async function fixture(intent) {
 async function run() {
   const fresh = await fixture(null)
   assert.deepEqual(fresh.entries.map(e => e.id), ['xbt-backend-identity', 'lightningd'])
+  assert.deepEqual(Array.from(fresh.entries[1].exec.command.slice(0,5)), ['/opt/xbt-venv/bin/python','/usr/local/libexec/gate.py','launch','/root/.lightning','lightningd'])
   assert.ok(fresh.entries[1].exec.command.includes('--clnrest-port=3010'))
   assert.ok(fresh.entries[1].exec.command.includes('--clnrest-protocol=http'))
   assert.ok(fresh.entries[1].exec.command.includes('--clnrest-host=0.0.0.0'))

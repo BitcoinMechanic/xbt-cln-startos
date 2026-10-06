@@ -1,3 +1,5 @@
+import { xbtGateStatus, activateXbtGate } from './gate'
+import { gateCredentialStatus, gateCredentialCreate, gateCredentialRevoke } from './gateCredential'
 import { controllerCredentialStatus, controllerCredentialCreate, controllerCredentialRevoke } from './controllerCredential'
 import { coordinatorStatus, prepareCoordinator } from './coordinator'
 import { createInvoice, invoiceStatus, reviewPayment, payInvoice, paymentStatus } from './lightning'
@@ -23,3 +25,6 @@ export const actions = sdk.Actions.of().addAction(nodeInfo).addAction(recoverySc
   .addAction(coordinatorStatus).addAction(prepareCoordinator)
 
   .addAction(controllerCredentialStatus).addAction(controllerCredentialCreate).addAction(controllerCredentialRevoke)
+
+  .addAction(xbtGateStatus).addAction(activateXbtGate)
+  .addAction(gateCredentialStatus).addAction(gateCredentialCreate).addAction(gateCredentialRevoke)

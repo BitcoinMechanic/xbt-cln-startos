@@ -30,6 +30,8 @@ from read_only_rpc import RESTRICTIONS
 RECORD = 'controller-read-only.json'
 
 class Credentials:
+    record_name = RECORD
+    restrictions = RESTRICTIONS
     def __init__(self, root, rpc=None, preparation=None, network="xbt"):
         require(network in ("xbt", "xbt-regtest"), "wrong_network")
         self.network = network
@@ -48,7 +50,7 @@ class Credentials:
         return reply
 
     def record(self):
-        path = self.root/RECORD
+        path = self.root/self.record_name
         if not os.path.lexists(path): return None
         r = load(path)
         info = self.rpc('getinfo')
@@ -68,7 +70,7 @@ class Credentials:
             and item.get('stored',True), 'credential_binding_changed')
         actual = [[a['fieldname']+a['condition']+a['value'] for a in rule['alternatives']]
                   for rule in item['restrictions']]
-        require(actual == RESTRICTIONS, 'credential_restrictions_changed')
+        require(actual == self.restrictions, 'credential_restrictions_changed')
         return item.get('blacklisted',False)
 
     def status(self):
@@ -87,11 +89,11 @@ class Credentials:
         r=self.record()
         if r is None:
             r=dict(schema=1,node_id=binding['node_id'],network=self.network,phase='creating')
-            save(self.root/RECORD,r)
+            save(self.root/self.record_name,r)
             # Never retry this RPC if the reply or subsequent save is lost.
-            reply=self.rpc('createrune', restrictions=RESTRICTIONS)
+            reply=self.rpc('createrune', restrictions=self.restrictions)
             r.update(rune=reply['rune'],unique_id=reply['unique_id'],phase='active')
-            save(self.root/RECORD,r)
+            save(self.root/self.record_name,r)
         require(r['phase']=='active', 'credential_needs_inspection_or_is_revoked')
         require(not self.verify(r), 'credential_revoked')
         return dict(phase='active',rune=r['rune'],read_only=True,payment_started=False)
@@ -102,22 +104,22 @@ class Credentials:
         require(r is not None and r['phase']!='creating','credential_needs_inspection')
         if not self.verify(r):
             require(r['phase']!='revoked','revocation_no_longer_effective')
-            r['phase']='revoking';save(self.root/RECORD,r)
+            r['phase']='revoking';save(self.root/self.record_name,r)
             self.rpc('blacklistrune',start=int(r['unique_id']),end=int(r['unique_id']))
             require(self.verify(r), 'revocation_not_confirmed')
-        r['phase']='revoked';save(self.root/RECORD,r)
+        r['phase']='revoked';save(self.root/self.record_name,r)
         return dict(phase='revoked',read_only=True,payment_started=False)
 
 
-def main():
+def main(worker_type=Credentials, lock_name="controller-read-only.lock"):
     os.umask(0o077)
     try:
         root=Path(sys.argv[1]);request=json.load(sys.stdin)
-        fd=os.open(root/'controller-read-only.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+        fd=os.open(root/lock_name,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
         with os.fdopen(fd,'a') as lock:
             require(stat.S_ISREG(os.fstat(lock.fileno()).st_mode),'nonregular_lock')
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-            worker=Credentials(root)
+            worker=worker_type(root)
             op=request.get('operation')
             if op=='status': result=worker.status()
             elif op=='create': result=worker.create(request.get('confirmed'))

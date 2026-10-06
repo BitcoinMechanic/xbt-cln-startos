@@ -1,3 +1,4 @@
+import { unlink, writeFile } from 'fs/promises'
 import { sdk } from './sdk'
 import { mainMounts, rootDir } from './utils'
 import { T } from '@start9labs/start-sdk'
@@ -29,6 +30,8 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
   sdk.Backups.ofVolumes('main')
     .setOptions({
       exclude: [
+        'xbt-gate-activation.json',
+        'xbt-gate.lock',
         'xbt/lightning-rpc',
         'xbt/lightningd.sqlite3',
         'xbt/lightningd.sqlite3-wal',
@@ -37,5 +40,11 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
       ],
     })
     .setPreBackup(async (effects) => check(effects, 'capture'))
-    .setPostRestore(async (effects) => check(effects, 'restore')),
+    .setPostRestore(async (effects) => {
+      await writeFile(sdk.volumes.main.subpath('xbt-gate-restored.json'), JSON.stringify({ schema: 1, blocked: true }), { mode: 0o600 })
+      await unlink(sdk.volumes.main.subpath('xbt-gate-activation.json')).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error
+      })
+      await check(effects, 'restore')
+    }),
 )
