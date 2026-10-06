@@ -1,12 +1,12 @@
 const assert = require('node:assert/strict')
 const { manifest, actions } = require('../javascript/index.js')
 assert.equal(manifest.id, 'xbt-cln')
-assert.equal(manifest.version, '0.1.0:15')
+assert.equal(manifest.version, '0.1.0:16')
 assert.deepEqual(Object.keys(manifest.images), ['lightning'])
 assert.equal(manifest.images.lightning.source.dockerBuild.dockerfile, 'Dockerfile.xbt')
 assert.deepEqual(Object.keys(manifest.dependencies), ['bitcoind'])
 assert.equal(manifest.dependencies.bitcoind.optional, false)
-assert.deepEqual(Object.keys(actions.actions), ['node-info', 'recovery-scan-start', 'finish-empty-recovery', 'wallet-deposit-address', 'wallet-funds', 'wallet-withdrawal-status', 'wallet-prepare-withdrawal', 'wallet-send-withdrawal', 'wallet-cancel-withdrawal', 'channel-connect-peer', 'channel-status', 'channel-open-private', 'channel-close-private', 'channel-archive-closed', 'lightning-create-invoice', 'lightning-invoice-status', 'lightning-review-payment', 'lightning-pay-invoice', 'lightning-payment-status', 'coordinator-status', 'coordinator-prepare', 'controller-credential-status', 'controller-credential-create', 'controller-credential-revoke', 'xbt-gate-status', 'xbt-gate-activate', 'gate-credential-status', 'gate-credential-create', 'gate-credential-revoke'])
+assert.deepEqual(Object.keys(actions.actions), ['node-info', 'recovery-scan-start', 'finish-empty-recovery', 'wallet-deposit-address', 'wallet-funds', 'wallet-withdrawal-status', 'wallet-prepare-withdrawal', 'wallet-send-withdrawal', 'wallet-cancel-withdrawal', 'channel-connect-peer', 'channel-status', 'channel-open-private', 'channel-close-private', 'channel-archive-closed', 'lightning-create-invoice', 'lightning-invoice-status', 'lightning-review-payment', 'lightning-pay-invoice', 'lightning-payment-status', 'coordinator-status', 'coordinator-prepare', 'controller-credential-status', 'controller-credential-create', 'controller-credential-revoke', 'xbt-gate-status', 'xbt-gate-activate', 'gate-credential-status', 'gate-credential-create', 'gate-credential-revoke', 'inspection-credential-status', 'inspection-credential-create', 'inspection-credential-revoke'])
 console.log('XBT package identity, image, dependency and action checks OK')
 
 const fs = require('node:fs')
@@ -16,3 +16,8 @@ assert.ok(backup.includes('xbt-gate-restored.json'))
 assert.ok(!backup.includes("'xbt/swap-gate'"))
 assert.ok(fs.readFileSync('startos/main.ts', 'utf8').includes("'/usr/local/libexec/gate.py', 'launch', rootDir"))
 console.log('XBT explicit gate startup and restore barrier checks OK')
+
+assert.ok(backup.includes('controller-inspection-read-only.json'))
+assert.ok(require('node:fs').readFileSync('Dockerfile.xbt','utf8').includes('inspection_credential.py'))
+
+require('./test-inspection-action.cjs')().catch(e => { console.error(e); process.exit(1) })

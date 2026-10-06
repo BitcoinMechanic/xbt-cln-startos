@@ -1,3 +1,4 @@
+import { inspectionCredentialStatus, inspectionCredentialCreate, inspectionCredentialRevoke } from './inspectionCredential'
 import { xbtGateStatus, activateXbtGate } from './gate'
 import { gateCredentialStatus, gateCredentialCreate, gateCredentialRevoke } from './gateCredential'
 import { controllerCredentialStatus, controllerCredentialCreate, controllerCredentialRevoke } from './controllerCredential'
@@ -28,3 +29,6 @@ export const actions = sdk.Actions.of().addAction(nodeInfo).addAction(recoverySc
 
   .addAction(xbtGateStatus).addAction(activateXbtGate)
   .addAction(gateCredentialStatus).addAction(gateCredentialCreate).addAction(gateCredentialRevoke)
+  .addAction(inspectionCredentialStatus)
+  .addAction(inspectionCredentialCreate)
+  .addAction(inspectionCredentialRevoke)

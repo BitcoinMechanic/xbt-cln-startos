@@ -493,3 +493,26 @@ reports `gate_active`, not a remote quote count (that RPC does not expose one).
 Verifying both profiles removes only the gate-verification blocker: live
 execution, execution credentials, amount/fee/expiry policy, cross-chain timing
 and any restored execution barrier remain separate outstanding requirements.
+
+
+## Dedicated swap inspection credential (0.1.0:16)
+
+Use **Create or Show XBT Inspection Credential** under Coordinator
+Preparation to mint or reveal the separate read-only preflight rune. Explicit
+confirmation is required. Its exact method allowlist is `decode`, `getinfo`,
+`listfunds`, `listpeerchannels`, and `listsendpays`; it has no payment, gate,
+channel-management or credential-management authority. These reads expose
+wallet, channel and payment history information, so keep the rune private.
+The existing monitor and gate observer credentials retain their scopes.
+
+Paste this masked rune only into the Swap Controller live inspection form.
+Creation requires coordinator preparation but does not activate any gate.
+Repeating creation returns the same active rune. Status never reveals it.
+Revoke targets only this rune ID and derivatives. A lost creation reply leaves
+a durable creating record and cannot automatically mint another rune. Revoked
+or interrupted credentials require separate inspection, not file deletion.
+
+The private receipt `controller-inspection-read-only.json` and lock are
+excluded from backups; the receipt is removed on restore. This does not revoke
+an externally retained rune on a still-running original node. Inspection grants
+no execution authority, and existing gate restore barriers remain in effect.

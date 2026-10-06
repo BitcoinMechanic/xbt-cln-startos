@@ -30,6 +30,8 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
   sdk.Backups.ofVolumes('main')
     .setOptions({
       exclude: [
+        'controller-inspection-read-only.json',
+        'controller-inspection-read-only.lock',
         'xbt-gate-activation.json',
         'xbt-gate.lock',
         'xbt/lightning-rpc',
@@ -43,6 +45,10 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
     .setPostRestore(async (effects) => {
       await writeFile(sdk.volumes.main.subpath('xbt-gate-restored.json'), JSON.stringify({ schema: 1, blocked: true }), { mode: 0o600 })
       await unlink(sdk.volumes.main.subpath('xbt-gate-activation.json')).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error
+      })
+
+      await unlink(sdk.volumes.main.subpath('controller-inspection-read-only.json')).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error
       })
       await check(effects, 'restore')

@@ -109,3 +109,5 @@ COPY assets/xbt/gate.py assets/xbt/gate_credential.py /usr/local/libexec/
 COPY assets/xbt/gate_plugin /usr/local/libexec/xbt-gate-plugin
 RUN chmod 755 /usr/local/libexec/xbt-gate-plugin && \
     /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); from gate import source_check; source_check()'
+
+COPY assets/xbt/inspection_credential.py /usr/local/libexec/inspection_credential.py

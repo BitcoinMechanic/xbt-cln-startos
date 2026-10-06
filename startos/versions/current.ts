@@ -1,9 +1,8 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 export const current = VersionInfo.of({
-  version: '0.1.0:15',
+  version: '0.1.0:16',
   releaseNotes: {
-    en_US:
-      'Adds explicit bounded XBT gate activation, durable gate journal, restore invalidation and a separate read-only gate credential. Controller live execution remains disabled.',
+    en_US: 'Add a dedicated read-only inspection credential for swap preflight. No spending or gate authority.',
   },
   migrations: { up: async () => {}, down: IMPOSSIBLE },
 })
