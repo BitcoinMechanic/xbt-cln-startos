@@ -454,3 +454,11 @@ updated XBT binary; updating the StartOS coordinator does not update that VM.
 
 Upstream release: https://github.com/ElementsProject/lightning/releases/tag/v26.06.9
 StartOS SDK-2 release: https://github.com/Start9Labs/cln-startos/releases/tag/v26.6.9_0
+
+## Bounded repeat-swap grant
+
+**Enable Repeat Swap Grant** creates a reusable controller credential pinned to one connected channel, for 1–10 fixed 1,000 BTC sat → 2,000 XBT sat enrollments (default 5). New enrollment expires after 24 hours. Copy this credential into the controller's **Pair Repeat Swap Grants** action once. Leave New grant off to retrieve the same credential without renewing its budget. Explicit replacement requires all previous enrollments to be terminal.
+
+Each enrolled contract consumes a slot, including failed or expired swaps. **Pause New Swap Enrollments** stops new contracts while preserving recovery for already enrolled contracts. The credential cannot issue arbitrary node RPCs. Deadline protection can force-close the pinned BTC channel and incur on-chain fees. Restore barriers remain enforced.
+
+The first pilot record and prior quote history are preserved. Repeat contracts have separate durable records; exact retries reuse their original slot. Restart the BTC coordinator after first enabling repeat mode if requested. The controller then offers invoice-only preparation, explicit confirmation, and swap history. Candidate funded regtests must pass before installation.

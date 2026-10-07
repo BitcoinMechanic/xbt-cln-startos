@@ -30,6 +30,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
   sdk.Backups.ofVolumes('main')
     .setOptions({
       exclude: [
+        'forward-session.json', 'forward-sessions', 'forward-swaps',
         'forward-pilot.json', 'forward-pilot.lock',
         'controller-inspection-read-only.json',
         'controller-inspection-read-only.lock',

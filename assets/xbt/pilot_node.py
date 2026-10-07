@@ -65,6 +65,10 @@ class LocalRPC:
 
 
 class Node:
+    gate_profile = 'live-pilot-v1'
+
+    def gate_ready(self, gate):
+        return gate == dict(profile=self.gate_profile, registered_quotes=0)
     def __init__(self,root,role,rpc=None,clock=time.time):
         require(role in ('btc','xbt'),'invalid_role')
         self.root=Path(root);self.role=role;self.network='bitcoin' if role=='btc' else 'xbt'
@@ -103,7 +107,7 @@ class Node:
             and channel.get('htlcs')==[],'channel_not_ready')
         if self.role=='btc':
             gate=self.rpc('xbt-pilot-info')
-            require(gate==dict(profile='live-pilot-v1',registered_quotes=0),'unused_live_gate_required')
+            require(self.gate_ready(gate),'unused_live_gate_required')
         else:
             decoded=self.rpc('decode',string=c['invoice'])
             self.invoice(c,decoded,now+120)
@@ -150,7 +154,7 @@ class Node:
             and type(binding[1]) is int,'incoming_binding_changed')
         spend=self.rpc('xbt-spend-info',payment_hash=c['payment_hash'])
         expected=dict(payment_hash=c['payment_hash'],binding=binding,btc_amount_msat=1000000,
-            xbt_amount_msat=2000000,xbt_invoice=c['invoice'],pilot='live-pilot-v1')
+            xbt_amount_msat=2000000,xbt_invoice=c['invoice'],pilot=self.gate_profile)
         require(all(spend.get(k)==v for k,v in expected.items()),'incoming_terms_changed')
         return binding,spend
     def step(self,pilot_id,operation,preimage=''):
@@ -163,10 +167,10 @@ class Node:
                 require('invoice' in r['publish'],'publication_outcome_requires_inspection')
                 return dict(invoice=r['publish']['invoice'],terms=r['publish']['terms'])
             now=int(self.clock());require(c['created_at']<=now<c['admission_until'],'admission_expired')
-            require(self.rpc('xbt-pilot-info')==dict(profile='live-pilot-v1',registered_quotes=0),'unused_live_gate_required')
+            require(self.gate_ready(self.rpc('xbt-pilot-info')),'unused_live_gate_required')
             terms=dict(payment_hash=c['payment_hash'],payment_secret=secrets.token_hex(32),btc_amount_msat=1000000,
                 xbt_amount_msat=2000000,xbt_invoice=c['invoice'],expires_at=now+120,min_cltv_delta=288,
-                max_cltv_delta=2016,pilot='live-pilot-v1')
+                max_cltv_delta=2016,pilot=self.gate_profile)
             self.intent(r,'publish',dict(terms=terms))
             require(self.rpc('xbt-register',quote=terms)=={'registered':True},'registration_unknown')
             from swap_invoice import unsigned_invoice
@@ -226,12 +230,17 @@ def plugin(root,role):
                 result=dict(options=[],rpcmethods=[dict(name='swap-pilot-observe',usage='pilot_id',description='Inspect one locally authorized pilot'),
                     dict(name='swap-pilot-step',usage='pilot_id operation preimage',description='Execute one exact locally authorized pilot operation')],
                     subscriptions=[],hooks=[],dynamic=False,nonnumericids=True)
+                result['rpcmethods'].append(dict(name='swap-session-call', usage='session_id operation contract pilot_id preimage', description='Bounded repeat swap authority'))
             elif method=='init':
                 require(msg['params']['configuration']['network']==node.network,'wrong_network');result={}
             else:
                 p=msg['params'];require(type(p) is dict,'named_parameters_required')
                 with locked(root):
-                    if method=='swap-pilot-observe':
+                    if method=='swap-session-call':
+                        require(set(p)=={'session_id','operation','contract','pilot_id','preimage'},'invalid_parameters')
+                        from swap_session import Session
+                        result=Session(root,role).call(**p)
+                    elif method=='swap-pilot-observe':
                         require(set(p)=={'pilot_id'},'invalid_parameters');result=node.observe(**p)
                     else:
                         require(method=='swap-pilot-step' and set(p)=={'pilot_id','operation','preimage'},'invalid_parameters')
