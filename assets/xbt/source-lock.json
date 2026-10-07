@@ -14,5 +14,12 @@
     "rpc_internal_port": 8332,
     "volume_id": "main",
     "cookie_relative_path": ".cookie"
+  },
+  "security_overlay": {
+    "upstream_repository": "https://github.com/ElementsProject/lightning",
+    "release": "v26.06.9",
+    "release_commit": "a2176589f235b63bc1a37e69362dfd6c925397e9",
+    "patch_sha256": "1efa187e9e053edcc00aa35911599ac74f4c18181b1da5285c69fe932eaaba77",
+    "binary_version": "xbt-81ba4099a63e-cln26.06.9"
   }
 }

@@ -75,7 +75,8 @@ class Tests(unittest.TestCase):
     def test_launch_inert_by_default_bound_when_enabled(self):
         with patch.object(g.os,'execvp') as execute:
             g.launch(self.root,['lightningd','--conf=/dev/null'])
-            self.assertEqual(execute.call_args.args[1],['lightningd','--conf=/dev/null'])
+            self.assertEqual(execute.call_args.args[1],['lightningd','--conf=/dev/null','--plugin=/usr/local/libexec/xbt-pilot-plugin'])
+            self.assertNotIn('--plugin='+g.PLUGIN,execute.call_args.args[1])
         self.activate()
         with patch.object(g,'source_check'), patch.object(g.os,'execvp') as execute, patch.dict(os.environ):
             g.launch(self.root,['lightningd'])

@@ -398,3 +398,59 @@ The private receipt `controller-inspection-read-only.json` and lock are
 excluded from backups; the receipt is removed on restore. This does not revoke
 an externally retained rune on a still-running original node. Inspection grants
 no execution authority, and existing gate restore barriers remain in effect.
+
+## Explicit forward pilot authority
+
+This candidate adds **Authorize XBT Forward Pilot**. It authorizes one immutable
+contract prepared by Swap Controller 0.1.0:12: 1,000 BTC sats in and 2,000 XBT sats
+out, using the existing direct channels. Installing this version does not grant
+authority or start a payment. The image-owned pilot plugin remains inert until
+this local action is explicitly confirmed.
+
+Paste the complete reviewed contract JSON into the action. Confirm the node
+identities, channel funding pins and recipient with the controller review, then
+return the displayed pilot ID and masked rune to the controller. The rune only
+permits `swap-pilot-observe` and `swap-pilot-step` for this exact contract. The
+node-side implementation fixes the amounts, recipient, route, original payment
+attempt and permitted channel/gate operations; it exposes no generic RPC proxy.
+An XBT grant can spend the contract's 2,000 sats. A BTC grant can publish its
+invoice, resolve its bound gate, or force-close its selected channel for deadline
+protection. These are execution credentials, separate from inspection credentials.
+
+There is one contract slot per node. Repeating authorization for the identical
+contract returns the same credential; another contract is refused. An expired
+or interrupted enrollment needs inspection, not deletion of the journal or
+blind replacement. Unknown mutation replies are reconciled from original node
+evidence; an intent without sufficient evidence blocks further submission.
+
+The authority record is private and excluded from backups. Restore creates a
+persistent pilot barrier, alongside the existing gate barrier. It cannot resume
+old execution or be cleared by re-pairing. Keep both nodes and Swap Controller
+running until completion. A forced close can cost more than the pilot amount.
+
+Validation for this candidate includes local unit/action/build checks. Its new
+funded pilot matrix must pass on the packaging VM before installation and live
+approval. Regtest uses a fixture-only currency adapter; that adapter is never
+included in service images and does not prove live-chain timing safety.
+
+## Core Lightning 26.06.9 security update
+
+This revision carries the upstream 26.06.9 security update, including channel
+reestablishment, shutdown HTLC deadlines, splicing, onchaind, gossip throttling,
+rune authorization and persistent configuration hardening. The BTC package
+uses the signed release binaries. The XBT package retains its existing fork,
+network identity and database lineage and builds with a checksum-pinned source
+overlay of the 26.06.9 fixes; it is not a downgrade to the stable BTC binary.
+Swap/gate Python source pins are unchanged. Existing channels use the same
+persistent data. Do not replace XBT with an unmodified Bitcoin CLN package.
+
+The CLBOSS Auto Close packaging fix is also included: its configuration is
+written as `clboss-auto-close=true` rather than a bare flag. Existing values are
+normalized by the regular config writer. Start SDK remains 2.0.9.
+
+The security build must pass its image checks and the funded pilot matrix
+before pilot approval. The customer VM's separate XBT daemon also needs the
+updated XBT binary; updating the StartOS coordinator does not update that VM.
+
+Upstream release: https://github.com/ElementsProject/lightning/releases/tag/v26.06.9
+StartOS SDK-2 release: https://github.com/Start9Labs/cln-startos/releases/tag/v26.6.9_0

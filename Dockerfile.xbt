@@ -21,12 +21,17 @@ RUN git init && \
     git checkout --detach FETCH_HEAD && \
     test "$(git rev-parse HEAD)" = 81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe && \
     git submodule update --init --recursive
+# Security overlay is pinned and checked before compiling the existing XBT fork.
+COPY assets/xbt/cln-26.06.9-security.patch /tmp/cln-26.06.9-security.patch
+RUN echo '1efa187e9e053edcc00aa35911599ac74f4c18181b1da5285c69fe932eaaba77  /tmp/cln-26.06.9-security.patch' | sha256sum -c - && \
+    git apply --check /tmp/cln-26.06.9-security.patch && \
+    git apply /tmp/cln-26.06.9-security.patch
 RUN ./configure --prefix=/usr/local --disable-valgrind --enable-rust && \
     make -j"${BUILD_JOBS}" install-program DESTDIR=/dist RUST_PROFILE=release \
-      VERSION=xbt-81ba4099a63e && \
+      VERSION=xbt-81ba4099a63e-cln26.06.9 && \
     make -j"${BUILD_JOBS}" bitcoin/test/run-block_blake2b \
       bitcoin/test/run-bitcoin_block_from_hex bitcoin/test/run-xbt-chainparams \
-      common/test/run-xbt-maturity RUST_PROFILE=release VERSION=xbt-81ba4099a63e && \
+      common/test/run-xbt-maturity RUST_PROFILE=release VERSION=xbt-81ba4099a63e-cln26.06.9 && \
     ./bitcoin/test/run-block_blake2b && \
     ./bitcoin/test/run-bitcoin_block_from_hex && \
     ./bitcoin/test/run-xbt-chainparams && \
@@ -111,3 +116,7 @@ RUN chmod 755 /usr/local/libexec/xbt-gate-plugin && \
     /opt/xbt-venv/bin/python -c 'import sys; sys.path.insert(0, "/usr/local/libexec"); from gate import source_check; source_check()'
 
 COPY assets/xbt/inspection_credential.py /usr/local/libexec/inspection_credential.py
+
+COPY assets/xbt/pilot_node.py assets/xbt/pilot_contract.py /usr/local/libexec/
+COPY assets/xbt/pilot_plugin /usr/local/libexec/xbt-pilot-plugin
+RUN chmod 755 /usr/local/libexec/xbt-pilot-plugin && /opt/xbt-venv/bin/python -m py_compile /usr/local/libexec/pilot_node.py /usr/local/libexec/pilot_contract.py

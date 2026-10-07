@@ -30,6 +30,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
   sdk.Backups.ofVolumes('main')
     .setOptions({
       exclude: [
+        'forward-pilot.json', 'forward-pilot.lock',
         'controller-inspection-read-only.json',
         'controller-inspection-read-only.lock',
         'xbt-gate-activation.json',
@@ -43,6 +44,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
     })
     .setPreBackup(async (effects) => check(effects, 'capture'))
     .setPostRestore(async (effects) => {
+      await writeFile(sdk.volumes.main.subpath('forward-pilot-restored.json'), JSON.stringify({blocked:true}), {mode:0o600})
       await writeFile(sdk.volumes.main.subpath('xbt-gate-restored.json'), JSON.stringify({ schema: 1, blocked: true }), { mode: 0o600 })
       await unlink(sdk.volumes.main.subpath('xbt-gate-activation.json')).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error

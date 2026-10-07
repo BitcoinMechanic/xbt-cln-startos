@@ -133,6 +133,8 @@ def launch(root, args):
         path.parent.mkdir(mode=0o700, exist_ok=True)
         os.environ['XBT_GATE_ROOT'] = str(root)
         args += ['--plugin='+PLUGIN]
+    os.environ['XBT_GATE_ROOT'] = str(root)
+    args += ['--plugin=/usr/local/libexec/xbt-pilot-plugin']
     os.execvp(args[0], args)
 
 

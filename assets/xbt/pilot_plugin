@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/xbt-venv/bin/python /usr/local/libexec/pilot_node.py xbt "$XBT_GATE_ROOT" plugin

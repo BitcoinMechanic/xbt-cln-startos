@@ -1,3 +1,4 @@
+import { authorizeForwardPilot } from './forwardPilot'
 import { inspectionCredentialStatus, inspectionCredentialCreate, inspectionCredentialRevoke } from './inspectionCredential'
 import { xbtGateStatus, activateXbtGate } from './gate'
 import { gateCredentialStatus, gateCredentialCreate, gateCredentialRevoke } from './gateCredential'
@@ -15,7 +16,7 @@ import { depositAddress, walletFunds, withdrawalStatus, prepareWithdrawal, sendW
 import { connectPeer, channelStatus, openChannel, closeChannel, archiveChannel } from './channels'
 
 // Bounded wallet, channel and Lightning payment actions.
-export const actions = sdk.Actions.of().addAction(nodeInfo).addAction(recoveryScanStart).addAction(finishEmptyRecovery)
+export const actions = sdk.Actions.of().addAction(authorizeForwardPilot).addAction(nodeInfo).addAction(recoveryScanStart).addAction(finishEmptyRecovery)
   .addAction(depositAddress).addAction(walletFunds).addAction(withdrawalStatus)
   .addAction(prepareWithdrawal).addAction(sendWithdrawal).addAction(cancelWithdrawal)
 

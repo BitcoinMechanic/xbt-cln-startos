@@ -1,0 +1,3 @@
+
+# Unified diffs contain significant context prefixes.
+assets/xbt/cln-26.06.9-security.patch -whitespace
