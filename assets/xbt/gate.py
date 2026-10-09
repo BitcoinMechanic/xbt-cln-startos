@@ -151,7 +151,7 @@ def plugin():
     original = sys.stdin
     token = None
     try:
-        namespace = runpy.run_path(str(SOURCE / 'reverse_gate.py'))
+        from reverse_repeat_gate import main as repeat_main
         from reverse_activation import ACTIVE
         # This private context enables only this gate process after validating the
         # package's explicit identity-bound opt-in. No controller process inherits it.
@@ -164,7 +164,7 @@ def plugin():
                         require(message['params']['configuration']['network'] == 'xbt', 'wrong_network')
                 yield line
         sys.stdin = requests()
-        namespace['main'](path, live=True)
+        repeat_main(path, live=True)
     finally:
         if token is not None: ACTIVE.reset(token)
         sys.stdin = original

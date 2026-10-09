@@ -10,10 +10,10 @@ from pathlib import Path
 import secrets
 import sys
 import time
-from pilot_contract import digest, hex32, pin_matches, require, validate, routed, incoming_pins, sent_amount
-from pilot_node import Node, load, locked, save
+from reverse_contract import digest, hex32, pin_matches, require, validate, routed, incoming_pins, sent_amount, GRANT_LIMITS, route_limit
+from reverse_node import Node, load, locked, save
 
-PROFILE = 'startos-fixed-repeat-v1'
+PROFILE = 'startos-reverse-repeat-v1'
 FIELDS = ('channel_id','short_channel_id','funding_txid','funding_outnum','peer_id')
 
 
@@ -29,9 +29,9 @@ class RepeatNode(Node):
     def __init__(self, root, role, pilot_id, rpc=None, clock=time.time):
         require(hex32(pilot_id), 'invalid_swap_id')
         super().__init__(root, role, rpc, clock)
-        self.path = folder(self.root, 'forward-swaps') / (pilot_id + '.json')
+        self.path = folder(self.root, 'reverse-swaps') / (pilot_id + '.json')
     def gate_ready(self, gate):
-        return gate.get('profile') == PROFILE and type(gate.get('registered_quotes')) is int
+        return gate.get('profile') == 'reverse-live-v1' and gate.get('repeat_profile') == PROFILE and gate.get('gate_active') is True
 
 
 class Session:
@@ -39,12 +39,12 @@ class Session:
     def __init__(self, root, role, rpc=None, clock=time.time):
         self.node = Node(root, role, rpc, clock)
         self.root = self.node.root; self.role = role; self.rpc = self.node.rpc; self.clock = clock
-    def sessions(self): return folder(self.root, 'forward-sessions')
-    def records(self): return folder(self.root, 'forward-swaps')
+    def sessions(self): return folder(self.root, 'reverse-sessions')
+    def records(self): return folder(self.root, 'reverse-swaps')
     def read(self, session_id):
         self.node.barrier(); require(hex32(session_id), 'invalid_session_id')
         s = load(self.sessions() / (session_id + '.json'))
-        require(s['session_id'] == session_id and s['role'] == self.role, 'session_identity_changed')
+        require(s['session_id'] == session_id and s['role'] == self.role and s.get('profile') in GRANT_LIMITS, 'session_identity_changed')
         info = self.rpc('getinfo')
         require(info.get('id') == s['node_id'] and info.get('network') == self.node.network
                 and not any(k.startswith('warning') for k in info), 'session_identity_changed')
@@ -77,13 +77,13 @@ class Session:
         require(type(history) is list, 'previous_htlc_not_terminal')
         found = [h for h in history if h.get('payment_hash') == c['payment_hash']]
         if 'retire' in r:
-            require(found == [], 'retired_outgoing_changed' if self.role == 'xbt' else 'retirement_unconfirmed')
+            require(found == [], 'retired_outgoing_changed' if self.role == 'btc' else 'retirement_unconfirmed')
             return
         expected = dict(short_channel_id=pin['short_channel_id'], payment_hash=c['payment_hash'],
-                        direction='in' if self.role == 'btc' else 'out',
-                        amount_msat=1000000 if self.role == 'btc' else sent_amount(c),
-                        state='SENT_REMOVE_ACK_REVOCATION' if self.role == 'btc' else 'RCVD_REMOVE_ACK_REVOCATION')
-        if self.role == 'btc':
+                        direction='in' if self.role == 'xbt' else 'out',
+                        amount_msat=3000000 if self.role == 'xbt' else sent_amount(c),
+                        state='SENT_REMOVE_ACK_REVOCATION' if self.role == 'xbt' else 'RCVD_REMOVE_ACK_REVOCATION')
+        if self.role == 'xbt':
             expected['id'] = binding[1]
             if routed(c): expected['expiry'] = r['incoming_expiry']
         require(len(found) == 1 and all(type(found[0].get(k)) is type(v) and found[0].get(k) == v
@@ -93,9 +93,9 @@ class Session:
         require(r.get('pilot_id') == digest(c) and r.get('role') == self.role, 'authority_changed')
         require('close' not in r, 'previous_swap_requires_recovery')
         pin = c['channels'][self.role]; binding = None
-        if self.role == 'btc':
+        if self.role == 'xbt':
             require('publish' in r, 'previous_enrollment_unfinished')
-            g = self.rpc('xbt-quote-status', payment_hash=c['payment_hash'])
+            g = self.rpc('reverse-status', payment_hash=c['payment_hash'])
             if 'retire' in r:
                 require(g.get('payment_hash')==c['payment_hash'] and g.get('phase')=='expired' and g.get('binding') is None, 'retirement_unconfirmed')
                 self.terminal_channel(c, r, pin)
@@ -128,9 +128,8 @@ class Session:
         self.terminal_channel(c, r, pin, binding)
     def prior(self, except_id=None, cross=True):
         if cross:
-            from reverse_session import Session as OtherSession
+            from swap_session import Session as OtherSession
             OtherSession(self.root,self.role,self.rpc,self.clock).prior(cross=False)
-        if self.node.path.exists(): self.terminal(load(self.node.path))
         for path in self.records().glob('*.json'):
             if path.stem != except_id: self.terminal(load(path))
         # A reserved slot with no complete record must never be silently skipped.
@@ -139,17 +138,20 @@ class Session:
             for pilot_id in s['enrolled']:
                 require((self.records()/(pilot_id+'.json')).exists() or pilot_id == except_id,
                         'enrollment_outcome_unknown')
-    def enable(self, channel_id, max_swaps, confirmed, new_grant=False, routed_grant=False):
+    def enable(self, channel_id, max_swaps, confirmed, new_grant=False, routed_grant=True, max_delay=80):
+        require(type(max_delay) is int and max_delay in GRANT_LIMITS.values(), 'invalid_route_limit')
+        require(routed_grant is True, 'routed_reverse_required')
         require(confirmed is True and type(new_grant) is bool and type(routed_grant) is bool, 'confirmation_required')
         require(type(max_swaps) is int and 1 <= max_swaps <= 10, 'invalid_swap_limit')
         self.node.barrier()
-        active = self.root/'forward-session.json'
+        active = self.root/'reverse-session.json'
         if active.exists() and not new_grant:
             s = self.read(load(active)['session_id'])
             require((not channel_id or s['channel']['short_channel_id'] == channel_id)
                     and s.get('routed',False)==routed_grant and s['max_swaps'] == max_swaps and s.get('rune'), 'existing_grant_differs_or_uncertain')
             return self.grant(s)
         self.prior()
+        self.enable_gate()
         info = self.rpc('getinfo')
         require(info.get('network') == self.node.network and not any(k.startswith('warning') for k in info), 'identity_unavailable')
         rows = self.rpc('listpeerchannels').get('channels')
@@ -162,39 +164,38 @@ class Session:
         require(all(type(r.get('short_channel_id')) is str and hex32(r.get('channel_id')) and hex32(r.get('funding_txid'))
                     and type(r.get('funding_outnum')) is int for r in choices),'invalid_channels')
         now = int(self.clock()); session_id = secrets.token_hex(32)
-        s = dict(schema=1, session_id=session_id, role=self.role, node_id=info['id'], channel=pin,
+        profile = next(profile for profile, limit in GRANT_LIMITS.items() if limit == max_delay)
+        s = dict(schema=1, profile=profile, session_id=session_id, role=self.role, node_id=info['id'], channel=pin,
                  created_at=now, expires_at=now+86400, max_swaps=max_swaps, enrolled={}, paused=False,
                  credential_intent=True, routed=routed_grant, channels=[{k:r[k] for k in FIELDS} for r in choices])
         self.write(s); save(active, {'session_id':session_id})
         # Restrict method, named parameter set and this grant ID on the CLN server.
-        restrictions = [['method=swap-session-call'], ['pnamesession_id='+session_id], ['pnum=5']]
+        restrictions = [['method=swap-reverse-call'], ['pnamesession_id='+session_id], ['pnum=5']]
         result = self.rpc('createrune', restrictions=restrictions)
         require(type(result.get('rune')) is str and result.get('unique_id') is not None, 'credential_reply_unknown')
         s.update(rune=result['rune'], unique_id=result['unique_id']); self.write(s)
         self.enable_gate()
         return self.grant(s)
     def enable_gate(self):
-        if self.role == 'btc':
-            from gate import record, RECORD
-            activation = record(self.root)
-            activation['profile'] = PROFILE
-            save(self.root/RECORD, activation)
+        # Existing explicit XBT gate activation remains identity/restore bound.
+        if self.role == 'xbt':
+            require(RepeatNode.gate_ready(self, self.rpc('reverse-pilot-info')), 'restart_xbt_for_reverse_gate')
     def grant(self, s):
-        # Retry of the local setup also completes a crash before gate opt-in.
         self.enable_gate()
         return dict(session_id=s['session_id'], credential=json.dumps({'session_id':s['session_id'],'rune':s['rune']},separators=(',',':')),
-                    max_swaps=s['max_swaps'], expires_at=s['expires_at'],
-                    restart_required=self.role=='btc' and self.rpc('xbt-pilot-info').get('profile') != PROFILE,
-                    payment_started=False)
+                    max_swaps=s['max_swaps'], max_delay_blocks=GRANT_LIMITS[s['profile']], expires_at=s['expires_at'], restart_required=False, payment_started=False)
     def pause(self):
-        s=self.read(load(self.root/'forward-session.json')['session_id']);s['paused']=True;self.write(s)
+        s=self.read(load(self.root/'reverse-session.json')['session_id']);s['paused']=True;self.write(s)
         return dict(paused=True, recovery_preserved=True)
     def enroll(self, s, c):
         validate(c); pilot_id=digest(c)
+        # A new binary never widens authority already issued by an older grant.
+        require(s.get('profile') in GRANT_LIMITS and route_limit(c) <= GRANT_LIMITS[s['profile']],
+                'contract_exceeds_grant_timing')
         node=RepeatNode(self.root,self.role,pilot_id,self.rpc,self.clock)
         require(c['nodes'][self.role] == s['node_id'] and routed(c)==s.get('routed',False), 'outside_session_channel')
         if routed(c):
-            require(c['channels'][self.role] in s['channels'] and (self.role!='btc' or incoming_pins(c)==s['channels']), 'outside_session_channel')
+            require(c['channels'][self.role] in s['channels'] and (self.role!='xbt' or incoming_pins(c)==s['channels']), 'outside_session_channel')
         else: require(c['channels'][self.role]==s['channel'],'outside_session_channel')
         # Idempotence is exact and works after expiry/pause; it never reserves again.
         if pilot_id in s['enrolled']:
@@ -203,22 +204,23 @@ class Session:
                 r=node.record(pilot_id);require(r['session_id']==s['session_id'],'enrollment_changed')
                 return dict(pilot_id=pilot_id)
         else:
-            require(load(self.root/'forward-session.json')['session_id'] == s['session_id']
+            require(load(self.root/'reverse-session.json')['session_id'] == s['session_id']
                     and not s['paused'] and s['created_at'] <= int(self.clock()) < s['expires_at'], 'session_closed')
             require(len(s['enrolled']) < s['max_swaps'], 'session_limit_reached')
             self.prior()
             require(not node.path.exists(), 'swap_already_enrolled')
             all_records = [load(p) for p in self.records().glob('*.json')]
-            all_records += [load(p) for p in folder(self.root,'reverse-swaps').glob('*.json')]
-            if self.node.path.exists(): all_records.append(load(self.node.path))
+            all_records += [load(p) for p in folder(self.root,'forward-swaps').glob('*.json')]
+            legacy=self.root/'forward-pilot.json'
+            if legacy.exists():all_records.append(load(legacy))
             require(not any(r['contract']['payment_hash']==c['payment_hash'] for r in all_records), 'payment_hash_reused')
             now=int(self.clock());require(c['created_at']<=now<c['admission_until'],'admission_expired')
             node.identity(c);ch=node.channel(c)
             require(ch.get('state')=='CHANNELD_NORMAL' and ch.get('peer_connected') is True and ch.get('htlcs')==[], 'channel_not_ready')
-            if self.role=='xbt':
+            if self.role=='btc':
                 node.invoice(c,self.rpc('decode',string=c['invoice']),now+120)
                 require(self.rpc('listsendpays',payment_hash=c['payment_hash']).get('payments')==[], 'outgoing_already_exists')
-            else: require(node.gate_ready(self.rpc('xbt-pilot-info')), 'restart_btc_for_repeat_gate')
+            else: require(node.gate_ready(self.rpc('reverse-pilot-info')), 'restart_xbt_for_repeat_gate')
             s['enrolled'][pilot_id]=c['payment_hash'];self.write(s)
         # If power failed after reservation, retry can only finish this exact record.
         save(node.path, dict(schema=1,role=self.role,pilot_id=pilot_id,contract=c,session_id=s['session_id']))
@@ -229,17 +231,17 @@ class Session:
         s=self.read(session_id)
         if operation=='info':
             require(contract==pilot_id==preimage=='','invalid_parameters')
-            return dict(session_id=session_id,node_id=s['node_id'],network=self.node.network,channel=s['channel'],routed=s.get('routed',False),channels=s.get('channels',[s['channel']]),
+            return dict(profile=s['profile'],max_delay_blocks=GRANT_LIMITS[s['profile']],session_id=session_id,node_id=s['node_id'],network=self.node.network,channel=s['channel'],routed=s.get('routed',False),channels=s.get('channels',[s['channel']]),
                         remaining=s['max_swaps']-len(s['enrolled']),expires_at=s['expires_at'],paused=s['paused'],
-                        current=load(self.root/'forward-session.json')['session_id']==session_id,
-                        gate_ready=self.role!='btc' or RepeatNode.gate_ready(self,self.rpc('xbt-pilot-info')))
+                        current=load(self.root/'reverse-session.json')['session_id']==session_id,
+                        gate_ready=self.role!='xbt' or RepeatNode.gate_ready(self,self.rpc('reverse-pilot-info')))
         if operation=='plan':
-            require(self.role=='xbt' and s.get('routed') is True and pilot_id==preimage==''
+            require(self.role=='btc' and s.get('routed') is True and pilot_id==preimage==''
                     and not s['paused'] and int(self.clock())<s['expires_at']
-                    and load(self.root/'forward-session.json')['session_id']==session_id,'route_planning_refused')
+                    and load(self.root/'reverse-session.json')['session_id']==session_id,'route_planning_refused')
             self.prior() # Route discovery must not occupy the plugin during active recovery.
-            from routed_plan import plan
-            hops=plan(self.rpc,contract,s['node_id'])
+            from reverse_plan import plan
+            hops=plan(self.rpc,contract,s['node_id'],max_delay=GRANT_LIMITS[s['profile']])
             pins=[p for p in s['channels'] if p['short_channel_id']==hops[0]['channel'] and p['peer_id']==hops[0]['id']]
             require(len(pins)==1,'route_outside_grant')
             return dict(route=hops,channel=pins[0])
@@ -255,13 +257,13 @@ class Session:
             require(preimage=='','invalid_parameters')
             r=node.record(pilot_id)
             require(not any(k in r for k in ('send','close','release','fail')),'retirement_refused')
-            if self.role=='btc':
+            if self.role=='xbt':
                 require('publish' in r and r['publish']['terms']['expires_at']<=int(self.clock()),'quote_not_expired')
-                g=self.rpc('xbt-quote-status',payment_hash=r['contract']['payment_hash'])
+                g=self.rpc('reverse-status',payment_hash=r['contract']['payment_hash'])
                 require(g.get('phase') in ('quoted','expired') and g.get('binding') is None,'quote_was_accepted')
                 if 'retire' not in r:node.intent(r,'retire',True)
                 if g['phase']!='expired':
-                    require(self.rpc('xbt-retire-repeat',payment_hash=r['contract']['payment_hash'])=={'retired':True},'retirement_unknown')
+                    require(self.rpc('reverse-retire-repeat',payment_hash=r['contract']['payment_hash'])=={'retired':True},'retirement_unknown')
             else:
                 require(self.rpc('listsendpays',payment_hash=r['contract']['payment_hash']).get('payments')==[], 'outgoing_already_exists')
                 if 'retire' not in r:node.intent(r,'retire',True)
@@ -278,8 +280,9 @@ def main():
     with locked(root):
         session=Session(root,role)
         if mode=='enable':
-            require(set(request)=={'channel','maxSwaps','confirmed','newGrant','routed'},'invalid_request')
-            result=session.enable(request['channel'],request['maxSwaps'],request['confirmed'],request['newGrant'],request['routed'])
+            fields={'channel','maxSwaps','confirmed','newGrant','routed'}
+            require(set(request) in (fields, fields|{'maxDelay'}),'invalid_request')
+            result=session.enable(request['channel'],request['maxSwaps'],request['confirmed'],request['newGrant'],request['routed'],request.get('maxDelay',80))
         else:
             require(mode=='pause' and request=={'confirmed':True},'confirmation_required');result=session.pause()
     print(json.dumps(result))

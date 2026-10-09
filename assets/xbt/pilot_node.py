@@ -133,6 +133,8 @@ class Node:
             r=self.record(pilot_id)
             require(r.get('rune') and not r.get('revoked'),'authority_unavailable')
             return dict(pilot_id=pilot_id,rune=r['rune'],payment_started='send' in r)
+        from reverse_session import Session as ReverseSession
+        ReverseSession(self.root,self.role,self.rpc,self.clock).prior(cross=False)
         channel=self.channel(c)
         require(channel.get('state')=='CHANNELD_NORMAL' and channel.get('peer_connected') is True
             and channel.get('htlcs')==[],'channel_not_ready')
@@ -270,12 +272,17 @@ def plugin(root,role):
                     dict(name='swap-pilot-step',usage='pilot_id operation preimage',description='Execute one exact locally authorized pilot operation')],
                     subscriptions=[],hooks=[],dynamic=False,nonnumericids=True)
                 result['rpcmethods'].append(dict(name='swap-session-call', usage='session_id operation contract pilot_id preimage', description='Bounded repeat swap authority'))
+                result['rpcmethods'].append(dict(name='swap-reverse-call',usage='session_id operation contract pilot_id preimage',description='Direction-scoped reverse swap authority'))
             elif method=='init':
                 require(msg['params']['configuration']['network']==node.network,'wrong_network');result={}
             else:
                 p=msg['params'];require(type(p) is dict,'named_parameters_required')
                 with locked(root):
-                    if method=='swap-session-call':
+                    if method=='swap-reverse-call':
+                        require(set(p)=={'session_id','operation','contract','pilot_id','preimage'},'invalid_parameters')
+                        from reverse_session import Session as ReverseSession
+                        result=ReverseSession(root,role).call(**p)
+                    elif method=='swap-session-call':
                         require(set(p)=={'session_id','operation','contract','pilot_id','preimage'},'invalid_parameters')
                         from swap_session import Session
                         result=Session(root,role).call(**p)
@@ -285,14 +292,21 @@ def plugin(root,role):
                         require(method=='swap-pilot-step' and set(p)=={'pilot_id','operation','preimage'},'invalid_parameters')
                         result=node.step(**p)
             reply=dict(jsonrpc='2.0',id=request_id,result=result)
-        except Exception:reply=dict(jsonrpc='2.0',id=request_id,error=dict(code=-32602,message='Pilot operation refused or uncertain; inspect pilot status.'))
+        except Exception as error:
+            reply=dict(jsonrpc='2.0',id=request_id,error=dict(code=-32602,message='Pilot operation refused or uncertain; inspect pilot status.'))
+            # Only fixed, non-sensitive planning refusals cross this boundary.
+            # Keep all mutation errors and unknown exceptions opaque.
+            if method=='swap-reverse-call' and type(msg.get('params')) is dict and msg['params'].get('operation')=='plan':
+                from reverse_contract import PLAN_ERRORS
+                if isinstance(error,ValueError) and str(error) in PLAN_ERRORS:
+                    reply=dict(jsonrpc='2.0',id=request_id,result=dict(route_error=str(error)))
         print(canonical(reply)+'\n',flush=True)
 
 
 def main():
     os.umask(0o077)
     # Pinned invoice encoder is image-owned, never loaded from a volume.
-    sys.path.insert(0,'/usr/local/libexec/cln-swap')
+    sys.path.insert(0,'/usr/local/libexec/xbt-swap' if sys.argv[1]=='xbt' else '/usr/local/libexec/cln-swap')
     role=sys.argv[1];root=Path(sys.argv[2]);mode=sys.argv[3]
     if mode=='plugin':plugin(root,role);return
     require(mode=='authorize','invalid_operation')

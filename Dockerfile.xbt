@@ -124,3 +124,6 @@ RUN chmod 755 /usr/local/libexec/xbt-pilot-plugin && /opt/xbt-venv/bin/python -m
 COPY assets/xbt/swap_session.py /usr/local/libexec/
 
 COPY assets/xbt/routed_plan.py assets/xbt/route_math.py assets/xbt/routed_invoice.py /usr/local/libexec/
+
+COPY assets/xbt/reverse_contract.py assets/xbt/reverse_node.py assets/xbt/reverse_session.py assets/xbt/reverse_plan.py assets/xbt/reverse_invoice.py assets/xbt/reverse_repeat_gate.py /usr/local/libexec/
+RUN python3 -m py_compile /usr/local/libexec/reverse_contract.py /usr/local/libexec/reverse_node.py /usr/local/libexec/reverse_session.py /usr/local/libexec/reverse_plan.py /usr/local/libexec/reverse_invoice.py /usr/local/libexec/reverse_repeat_gate.py
