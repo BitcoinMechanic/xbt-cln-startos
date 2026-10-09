@@ -1,77 +1,48 @@
-# XBT Core Lightning — bounded on-chain pilot
+# XBT Core Lightning
 
-## Live swap checkpoint (0059)
+## Swapping with 0060
 
-Both directions have now completed a user-confirmed live swap. The latest
-XBT to BTC swap completed on the customer XBT node, settled in Reverse Swap
-History and delivered 1,500 sats to the LND recipient. The earlier BTC to XBT
-swap delivered 2,000 XBT sats. Failure and restart recovery were tested in
-regtest; those live recovery outcomes are not claimed.
+After the packaging-VM script reports READY, install BTC 26.6.9:7, XBT 0.1.0:25
+and Swap Controller 0.1.0:22. Keep your saved pairing, inspection credentials and
+grants. This update does not require grant renewal or a new test payment.
+Finish any active swap before updating the installed services.
 
-Keep the installed BTC 26.6.9:6, XBT 0.1.0:24 and Swap Controller 0.1.0:21.
-This documentation/source checkpoint needs no rebuild, reinstall or grant
-renewal. Existing grants keep their saved limits and remaining budget.
-For another swap, use invoice → confirm → pay and verify both the recipient
-amount and the corresponding Swap History result.
+In **Swap Controller → Swaps**, open **Swap Status** to check connections,
+remaining grant slots, expiry and any setup problem. It is read-only. A ready
+status means you can check an invoice; it does not guarantee a usable route.
+Then use the actions for the direction you want:
 
-## Reverse public-prefix timing update (0058)
+- **New BTC to XBT Swap** → **Confirm BTC to XBT Swap** → pay the BTC invoice.
+  Check **BTC to XBT Swap History** and the XBT recipient receipt.
+- **New XBT to BTC Swap** → **Confirm XBT to BTC Swap** → pay the XBT invoice.
+  Check **XBT to BTC Swap History** and the BTC recipient receipt.
 
-Install BTC 26.6.9:6, XBT 0.1.0:24 and Swap Controller 0.1.0:21 after the 0058
-packaging script reports READY. New reverse grants allow a maximum 288-block
-BTC route. Existing grants retain their original 80- or 144-block limit.
-The earlier read-only three-hop route needed 200 blocks and 2.002 sats in fees;
-review the actual planned route for each new swap.
+The fixed prices remain 1,000 BTC sats → 2,000 XBT sats and 3,000 XBT sats →
+1,500 BTC sats. Payer routing fees are additional. Use a fresh recipient invoice
+with at least 33 minutes remaining and final CLTV at most 40. Include private
+routing hints where needed. Review the recipient, amounts and route fee before
+confirming. Only an unapproved draft can be cancelled.
 
-After existing swaps finish, use **Enable Reverse Swap Grant** on BOTH
-coordinators. Enable **Replace a previous grant with a new 24-hour budget**,
-select the swap count and explicitly confirm the displayed bounds. Check
-**Maximum BTC route delay (blocks)** is **288** on both results. Retrieval with
-replacement off preserves the old budget. Pair the new credentials under
-**Pair Reverse Swap Grants**; its result must also show 288. Retain the existing
-node pairing and inspection credentials.
+**Swap Setup** contains node pairing, inspection credentials, **Pair BTC to XBT
+Grants** and **Pair XBT to BTC Grants**. On each coordinator, **Swap Grants**
+contains **Enable BTC to XBT Grant**, **Enable XBT to BTC Grant** and each
+direction's pause control. Keep replacement off to retrieve a grant using its
+original settings. Expiry or pause stops new enrollment while already enrolled
+swaps retain recovery rights. Explicitly replace grants only after existing
+swaps finish; this update does not widen an old grant or replenish its slots.
 
-Use a fresh 1,500-sat BTC invoice with at least 33 minutes remaining, final CLTV
-at most 40 and private hints where needed. Review the amounts, routing fee and
-planned delay before confirming and paying the XBT invoice. The previously
-observed route was 200 blocks and 2,002 msat; a newly selected route can differ.
-The maximum routing fee remains 10 BTC sats, with four hops, one part and one
-outgoing attempt. A refusal displays your actual saved timing limit.
+The controller normally shows 15 actions. Regtest and old pilot-creation tools
+are hidden from the menu. **Legacy Pilot Status** and its approval action appear
+if an older record exists. Legacy quote/recovery inspection appears when its
+records exist. **Advanced / Recovery → Worker Status** remains available.
+Coordinator single-pilot authorization is retained under **Advanced / Legacy**
+for an older reviewed contract. Current direct swaps still work through the
+normal swap actions and existing direct grants.
 
-Pending or uncertain swaps must finish/recover before renewal. Their original
-payment attempts and incoming bindings remain intact; no automatic retries or
-multipart payments are added. Existing BTC to XBT grants and history remain
-available.
-
-## XBT to BTC swaps
-
-The 0058 packaging-VM test script reported READY for the installed packages. Existing BTC to XBT grants and history remain available.
-
-On each coordinator use **Enable Reverse Swap Grant**. The XBT coordinator must
-already have its gate explicitly activated and running. Review the fixed price
-(3,000 XBT sats for 1,500 BTC sats), the maximum 10 BTC sats routing fee, the
-24-hour enrollment window and the chosen 1–10 swap budget. Eligible channels
-are selected automatically; no short channel ID is required. Leave replacement
-off when retrieving an existing grant. Pausing or expiration stops new swaps
-while preserving recovery of already approved ones.
-
-In Swap Controller, retain the existing read-only pairing and inspection setup.
-Use **Pair Reverse Swap Grants** for the two new credentials. Then:
-
-1. Generate a 1,500-sat BTC recipient invoice, including private routing hints
-   if needed, with at least 33 minutes remaining and final CLTV at most 40.
-2. Use **New XBT to BTC Swap** and review the recipient, price and BTC routing fee.
-3. Open **Confirm XBT to BTC Swap** and explicitly approve that reviewed swap.
-4. Pay the returned XBT invoice once before its deadline. Payer routing fees
-   are additional. Keep both coordinators and the controller running.
-5. Check **Reverse Swap History** and the recipient's paid invoice/received amount.
-
-Only one swap may be active across both directions. Finish it, or cancel its
-unapproved draft, before starting another. Do not repeat a payment because a
-reply was lost. Restarts preserve the original attempt and incoming channel.
-Deadline protection may force-close that XBT channel and incur on-chain costs;
-on-chain recovery requires further verification and is not a settled status.
-This release does not add automatic retries or multipart swaps.
-
+If an action reports an uncertain response, check Swap Status and that swap's
+history. Keep the existing record and let its worker recover the original
+attempt. Do not pay a second time because a reply was lost. On-chain recovery
+requires separate claim/sweep verification; it is not a settled result.
 
 This is an experimental XBT (BLAKE2b) Lightning node, distinct from Bitcoin Core
 Lightning. It requires a synced, unpruned BLAKE2b Knots service on the same StartOS
@@ -304,294 +275,57 @@ attempt. Do not delete records to work around these checks. Lost close replies
 without a saved close transaction still require local inspection.
 
 
-## Coordinator preparation (0.1.0:12)
+## Coordinator setup and grants
 
-The default remains an ordinary XBT Lightning node. The image now includes the
-swap modules from CLN commit `81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`
-in an inert directory outside plugin discovery. No swap gate, controller,
-quote API or network listener is started by this addition.
+Existing paired installations can keep their saved setup after this update.
+For a fresh coordinator, use **Swap Setup → Coordinator Readiness**, then
+**Prepare Coordinator** with explicit confirmation. Preparation checks identity,
+chain synchronization, recovery state and pending HTLCs; it grants no payment
+authority. Use **Create or Show Read-only Controller Credential** to obtain the
+restricted monitoring rune for **Pair Coordinator Nodes** in Swap Controller.
+Use that node's verified HTTPS interface and authenticated StartOS root CA.
 
-**Coordinator Readiness** checks the bundle, node identity, synchronization,
-recovery state and absence of pending HTLCs. **Prepare Coordinator** requires
-explicit confirmation and saves a local preparation receipt tied to this node,
-network and source revision. Repeating preparation preserves the same receipt.
-Neither action sends payments or changes channels. The readiness action only
-reads node RPCs; its action lock may be created locally.
+Create or retrieve the node's separate **Inspection Credential** under
+**Swap Setup**, then save both node inspection credentials in the controller.
+These allow invoice, reserve and channel checks without payment authority.
+Keep them private. Do not substitute an administrator rune, delete interrupted
+credential records, or bypass a restore barrier.
 
-This is preparation only, not live swap authorization. A future controller
-pairing step must bind both operators and their policy before enabling gates.
-The receipt is not a substitute for that activation check, and is not included
-in key/SCB recovery backups. Recovered nodes must be prepared and paired again.
-Existing wallet and channel actions continue unchanged.
+Enable the bounded swap gate when the setup action requests it. On the XBT
+coordinator, reverse swaps require **Enable Bounded XBT Swap Gate**, followed by
+a restart if indicated and **XBT Swap Gate Status**. The BTC grant setup reports
+any required BTC gate restart. Gate activation alone does not authorize a swap.
+Grant controls under **Swap Grants** separately approve the fixed amounts,
+route limits, selected channels and enrollment budget. Review those bounds
+before confirming, then pair the credentials for that direction in the controller.
 
+For routed BTC to XBT grants, explicitly enable **Allow routed swaps** and leave
+the optional channel field empty to approve all currently eligible local channels
+(up to eight). Existing direct grants keep their mode unless explicitly replaced.
+XBT to BTC grants automatically select eligible local channels. New reverse
+grants allow up to 288 BTC route-delay blocks; old grants retain 80 or 144.
+A status check never renews or widens a grant.
 
-## Read-only controller credential (0.1.0:13)
+After adding or closing channels, finish existing swaps before explicitly
+replacing grants and pairing the new credentials. More receiving liquidity does
+not resolve a fee/dust protection refusal. Preserve records if the outcome of
+any earlier payment or grant operation is uncertain.
 
-Coordinator Preparation includes Controller Credential Status, Create or Show
-Read-only Controller Credential, and Revoke Read-only Controller Credential.
-Run Prepare Coordinator first. Creation/export requires the existing XBT
-identity, synchronization and recovery checks to pass. The rune is masked and
-copyable; status never returns it. It permits only `getinfo` and
-`listpeerchannels`, with zero parameters. No payment methods are authorized.
+Development fixtures and historical release details are documented in README.md.
 
-Repeated creation returns the same active rune. A durable creation intent
-prevents another mint after a lost reply; an interrupted creation requires
-inspection, not deletion of its record. Revocation targets only the saved rune
-ID and reconciles a lost reply. Repeated revocation is safe, and revoked runes
-are not automatically replaced in this version.
+## Recipient hints and preparation errors
 
-The private controller-read-only.json record stays on the main volume and is
-included in backups. Its saved phase is not proof of credential validity after
-a database restore: the helper checks CLN's stored rune and blacklist before
-export/status/revocation. Missing, changed or unexpectedly unrevoked credentials
-are refused. Restored credentials require inspection; preserving CLN revocation
-history through restoration is outside this patch's guarantees.
+A recipient invoice needs a route the paying coordinator can discover. Private
+hints being enabled does not guarantee a hint was included: CLN can omit a
+channel whose peer appears to be a dead end. If preparation reports an unavailable
+coordinator request while Swap Status says ready, check the recipient invoice's
+actual hint count and channel readiness. A read-only route/history diagnostic
+can distinguish a route refusal from an authority or transport problem. Keep
+existing grants and records while diagnosing.
 
-No REST listener or StartOS interface is added here. A later transport step
-will pair the controller using verified HTTPS; never transmit this rune over
-unencrypted HTTP. Existing peer connectivity remains as configured.
-
-Validate on the packaging VM:
-
-```sh
-python3 tests/test_controller_credential.py -v
-npm run check
-npm run test:xbt
-npm run build
-npm run check:bundle
-docker buildx build --builder startos-builder --load \
-  -f Dockerfile.xbt -t xbt-cln:recovery-test .
-bash scripts/test-image-recovery.sh \
-  xbt-cln:recovery-test ../bitcoind --controller-credential
-```
-
-The disposable test uses real XBT regtest preparation and credentials, verified
-HTTPS reads, server-side denial of newaddr, and repeated revocation. It neither
-uses live wallets nor changes the installed StartOS package.
-
-
-## Controller RPC interface (0.1.0:14)
-
-The XBT Controller RPC interface exports CLN REST on internal port 3010,
-with host/interface ID `controller-rpc`. It has no rune, username, or query
-parameters in its URL. The Lightning peer interface retains its existing ID
-and port. Use the HTTPS address shown by StartOS rather than assuming an
-external port: StartOS may assign a different port when one is occupied.
-
-StartOS terminates HTTPS at its edge and forwards HTTP to CLN REST inside
-the service network. The SDK's HTTP binding uses `secure: null` and an
-`addSsl` listener; the package does not mark plaintext as safe for untrusted
-networks. Local/bridge HTTP may still be available to trusted paths. Use only
-verified HTTPS for off-box controller credentials. Reachability and enabled
-addresses remain under the operator's StartOS interface settings; this patch
-does not configure Tor or public exposure.
-
-CLN REST uses Rune authentication for RPC. The dedicated controller rune
-restricts requests to getinfo and listpeerchannels without parameters. The
-endpoint itself is not a read-only filter: another rune carries its own
-permissions. Do not substitute an unrestricted rune. Public CLN REST metadata
-or documentation routes are not proof of authenticated RPC access.
-
-For an off-box client, obtain the server's root CA through the authenticated
-StartOS certificate download flow and trust it explicitly when verifying the
-HTTPS URL. This package's pinned SDK does not provide getRootCa, so no custom
-certificate-export action is included. Do not disable certificate or hostname
-verification to work around a connection failure.
-
-```sh
-npm run check
-npm run test:xbt
-npm run build
-npm run check:bundle
-BUILDX_BUILDER=startos-builder make x86
-```
-
-The interface test executes the factory with the installed SDK's real
-MultiHost/Origin implementation and verifies the generated TLS binding and
-credential-free URL. The daemon topology test verifies the matching CLN REST
-port, host and HTTP protocol flags. These checks do not exercise a live StartOS
-edge proxy: verify external HTTPS and denied unauthenticated RPC after updating.
-Existing credential records are reused; no swap gate or controller is activated.
-
-## XBT reverse gate opt-in and observation
-
-XBT Core Lightning 0.1.0:15 adds **XBT Swap Gate Status** and
-**Enable Bounded XBT Swap Gate**. Prepare Coordinator must already succeed,
-and a connected normal channel with no pending HTLCs is required for activation.
-Activation saves a receipt bound to this node, its wallet secret hash and the
-exact pinned Python source bundle. Restart the service explicitly, then check
-status again. The wrapper loads immutable image code; the durable gate journal
-is stored at `xbt/swap-gate/reverse_gate.quotes.json`.
-
-The reverse gate uses `reverse-live-v1`: 1,500 BTC sats payout, incoming XBT from
-1 to 500,000 sats, at most 30 BTC sats routing fee, and one active quote at a time.
-These are existing pilot bounds, not a market price or a controller authorization.
-The forward BTC gate's `live-pilot-v1` limits are different. Ordinary payments
-with unregistered hashes continue normally. This action publishes no invoice,
-registers no quote, creates no credential and submits no payment.
-
-Activation is excluded from backups. Restore writes a gate barrier before
-removing activation and running existing recovery checks. The gate journal is
-preserved; an existing journal without its activation cannot be silently reused.
-There is no automatic barrier reset or gate-disable action for unresolved swaps.
-
-After the gate is active, use **Create or Show XBT Gate Observation Credential**.
-It permits only parameterless `getinfo` and `reverse-pilot-info`; its status and
-revocation actions are separate from the existing monitor credential.
-In Swap Controller 0.1.0:8, **Pair XBT Gate Observation** reuses the saved XBT
-HTTPS endpoint and CA, verifies both node identities and binds the new credential
-to the current pairing generation. Existing BTC gate pairing is preserved.
-Controller backups omit both observation credentials and restore removes them.
-
-Live Swap Readiness verifies the two profiles independently. XBT observation
-reports `gate_active`, not a remote quote count (that RPC does not expose one).
-Verifying both profiles removes only the gate-verification blocker: live
-execution, execution credentials, amount/fee/expiry policy, cross-chain timing
-and any restored execution barrier remain separate outstanding requirements.
-
-
-## Dedicated swap inspection credential (0.1.0:16)
-
-Use **Create or Show XBT Inspection Credential** under Coordinator
-Preparation to mint or reveal the separate read-only preflight rune. Explicit
-confirmation is required. Its exact method allowlist is `decode`, `getinfo`,
-`listfunds`, `listpeerchannels`, and `listsendpays`; it has no payment, gate,
-channel-management or credential-management authority. These reads expose
-wallet, channel and payment history information, so keep the rune private.
-The existing monitor and gate observer credentials retain their scopes.
-
-Paste this masked rune only into the Swap Controller live inspection form.
-Creation requires coordinator preparation but does not activate any gate.
-Repeating creation returns the same active rune. Status never reveals it.
-Revoke targets only this rune ID and derivatives. A lost creation reply leaves
-a durable creating record and cannot automatically mint another rune. Revoked
-or interrupted credentials require separate inspection, not file deletion.
-
-The private receipt `controller-inspection-read-only.json` and lock are
-excluded from backups; the receipt is removed on restore. This does not revoke
-an externally retained rune on a still-running original node. Inspection grants
-no execution authority, and existing gate restore barriers remain in effect.
-
-## Explicit forward pilot authority
-
-This candidate adds **Authorize XBT Forward Pilot**. It authorizes one immutable
-contract prepared by Swap Controller 0.1.0:12: 1,000 BTC sats in and 2,000 XBT sats
-out, using the existing direct channels. Installing this version does not grant
-authority or start a payment. The image-owned pilot plugin remains inert until
-this local action is explicitly confirmed.
-
-Paste the complete reviewed contract JSON into the action. Confirm the node
-identities, channel funding pins and recipient with the controller review, then
-return the displayed pilot ID and masked rune to the controller. The rune only
-permits `swap-pilot-observe` and `swap-pilot-step` for this exact contract. The
-node-side implementation fixes the amounts, recipient, route, original payment
-attempt and permitted channel/gate operations; it exposes no generic RPC proxy.
-An XBT grant can spend the contract's 2,000 sats. A BTC grant can publish its
-invoice, resolve its bound gate, or force-close its selected channel for deadline
-protection. These are execution credentials, separate from inspection credentials.
-
-There is one contract slot per node. Repeating authorization for the identical
-contract returns the same credential; another contract is refused. An expired
-or interrupted enrollment needs inspection, not deletion of the journal or
-blind replacement. Unknown mutation replies are reconciled from original node
-evidence; an intent without sufficient evidence blocks further submission.
-
-The authority record is private and excluded from backups. Restore creates a
-persistent pilot barrier, alongside the existing gate barrier. It cannot resume
-old execution or be cleared by re-pairing. Keep both nodes and Swap Controller
-running until completion. A forced close can cost more than the pilot amount.
-
-Validation for this candidate includes local unit/action/build checks. Its new
-funded pilot matrix must pass on the packaging VM before installation and live
-approval. Regtest uses a fixture-only currency adapter; that adapter is never
-included in service images and does not prove live-chain timing safety.
-
-## Core Lightning 26.06.9 security update
-
-This revision carries the upstream 26.06.9 security update, including channel
-reestablishment, shutdown HTLC deadlines, splicing, onchaind, gossip throttling,
-rune authorization and persistent configuration hardening. The BTC package
-uses the signed release binaries. The XBT package retains its existing fork,
-network identity and database lineage and builds with a checksum-pinned source
-overlay of the 26.06.9 fixes; it is not a downgrade to the stable BTC binary.
-Swap/gate Python source pins are unchanged. Existing channels use the same
-persistent data. Do not replace XBT with an unmodified Bitcoin CLN package.
-
-The CLBOSS Auto Close packaging fix is also included: its configuration is
-written as `clboss-auto-close=true` rather than a bare flag. Existing values are
-normalized by the regular config writer. Start SDK remains 2.0.9.
-
-The security build must pass its image checks and the funded pilot matrix
-before pilot approval. The customer VM's separate XBT daemon also needs the
-updated XBT binary; updating the StartOS coordinator does not update that VM.
-
-Upstream release: https://github.com/ElementsProject/lightning/releases/tag/v26.06.9
-StartOS SDK-2 release: https://github.com/Start9Labs/cln-startos/releases/tag/v26.6.9_0
-
-## Bounded repeat-swap grant
-
-**Enable Repeat Swap Grant** creates a reusable controller credential pinned to one connected channel, for 1–10 fixed 1,000 BTC sat → 2,000 XBT sat enrollments (default 5). New enrollment expires after 24 hours. Copy this credential into the controller's **Pair Repeat Swap Grants** action once. Leave New grant off to retrieve the same credential without renewing its budget. Explicit replacement requires all previous enrollments to be terminal.
-
-Each enrolled contract consumes a slot, including failed or expired swaps. **Pause New Swap Enrollments** stops new contracts while preserving recovery for already enrolled contracts. The credential cannot issue arbitrary node RPCs. Deadline protection can force-close the pinned BTC channel and incur on-chain fees. Restore barriers remain enforced.
-
-The first pilot record and prior quote history are preserved. Repeat contracts have separate durable records; exact retries reuse their original slot. Restart the BTC coordinator after first enabling repeat mode if requested. The controller then offers invoice-only preparation, explicit confirmation, and swap history. Candidate funded regtests must pass before installation.
-
-
-### Routed forward swap candidate
-
-Enable Repeat Swap Grant now has an explicit **Allow routed swaps** option,
-off by default. Existing direct grants keep their original scope. After all old
-swaps finish, select New grant to change modes. An empty channel field in routed
-mode snapshots up to eight currently connected, normal, idle local channels;
-new channels are never added automatically. Grant expiry, slot consumption,
-pause and restore barriers retain their previous behavior.
-
-The fixed swap remains 1,000 BTC sats for 2,000 XBT sats. The XBT coordinator may
-spend at most 10 additional XBT sats in routing fees, with a maximum of four hops
-and 80 blocks total outgoing CLTV. The final hop receives exactly 2,000 sats with
-40 blocks CLTV. There is one payment part and one outgoing attempt, with no
-payment retry or replanning after approval. Only invoice-bound read-only planning
-is added to the restricted session wrapper; no raw RPC authority is granted.
-
-The BTC invoice advertises eligible approved receiving channels using the peer's
-observed fee and CLTV policy. Private-channel route hints expose those channels
-to the payer, who still needs a reachable path to a hinted peer. The accepted
-incoming HTLC selects the actual approved channel. Its funding identity, HTLC ID
-and expiry are durably recorded before outgoing submission; deadline protection
-can close only that original channel. An unapproved channel or changed funding
-blocks outgoing submission. Existing mutation intents remain observe-only after
-an uncertain reply.
-
-The route conversion helper is vendored unchanged from
-`tools/blake2b/reverse_route.py` at source commit
-`81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`. The new wrapper and contract validation
-apply the fixed forward-swap limits independently. Public routes and bounded
-BOLT11 route hints are supported; multipath, blinded routing, automatic retries
-and reverse routed swaps are outside this candidate.
-
-Local regression tests cover the new bindings and preserve direct repeat flows.
-Funded six-node validation is provided by the controller's `--routed` harness;
-its execution on the packaging VM is required before installing this candidate.
-
-
-Private incoming BTC route hints follow CLN's SCID-alias rules: negotiated
-alias channels require the peer's remote alias; a missing alias is not replaced
-with the funding SCID. Legacy private channels prefer an available remote alias.
-The approved funding pin and the actual incoming HTLC binding remain unchanged.
-The funded routed fixture checks the advertised alias before paying and reports
-the payer's error directly if it exits before the gate accepts its HTLC.
-
-### After changing channels
-
-Repeat grants keep the channel list approved at creation. If you entered a
-channel short ID, only that channel was approved. After adding or closing a
-channel, finish current swaps and run **Enable Repeat Swap Grant** on the
-affected coordinator. Enable **Allow routed swaps**, leave the channel field
-empty, choose the swap budget and enable **Replace a previous grant with a new
-24-hour budget**. Authorize it, then use **Pair Repeat Swap Grants** in Swap
-Controller with the new credential and the other coordinator's current grant.
-
-A completed swap's closed channel can be checked against its retained history.
-If that history is unavailable or the swap still needs recovery, renewal remains
-blocked. Keep the swap records; opening another channel does not resolve an
-unsettled swap.
+On a customer CLN node, explicitly selecting eligible local channels in the
+invoice's exposeprivatechannels array can provide hints omitted by the boolean
+setting. Select from current connected, normal channels with sufficient receiving
+liquidity and verify that the new invoice contains a hint; never invent a SCID.
+This does not widen grant authority or route limits. The forward preparation UI
+can still mask a specific route refusal as a generic coordinator-request error.

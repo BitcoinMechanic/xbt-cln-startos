@@ -1,7 +1,7 @@
 import { sdk } from '../sdk'
 import { mainMounts, rootDir } from '../utils'
 const meta = async () => ({
-  name: 'Authorize XBT Forward Pilot', group: 'Forward Pilot',
+  name: 'Authorize XBT Forward Pilot', group: 'Advanced / Legacy',
   description: 'Authorize the exact reviewed 1,000 BTC sat to 2,000 XBT sat pilot contract. This credential has spending or protection authority.',
   warning: 'Only authorize the contract you reviewed in Swap Controller. Existing channels may be force-closed if deadline protection is needed.',
   allowedStatuses: 'only-running' as const, visibility: 'enabled' as const,

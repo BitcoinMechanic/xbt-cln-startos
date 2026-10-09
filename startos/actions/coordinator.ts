@@ -4,7 +4,7 @@ import { mainMounts, rootDir } from '../utils'
 const metadata = (name: string) => async () => ({
   name, description: 'Preparation only. Does not activate swap gates or spend funds.',
   warning: null, allowedStatuses: 'only-running' as const,
-  group: 'Coordinator Preparation', visibility: 'enabled' as const,
+  group: 'Swap Setup', visibility: 'enabled' as const,
 })
 async function invoke(effects: T.Effects, request: object): Promise<T.ActionResult & { version: '1' }> {
   return sdk.SubContainer.withTemp(effects, { imageId: 'lightning' }, mainMounts,
