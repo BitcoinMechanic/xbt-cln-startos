@@ -462,3 +462,63 @@ StartOS SDK-2 release: https://github.com/Start9Labs/cln-startos/releases/tag/v2
 Each enrolled contract consumes a slot, including failed or expired swaps. **Pause New Swap Enrollments** stops new contracts while preserving recovery for already enrolled contracts. The credential cannot issue arbitrary node RPCs. Deadline protection can force-close the pinned BTC channel and incur on-chain fees. Restore barriers remain enforced.
 
 The first pilot record and prior quote history are preserved. Repeat contracts have separate durable records; exact retries reuse their original slot. Restart the BTC coordinator after first enabling repeat mode if requested. The controller then offers invoice-only preparation, explicit confirmation, and swap history. Candidate funded regtests must pass before installation.
+
+
+### Routed forward swap candidate
+
+Enable Repeat Swap Grant now has an explicit **Allow routed swaps** option,
+off by default. Existing direct grants keep their original scope. After all old
+swaps finish, select New grant to change modes. An empty channel field in routed
+mode snapshots up to eight currently connected, normal, idle local channels;
+new channels are never added automatically. Grant expiry, slot consumption,
+pause and restore barriers retain their previous behavior.
+
+The fixed swap remains 1,000 BTC sats for 2,000 XBT sats. The XBT coordinator may
+spend at most 10 additional XBT sats in routing fees, with a maximum of four hops
+and 80 blocks total outgoing CLTV. The final hop receives exactly 2,000 sats with
+40 blocks CLTV. There is one payment part and one outgoing attempt, with no
+payment retry or replanning after approval. Only invoice-bound read-only planning
+is added to the restricted session wrapper; no raw RPC authority is granted.
+
+The BTC invoice advertises eligible approved receiving channels using the peer's
+observed fee and CLTV policy. Private-channel route hints expose those channels
+to the payer, who still needs a reachable path to a hinted peer. The accepted
+incoming HTLC selects the actual approved channel. Its funding identity, HTLC ID
+and expiry are durably recorded before outgoing submission; deadline protection
+can close only that original channel. An unapproved channel or changed funding
+blocks outgoing submission. Existing mutation intents remain observe-only after
+an uncertain reply.
+
+The route conversion helper is vendored unchanged from
+`tools/blake2b/reverse_route.py` at source commit
+`81ba4099a63e5a0e83f55cead53c54f2a1b3c1fe`. The new wrapper and contract validation
+apply the fixed forward-swap limits independently. Public routes and bounded
+BOLT11 route hints are supported; multipath, blinded routing, automatic retries
+and reverse routed swaps are outside this candidate.
+
+Local regression tests cover the new bindings and preserve direct repeat flows.
+Funded six-node validation is provided by the controller's `--routed` harness;
+its execution on the packaging VM is required before installing this candidate.
+
+
+Private incoming BTC route hints follow CLN's SCID-alias rules: negotiated
+alias channels require the peer's remote alias; a missing alias is not replaced
+with the funding SCID. Legacy private channels prefer an available remote alias.
+The approved funding pin and the actual incoming HTLC binding remain unchanged.
+The funded routed fixture checks the advertised alias before paying and reports
+the payer's error directly if it exits before the gate accepts its HTLC.
+
+### After changing channels
+
+Repeat grants keep the channel list approved at creation. If you entered a
+channel short ID, only that channel was approved. After adding or closing a
+channel, finish current swaps and run **Enable Repeat Swap Grant** on the
+affected coordinator. Enable **Allow routed swaps**, leave the channel field
+empty, choose the swap budget and enable **Replace a previous grant with a new
+24-hour budget**. Authorize it, then use **Pair Repeat Swap Grants** in Swap
+Controller with the new credential and the other coordinator's current grant.
+
+A completed swap's closed channel can be checked against its retained history.
+If that history is unavailable or the swap still needs recovery, renewal remains
+blocked. Keep the swap records; opening another channel does not resolve an
+unsettled swap.

@@ -122,3 +122,5 @@ COPY assets/xbt/pilot_plugin /usr/local/libexec/xbt-pilot-plugin
 RUN chmod 755 /usr/local/libexec/xbt-pilot-plugin && /opt/xbt-venv/bin/python -m py_compile /usr/local/libexec/pilot_node.py /usr/local/libexec/pilot_contract.py
 
 COPY assets/xbt/swap_session.py /usr/local/libexec/
+
+COPY assets/xbt/routed_plan.py assets/xbt/route_math.py assets/xbt/routed_invoice.py /usr/local/libexec/

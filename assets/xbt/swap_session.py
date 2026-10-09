@@ -10,7 +10,7 @@ from pathlib import Path
 import secrets
 import sys
 import time
-from pilot_contract import digest, hex32, pin_matches, require, validate
+from pilot_contract import digest, hex32, pin_matches, require, validate, routed, incoming_pins, sent_amount
 from pilot_node import Node, load, locked, save
 
 PROFILE = 'startos-fixed-repeat-v1'
@@ -50,35 +50,82 @@ class Session:
                 and not any(k.startswith('warning') for k in info), 'session_identity_changed')
         return s
     def write(self, s): save(self.sessions() / (s['session_id'] + '.json'), s)
+    def terminal_channel(self, c, r, pin, binding=None):
+        """Check historical settlement without requiring an old channel to stay open.
+
+        Never select a replacement channel. A non-normal retained channel needs
+        the original HTLC's terminal wallet state; an archived channel must match
+        every funding pin. CLN archives only after full on-chain resolution.
+        """
+        rows = self.rpc('listpeerchannels').get('channels')
+        require(type(rows) is list, 'invalid_channels')
+        matches = [ch for ch in rows if ch.get('channel_id') == pin['channel_id']]
+        if not matches:
+            closed = self.rpc('listclosedchannels').get('closedchannels')
+            require(type(closed) is list, 'previous_channel_history_unavailable')
+            matches = [ch for ch in closed if ch.get('channel_id') == pin['channel_id']]
+            require(len(matches) == 1 and pin_matches(matches[0], pin), 'previous_channel_history_unavailable')
+            return
+        require(len(matches) == 1 and pin_matches(matches[0], pin), 'channel_changed')
+        ch = matches[0]
+        require(ch.get('htlcs') == [], 'previous_swap_requires_recovery')
+        if ch.get('state') == 'CHANNELD_NORMAL': return
+        require(ch.get('state') in ('CHANNELD_SHUTTING_DOWN', 'CLOSINGD_SIGEXCHANGE',
+                'CLOSINGD_COMPLETE', 'AWAITING_UNILATERAL', 'FUNDING_SPEND_SEEN', 'ONCHAIN'),
+                'previous_swap_requires_recovery')
+        history = self.rpc('listhtlcs', id=pin['channel_id']).get('htlcs')
+        require(type(history) is list, 'previous_htlc_not_terminal')
+        found = [h for h in history if h.get('payment_hash') == c['payment_hash']]
+        if 'retire' in r:
+            require(found == [], 'retired_outgoing_changed' if self.role == 'xbt' else 'retirement_unconfirmed')
+            return
+        expected = dict(short_channel_id=pin['short_channel_id'], payment_hash=c['payment_hash'],
+                        direction='in' if self.role == 'btc' else 'out',
+                        amount_msat=1000000 if self.role == 'btc' else sent_amount(c),
+                        state='SENT_REMOVE_ACK_REVOCATION' if self.role == 'btc' else 'RCVD_REMOVE_ACK_REVOCATION')
+        if self.role == 'btc':
+            expected['id'] = binding[1]
+            if routed(c): expected['expiry'] = r['incoming_expiry']
+        require(len(found) == 1 and all(type(found[0].get(k)) is type(v) and found[0].get(k) == v
+                for k,v in expected.items()), 'previous_htlc_not_terminal')
     def terminal(self, r):
         c = validate(r['contract']); self.node.identity(c)
-        ch = self.node.channel(c)
-        require(ch.get('state') == 'CHANNELD_NORMAL' and ch.get('htlcs') == []
-                and 'close' not in r, 'previous_swap_requires_recovery')
+        require(r.get('pilot_id') == digest(c) and r.get('role') == self.role, 'authority_changed')
+        require('close' not in r, 'previous_swap_requires_recovery')
+        pin = c['channels'][self.role]; binding = None
         if self.role == 'btc':
             require('publish' in r, 'previous_enrollment_unfinished')
             g = self.rpc('xbt-quote-status', payment_hash=c['payment_hash'])
             if 'retire' in r:
                 require(g.get('payment_hash')==c['payment_hash'] and g.get('phase')=='expired' and g.get('binding') is None, 'retirement_unconfirmed')
+                self.terminal_channel(c, r, pin)
                 return
+            binding = g.get('binding')
+            if routed(c):
+                require(r.get('incoming_pin') in incoming_pins(c) and binding == r.get('incoming_binding'),
+                        'incoming_binding_changed')
+                pin = r['incoming_pin']
             require(g.get('payment_hash') == c['payment_hash'] and g.get('phase') in ('resolved','failed')
-                    and type(g.get('binding')) is list
-                    and g['binding'][0] == c['channels']['btc']['short_channel_id'], 'previous_gate_not_terminal')
-            require(('release' in r and g['phase'] == 'resolved') or ('fail' in r and g['phase'] == 'failed'),
-                    'previous_resolution_unknown')
+                    and type(binding) is list and len(binding) == 2 and type(binding[1]) is int
+                    and binding[0] == pin['short_channel_id'], 'previous_gate_not_terminal')
+            action, other = ('release','fail') if g['phase'] == 'resolved' else ('fail','release')
+            require(r.get(action) == dict(binding=binding) and other not in r, 'previous_resolution_unknown')
         else:
             p = self.rpc('listsendpays', payment_hash=c['payment_hash']).get('payments')
             if 'retire' in r:
-                require('send' not in r and p==[], 'retired_outgoing_changed');return
+                require('send' not in r and p==[], 'retired_outgoing_changed')
+                self.terminal_channel(c, r, pin)
+                return
             require('send' in r and type(p) is list and len(p) == 1, 'previous_attempt_unknown')
             p = dict(p[0]); p.setdefault('partid', 0)
             require(all(type(p.get(k)) is type(v) and p.get(k) == v for k,v in
-                        dict(payment_hash=c['payment_hash'],groupid=1,partid=0,amount_sent_msat=2000000).items())
+                        dict(payment_hash=c['payment_hash'],groupid=1,partid=0,amount_sent_msat=sent_amount(c)).items())
                     and p.get('status') in ('complete','failed'), 'previous_attempt_not_terminal')
             if p['status']=='complete':
                 import hashlib
                 require(hex32(p.get('payment_preimage')) and hashlib.sha256(bytes.fromhex(p['payment_preimage'])).hexdigest()==c['payment_hash'], 'previous_preimage_invalid')
             else: require(not p.get('payment_preimage'), 'contradictory_previous_outcome')
+        self.terminal_channel(c, r, pin, binding)
     def prior(self, except_id=None):
         if self.node.path.exists(): self.terminal(load(self.node.path))
         for path in self.records().glob('*.json'):
@@ -89,15 +136,15 @@ class Session:
             for pilot_id in s['enrolled']:
                 require((self.records()/(pilot_id+'.json')).exists() or pilot_id == except_id,
                         'enrollment_outcome_unknown')
-    def enable(self, channel_id, max_swaps, confirmed, new_grant=False):
-        require(confirmed is True and type(new_grant) is bool, 'confirmation_required')
+    def enable(self, channel_id, max_swaps, confirmed, new_grant=False, routed_grant=False):
+        require(confirmed is True and type(new_grant) is bool and type(routed_grant) is bool, 'confirmation_required')
         require(type(max_swaps) is int and 1 <= max_swaps <= 10, 'invalid_swap_limit')
         self.node.barrier()
         active = self.root/'forward-session.json'
         if active.exists() and not new_grant:
             s = self.read(load(active)['session_id'])
             require((not channel_id or s['channel']['short_channel_id'] == channel_id)
-                    and s['max_swaps'] == max_swaps and s.get('rune'), 'existing_grant_differs_or_uncertain')
+                    and s.get('routed',False)==routed_grant and s['max_swaps'] == max_swaps and s.get('rune'), 'existing_grant_differs_or_uncertain')
             return self.grant(s)
         self.prior()
         info = self.rpc('getinfo')
@@ -106,12 +153,15 @@ class Session:
         require(type(rows) is list, 'invalid_channels')
         choices = [r for r in rows if r.get('state') == 'CHANNELD_NORMAL' and r.get('peer_connected') is True
                    and r.get('htlcs') == [] and (not channel_id or r.get('short_channel_id') == channel_id)]
-        require(len(choices) == 1, 'choose_one_connected_channel')
+        require((1<=len(choices)<=8) if routed_grant else len(choices)==1, 'choose_one_connected_channel')
+        choices.sort(key=lambda r:r['short_channel_id'])
         pin = {k:choices[0][k] for k in FIELDS}
+        require(all(type(r.get('short_channel_id')) is str and hex32(r.get('channel_id')) and hex32(r.get('funding_txid'))
+                    and type(r.get('funding_outnum')) is int for r in choices),'invalid_channels')
         now = int(self.clock()); session_id = secrets.token_hex(32)
         s = dict(schema=1, session_id=session_id, role=self.role, node_id=info['id'], channel=pin,
                  created_at=now, expires_at=now+86400, max_swaps=max_swaps, enrolled={}, paused=False,
-                 credential_intent=True)
+                 credential_intent=True, routed=routed_grant, channels=[{k:r[k] for k in FIELDS} for r in choices])
         self.write(s); save(active, {'session_id':session_id})
         # Restrict method, named parameter set and this grant ID on the CLN server.
         restrictions = [['method=swap-session-call'], ['pnamesession_id='+session_id], ['pnum=5']]
@@ -139,7 +189,10 @@ class Session:
     def enroll(self, s, c):
         validate(c); pilot_id=digest(c)
         node=RepeatNode(self.root,self.role,pilot_id,self.rpc,self.clock)
-        require(c['nodes'][self.role] == s['node_id'] and c['channels'][self.role] == s['channel'], 'outside_session_channel')
+        require(c['nodes'][self.role] == s['node_id'] and routed(c)==s.get('routed',False), 'outside_session_channel')
+        if routed(c):
+            require(c['channels'][self.role] in s['channels'] and (self.role!='btc' or incoming_pins(c)==s['channels']), 'outside_session_channel')
+        else: require(c['channels'][self.role]==s['channel'],'outside_session_channel')
         # Idempotence is exact and works after expiry/pause; it never reserves again.
         if pilot_id in s['enrolled']:
             require(s['enrolled'][pilot_id] == c['payment_hash'], 'enrollment_changed')
@@ -172,10 +225,20 @@ class Session:
         s=self.read(session_id)
         if operation=='info':
             require(contract==pilot_id==preimage=='','invalid_parameters')
-            return dict(session_id=session_id,node_id=s['node_id'],network=self.node.network,channel=s['channel'],
+            return dict(session_id=session_id,node_id=s['node_id'],network=self.node.network,channel=s['channel'],routed=s.get('routed',False),channels=s.get('channels',[s['channel']]),
                         remaining=s['max_swaps']-len(s['enrolled']),expires_at=s['expires_at'],paused=s['paused'],
                         current=load(self.root/'forward-session.json')['session_id']==session_id,
                         gate_ready=self.role!='btc' or RepeatNode.gate_ready(self,self.rpc('xbt-pilot-info')))
+        if operation=='plan':
+            require(self.role=='xbt' and s.get('routed') is True and pilot_id==preimage==''
+                    and not s['paused'] and int(self.clock())<s['expires_at']
+                    and load(self.root/'forward-session.json')['session_id']==session_id,'route_planning_refused')
+            self.prior() # Route discovery must not occupy the plugin during active recovery.
+            from routed_plan import plan
+            hops=plan(self.rpc,contract,s['node_id'])
+            pins=[p for p in s['channels'] if p['short_channel_id']==hops[0]['channel'] and p['peer_id']==hops[0]['id']]
+            require(len(pins)==1,'route_outside_grant')
+            return dict(route=hops,channel=pins[0])
         if operation=='enroll':
             require(pilot_id==preimage=='' and len(contract)<=32768,'invalid_parameters')
             return self.enroll(s,json.loads(contract))
@@ -211,8 +274,8 @@ def main():
     with locked(root):
         session=Session(root,role)
         if mode=='enable':
-            require(set(request)=={'channel','maxSwaps','confirmed','newGrant'},'invalid_request')
-            result=session.enable(request['channel'],request['maxSwaps'],request['confirmed'],request['newGrant'])
+            require(set(request)=={'channel','maxSwaps','confirmed','newGrant','routed'},'invalid_request')
+            result=session.enable(request['channel'],request['maxSwaps'],request['confirmed'],request['newGrant'],request['routed'])
         else:
             require(mode=='pause' and request=={'confirmed':True},'confirmation_required');result=session.pause()
     print(json.dumps(result))
