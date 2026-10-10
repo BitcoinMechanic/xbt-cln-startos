@@ -117,6 +117,7 @@ RUN chmod 755 /usr/local/libexec/xbt-gate-plugin && \
 
 COPY assets/xbt/inspection_credential.py /usr/local/libexec/inspection_credential.py
 
+COPY assets/xbt/market_terms.py /usr/local/libexec/
 COPY assets/xbt/pilot_node.py assets/xbt/pilot_contract.py /usr/local/libexec/
 COPY assets/xbt/pilot_plugin /usr/local/libexec/xbt-pilot-plugin
 RUN chmod 755 /usr/local/libexec/xbt-pilot-plugin && /opt/xbt-venv/bin/python -m py_compile /usr/local/libexec/pilot_node.py /usr/local/libexec/pilot_contract.py

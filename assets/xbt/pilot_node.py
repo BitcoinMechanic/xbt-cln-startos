@@ -1,3 +1,4 @@
+import market_terms as mt
 #!/usr/bin/env python3
 """Local one-contract authority and exact-operation RPCs for a forward pilot.
 
@@ -112,7 +113,7 @@ class Node:
                     require(spend.get('binding')==binding and spend.get('payment_hash')==c['payment_hash'], 'incoming_binding_changed')
                     hs=[h for h in ch.get('htlcs',[]) if h.get('direction')=='in' and h.get('id')==binding[1]]
                     require(ch.get('state')=='CHANNELD_NORMAL' and ch.get('peer_connected') is True and len(hs)==1
-                            and hs[0].get('payment_hash')==c['payment_hash'] and hs[0].get('amount_msat')==1000000
+                            and hs[0].get('payment_hash')==c['payment_hash'] and hs[0].get('amount_msat')==mt.amounts(c)['btc']
                             and hs[0].get('expiry')==spend.get('cltv_expiry') and hs[0].get('state')=='RCVD_ADD_ACK_REVOCATION'
                             and hs[0].get('local_trimmed',False) is False,'committed_incoming_htlc_required')
                     # Durable once-only actual channel binding, before controller may send.
@@ -154,7 +155,7 @@ class Node:
         return dict(pilot_id=pilot_id,rune=r['rune'],payment_started=False)
     def invoice(self,c,d,deadline):
         expected=dict(valid=True,type='bolt11 invoice',currency='xbt',payment_hash=c['payment_hash'],
-            payment_secret=c['payment_secret'],payee=c['recipient'],amount_msat=2000000)
+            payment_secret=c['payment_secret'],payee=c['recipient'],amount_msat=mt.amounts(c)['xbt'])
         require(all(d.get(k)==v and type(d.get(k)) is type(v) for k,v in expected.items()),'invoice_changed')
         require(type(d.get('created_at')) is int and type(d.get('expiry')) is int
             and d['created_at']<=int(self.clock()) and d['created_at']+d['expiry']>=deadline+60
@@ -186,8 +187,8 @@ class Node:
         require(type(binding) is list and len(binding)==2 and binding[0]==ch['short_channel_id']
             and type(binding[1]) is int,'incoming_binding_changed')
         spend=self.rpc('xbt-spend-info',payment_hash=c['payment_hash'])
-        expected=dict(payment_hash=c['payment_hash'],binding=binding,btc_amount_msat=1000000,
-            xbt_amount_msat=2000000,xbt_invoice=c['invoice'],pilot=self.gate_profile)
+        expected=dict(payment_hash=c['payment_hash'],binding=binding,btc_amount_msat=mt.amounts(c)['btc'],
+            xbt_amount_msat=mt.amounts(c)['xbt'],xbt_invoice=c['invoice'],pilot=mt.GATE if mt.market(c) else self.gate_profile)
         require(all(spend.get(k)==v for k,v in expected.items()),'incoming_terms_changed')
         if routed(c): require(spend.get('cltv_expiry')==r.get('incoming_expiry'),'incoming_expiry_changed')
         return binding,spend
@@ -197,29 +198,39 @@ class Node:
         require(preimage=='' or operation=='release','unexpected_preimage')
         if operation=='publish':
             require(self.role=='btc','wrong_role')
-            if 'publish' in r:
-                require('invoice' in r['publish'],'publication_outcome_requires_inspection')
+            if 'publish' in r and 'invoice' in r['publish']:
                 return dict(invoice=r['publish']['invoice'],terms=r['publish']['terms'])
-            now=int(self.clock());require(c['created_at']<=now<c['admission_until'],'admission_expired')
-            require(self.gate_ready(self.rpc('xbt-pilot-info')),'unused_live_gate_required')
-            terms=dict(payment_hash=c['payment_hash'],payment_secret=secrets.token_hex(32),btc_amount_msat=1000000,
-                xbt_amount_msat=2000000,xbt_invoice=c['invoice'],expires_at=now+120,min_cltv_delta=288,
-                max_cltv_delta=2016,pilot=self.gate_profile)
-            invoice_hints=None
-            if routed(c):
-                from routed_invoice import hints
-                invoice_hints=hints(c,self.rpc('listpeerchannels')['channels'])
-            self.intent(r,'publish',dict(terms=terms))
-            require(self.rpc('xbt-register',quote=terms)=={'registered':True},'registration_unknown')
-            from swap_invoice import unsigned_invoice
-            unsigned=unsigned_invoice(c['payment_hash'],terms['payment_secret'],1000000,120,currency='bc',final_cltv=300)
-            if invoice_hints is not None:
-                from routed_invoice import add
-                unsigned=add(unsigned,invoice_hints)
+            if 'publish' not in r:
+                now=int(self.clock());require(c['created_at']<=now<c['admission_until'],'admission_expired')
+                require(self.gate_ready(self.rpc('xbt-pilot-info')),'unused_live_gate_required')
+                terms=dict(payment_hash=c['payment_hash'],payment_secret=secrets.token_hex(32),btc_amount_msat=mt.amounts(c)['btc'],
+                    xbt_amount_msat=mt.amounts(c)['xbt'],xbt_invoice=c['invoice'],expires_at=mt.expiry(c,now),min_cltv_delta=288,
+                    max_cltv_delta=2016,pilot=mt.GATE if mt.market(c) else self.gate_profile)
+                if mt.market(c): terms['contract']=c
+                invoice_hints=None
+                if routed(c):
+                    from routed_invoice import hints
+                    invoice_hints=hints(c,self.rpc('listpeerchannels')['channels'])
+                from swap_invoice import unsigned_invoice
+                unsigned=unsigned_invoice(c['payment_hash'],terms['payment_secret'],mt.amounts(c)['btc'],terms['expires_at']-now,currency='bc',final_cltv=300)
+                if invoice_hints is not None:
+                    from routed_invoice import add
+                    unsigned=add(unsigned,invoice_hints)
+                self.intent(r,'publish',dict(terms=terms,**({'unsigned':unsigned} if mt.market(c) else {})))
+            else:
+                require(mt.market(c) and type(r['publish'].get('unsigned')) is str,'publication_outcome_requires_inspection')
+                terms=r['publish']['terms'];unsigned=r['publish']['unsigned']
+            if mt.market(c) and int(self.clock())>=terms['expires_at']:
+                # An already-held quote may finish publication from its exact
+                # saved bytes; expired new admission cannot be registered.
+                gate=self.rpc('xbt-quote-status',payment_hash=c['payment_hash'])
+                require(gate.get('phase')=='held' and gate.get('terms')==terms,'publication_outcome_requires_inspection')
+            else:
+                require(self.rpc('xbt-register',quote=terms)=={'registered':True},'registration_unknown')
             invoice=self.rpc('signinvoice',invstring=unsigned)['bolt11']
             d=self.rpc('decode',string=invoice)
             expected=dict(valid=True,currency='bc',payee=c['nodes']['btc'],payment_hash=c['payment_hash'],
-                payment_secret=terms['payment_secret'],amount_msat=1000000,min_final_cltv_expiry=300)
+                payment_secret=terms['payment_secret'],amount_msat=mt.amounts(c)['btc'],min_final_cltv_expiry=300)
             require(all(d.get(k)==v for k,v in expected.items()),'signed_invoice_mismatch')
             r['publish']['invoice']=invoice;save(self.path,r)
             return dict(invoice=invoice,terms=terms)
@@ -242,7 +253,7 @@ class Node:
             require(ch.get('state')=='CHANNELD_NORMAL' and type(spend.get('cltv_expiry')) is int
                 and 0<spend['cltv_expiry']-height<=72,'close_deadline_not_reached')
             h=[h for h in ch.get('htlcs',[]) if h.get('id')==binding[1] and h.get('direction')=='in']
-            require(len(h)==1 and h[0].get('payment_hash')==c['payment_hash'] and h[0].get('amount_msat')==1000000
+            require(len(h)==1 and h[0].get('payment_hash')==c['payment_hash'] and h[0].get('amount_msat')==mt.amounts(c)['btc']
                 and h[0].get('expiry')==spend['cltv_expiry'] and h[0].get('state')=='RCVD_ADD_ACK_REVOCATION'
                 and h[0].get('local_trimmed',False) is False,'original_htlc_required')
             self.intent(r,'close',dict(binding=binding,expiry=spend['cltv_expiry']))

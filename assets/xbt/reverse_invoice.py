@@ -1,3 +1,4 @@
+import market_terms as mt
 """Append bounded, one-hop incoming hints to our unsigned BOLT11 invoice.
 
 Only current approved local channels with an observed remote fee/CLTV policy
@@ -33,14 +34,14 @@ def hints(c, rows):
     for pin in incoming_pins(c):
         found=[ch for ch in rows if pin_matches(ch,pin)]
         require(len(found)==1,'channel_changed');ch=found[0]
-        if ch.get('state')!='CHANNELD_NORMAL' or ch.get('peer_connected') is not True or ch.get('receivable_msat',0)<3000000:
+        if ch.get('state')!='CHANNELD_NORMAL' or ch.get('peer_connected') is not True or ch.get('receivable_msat',0)<mt.amounts(c)['xbt']:
             continue
         scid=hint_scid(ch)
         if scid is None:continue
         p=ch.get('updates',{}).get('remote',{})
         keys=('fee_base_msat','fee_proportional_millionths','cltv_expiry_delta')
         if not all(type(p.get(k)) is int and 0<=p[k]<bound for k,bound in zip(keys,(2**32,2**32,2**16))):continue
-        if not (p.get('htlc_minimum_msat',3000001)<=3000000<=p.get('htlc_maximum_msat',0)):continue
+        if not (p.get('htlc_minimum_msat',mt.amounts(c)['xbt']+1)<=mt.amounts(c)['xbt']<=p.get('htlc_maximum_msat',0)):continue
         result.append(dict(pubkey=pin['peer_id'],short_channel_id=scid,**{k:p[k] for k in keys}))
     require(result,'incoming_route_hints_unavailable')
     return result
@@ -62,11 +63,11 @@ def add(unsigned, routes):
     return encode(hrp,words+[0]*104)
 
 
-def unsigned(payment_hash,secret,final_cltv):
+def unsigned(payment_hash,secret,final_cltv,*,amount_msat=3000000,expiry=120):
     # Caller has checked the active identity-bound XBT gate and enrolled grant.
     # Limit the pinned encoder's explicit live opt-in to this single operation.
     from reverse_activation import ACTIVE
     from swap_invoice import unsigned_invoice
     token=ACTIVE.set(True)
-    try:return unsigned_invoice(payment_hash,secret,3000000,120,currency='xbt',final_cltv=final_cltv,live_reverse=True)
+    try:return unsigned_invoice(payment_hash,secret,amount_msat,expiry,currency='xbt',final_cltv=final_cltv,live_reverse=True)
     finally:ACTIVE.reset(token)

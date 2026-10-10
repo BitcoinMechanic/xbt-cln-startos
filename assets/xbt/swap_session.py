@@ -1,3 +1,4 @@
+import market_terms as mt
 """Locally enabled, channel-pinned repeat authority. No raw RPC passthrough.
 
 Enrollment consumes a durable slot before any operation is exposed. Expiry and
@@ -31,7 +32,7 @@ class RepeatNode(Node):
         super().__init__(root, role, rpc, clock)
         self.path = folder(self.root, 'forward-swaps') / (pilot_id + '.json')
     def gate_ready(self, gate):
-        return gate.get('profile') == PROFILE and type(gate.get('registered_quotes')) is int
+        return gate.get('profile') in (PROFILE,mt.GATE) and type(gate.get('registered_quotes')) is int
 
 
 class Session:
@@ -81,7 +82,7 @@ class Session:
             return
         expected = dict(short_channel_id=pin['short_channel_id'], payment_hash=c['payment_hash'],
                         direction='in' if self.role == 'btc' else 'out',
-                        amount_msat=1000000 if self.role == 'btc' else sent_amount(c),
+                        amount_msat=mt.amounts(c)['btc'] if self.role == 'btc' else sent_amount(c),
                         state='SENT_REMOVE_ACK_REVOCATION' if self.role == 'btc' else 'RCVD_REMOVE_ACK_REVOCATION')
         if self.role == 'btc':
             expected['id'] = binding[1]
@@ -93,6 +94,11 @@ class Session:
         require(r.get('pilot_id') == digest(c) and r.get('role') == self.role, 'authority_changed')
         require('close' not in r, 'previous_swap_requires_recovery')
         pin = c['channels'][self.role]; binding = None
+        if r.get('unpublished_retired') is True:
+            require(mt.market(c) and r.get('retire') is True and not any(k in r for k in ('publish','send','release','fail','close')), 'retirement_refused')
+            require(self.rpc('listsendpays',payment_hash=c['payment_hash']).get('payments')==[], 'retirement_refused')
+            self.terminal_channel(c,r,pin)
+            return
         if self.role == 'btc':
             require('publish' in r, 'previous_enrollment_unfinished')
             g = self.rpc('xbt-quote-status', payment_hash=c['payment_hash'])
@@ -139,15 +145,17 @@ class Session:
             for pilot_id in s['enrolled']:
                 require((self.records()/(pilot_id+'.json')).exists() or pilot_id == except_id,
                         'enrollment_outcome_unknown')
-    def enable(self, channel_id, max_swaps, confirmed, new_grant=False, routed_grant=False):
+    def enable(self, channel_id, max_swaps, confirmed, new_grant=False, routed_grant=False, market_limits=None):
         require(confirmed is True and type(new_grant) is bool and type(routed_grant) is bool, 'confirmation_required')
         require(type(max_swaps) is int and 1 <= max_swaps <= 10, 'invalid_swap_limit')
+        if market_limits is not None:
+            mt.limits(market_limits);require(routed_grant is True,'market_grants_required')
         self.node.barrier()
         active = self.root/'forward-session.json'
         if active.exists() and not new_grant:
             s = self.read(load(active)['session_id'])
             require((not channel_id or s['channel']['short_channel_id'] == channel_id)
-                    and s.get('routed',False)==routed_grant and s['max_swaps'] == max_swaps and s.get('rune'), 'existing_grant_differs_or_uncertain')
+                    and s.get('market_limits')==market_limits and s.get('routed',False)==routed_grant and s['max_swaps'] == max_swaps and s.get('rune'), 'existing_grant_differs_or_uncertain')
             return self.grant(s)
         self.prior()
         info = self.rpc('getinfo')
@@ -165,6 +173,7 @@ class Session:
         s = dict(schema=1, session_id=session_id, role=self.role, node_id=info['id'], channel=pin,
                  created_at=now, expires_at=now+86400, max_swaps=max_swaps, enrolled={}, paused=False,
                  credential_intent=True, routed=routed_grant, channels=[{k:r[k] for k in FIELDS} for r in choices])
+        if market_limits is not None:s.update(market_limits=market_limits,market_reserved={})
         self.write(s); save(active, {'session_id':session_id})
         # Restrict method, named parameter set and this grant ID on the CLN server.
         restrictions = [['method=swap-session-call'], ['pnamesession_id='+session_id], ['pnum=5']]
@@ -177,21 +186,22 @@ class Session:
         if self.role == 'btc':
             from gate import record, RECORD
             activation = record(self.root)
-            activation['profile'] = PROFILE
+            activation['profile'] = mt.GATE
             save(self.root/RECORD, activation)
     def grant(self, s):
         # Retry of the local setup also completes a crash before gate opt-in.
         self.enable_gate()
         return dict(session_id=s['session_id'], credential=json.dumps({'session_id':s['session_id'],'rune':s['rune']},separators=(',',':')),
-                    max_swaps=s['max_swaps'], expires_at=s['expires_at'],
-                    restart_required=self.role=='btc' and self.rpc('xbt-pilot-info').get('profile') != PROFILE,
+                    market_limits=s.get('market_limits'),max_swaps=s['max_swaps'], expires_at=s['expires_at'],
+                    restart_required=self.role=='btc' and self.rpc('xbt-pilot-info').get('profile') != mt.GATE,
                     payment_started=False)
     def pause(self):
         s=self.read(load(self.root/'forward-session.json')['session_id']);s['paused']=True;self.write(s)
         return dict(paused=True, recovery_preserved=True)
     def enroll(self, s, c):
-        validate(c); pilot_id=digest(c)
+        validate(c); mt.grant_check(s,c); pilot_id=digest(c)
         node=RepeatNode(self.root,self.role,pilot_id,self.rpc,self.clock)
+        if node.path.exists():require('retire' not in load(node.path),'retired_swap')
         require(c['nodes'][self.role] == s['node_id'] and routed(c)==s.get('routed',False), 'outside_session_channel')
         if routed(c):
             require(c['channels'][self.role] in s['channels'] and (self.role!='btc' or incoming_pins(c)==s['channels']), 'outside_session_channel')
@@ -218,7 +228,10 @@ class Session:
             if self.role=='xbt':
                 node.invoice(c,self.rpc('decode',string=c['invoice']),now+120)
                 require(self.rpc('listsendpays',payment_hash=c['payment_hash']).get('payments')==[], 'outgoing_already_exists')
-            else: require(node.gate_ready(self.rpc('xbt-pilot-info')), 'restart_btc_for_repeat_gate')
+            else:
+                g=self.rpc('xbt-pilot-info')
+                require(node.gate_ready(g) and (not mt.market(c) or g.get('profile')==mt.GATE),'restart_btc_for_repeat_gate')
+            mt.reserve(s,c,pilot_id)
             s['enrolled'][pilot_id]=c['payment_hash'];self.write(s)
         # If power failed after reservation, retry can only finish this exact record.
         save(node.path, dict(schema=1,role=self.role,pilot_id=pilot_id,contract=c,session_id=s['session_id']))
@@ -230,19 +243,43 @@ class Session:
         if operation=='info':
             require(contract==pilot_id==preimage=='','invalid_parameters')
             return dict(session_id=session_id,node_id=s['node_id'],network=self.node.network,channel=s['channel'],routed=s.get('routed',False),channels=s.get('channels',[s['channel']]),
-                        remaining=s['max_swaps']-len(s['enrolled']),expires_at=s['expires_at'],paused=s['paused'],
+                        market_limits=s.get('market_limits'),market_reserved=s.get('market_reserved',{}),remaining=s['max_swaps']-len(s['enrolled']),expires_at=s['expires_at'],paused=s['paused'],
                         current=load(self.root/'forward-session.json')['session_id']==session_id,
-                        gate_ready=self.role!='btc' or RepeatNode.gate_ready(self,self.rpc('xbt-pilot-info')))
+                        gate_ready=self.role!='btc' or (self.rpc('xbt-pilot-info').get('profile')==mt.GATE if 'market_limits' in s else RepeatNode.gate_ready(self,self.rpc('xbt-pilot-info'))))
         if operation=='plan':
             require(self.role=='xbt' and s.get('routed') is True and pilot_id==preimage==''
                     and not s['paused'] and int(self.clock())<s['expires_at']
                     and load(self.root/'forward-session.json')['session_id']==session_id,'route_planning_refused')
             self.prior() # Route discovery must not occupy the plugin during active recovery.
             from routed_plan import plan
-            hops=plan(self.rpc,contract,s['node_id'])
+            hops=plan(self.rpc,contract,s['node_id'],market_limits=s.get('market_limits'))
             pins=[p for p in s['channels'] if p['short_channel_id']==hops[0]['channel'] and p['peer_id']==hops[0]['id']]
             require(len(pins)==1,'route_outside_grant')
             return dict(route=hops,channel=pins[0])
+        if operation=='expire':
+            require(preimage=='' and len(contract)<=32768,'invalid_parameters')
+            c=validate(json.loads(contract));mt.grant_check(s,c)
+            require(mt.market(c) and digest(c)==pilot_id and int(self.clock())>=c['pricing']['expires_at'],'retirement_refused')
+            require(c['nodes'][self.role]==s['node_id'] and c['channels'][self.role] in s['channels'],'outside_session_channel')
+            node=RepeatNode(self.root,self.role,pilot_id,self.rpc,self.clock)
+            if node.path.exists():
+                r=node.record(pilot_id);require(r['session_id']==session_id,'enrollment_changed')
+            else:
+                require(pilot_id not in s['enrolled'] or s['enrolled'][pilot_id]==c['payment_hash'],'enrollment_changed')
+                r=dict(schema=1,role=self.role,pilot_id=pilot_id,contract=c,session_id=session_id)
+            require(not any(k in r for k in ('send','close','release','fail')),'retirement_refused')
+            require(self.rpc('listsendpays',payment_hash=c['payment_hash']).get('payments')==[],'outgoing_already_exists')
+            if self.role=='btc' and 'publish' in r:
+                g=self.rpc('xbt-quote-status',payment_hash=c['payment_hash'])
+                if g.get('binding') is not None or g.get('phase')=='held':return {'accepted':True}
+                require(g.get('phase') in ('quoted','expired'),'retirement_refused')
+                if 'retire' not in r:node.intent(r,'retire',True)
+                if g['phase']!='expired':require(self.rpc('xbt-retire-repeat',payment_hash=c['payment_hash'])=={'retired':True},'retirement_unknown')
+            else:
+                require('publish' not in r,'wrong_role')
+                self.terminal_channel(c,dict(r,retire=True),c['channels'][self.role])
+                r.update(retire=True,unpublished_retired=True);save(node.path,r)
+            return {'retired':True}
         if operation=='enroll':
             require(pilot_id==preimage=='' and len(contract)<=32768,'invalid_parameters')
             return self.enroll(s,json.loads(contract))
@@ -278,8 +315,8 @@ def main():
     with locked(root):
         session=Session(root,role)
         if mode=='enable':
-            require(set(request)=={'channel','maxSwaps','confirmed','newGrant','routed'},'invalid_request')
-            result=session.enable(request['channel'],request['maxSwaps'],request['confirmed'],request['newGrant'],request['routed'])
+            require(set(request)-{'marketLimits'}=={'channel','maxSwaps','confirmed','newGrant','routed'},'invalid_request')
+            result=session.enable(request['channel'],request['maxSwaps'],request['confirmed'],request['newGrant'],request['routed'],market_limits=request.get('marketLimits'))
         else:
             require(mode=='pause' and request=={'confirmed':True},'confirmation_required');result=session.pause()
     print(json.dumps(result))
@@ -289,5 +326,6 @@ if __name__=='__main__':
     try:main()
     except Exception as error:
         safe={'restored_authority_blocked','choose_one_connected_channel','previous_swap_requires_recovery','previous_gate_not_terminal','previous_attempt_not_terminal','previous_enrollment_unfinished','existing_grant_differs_or_uncertain','invalid_swap_limit'}
+        safe.update(mt.ERRORS)
         reason=str(error) if isinstance(error,ValueError) and str(error) in safe else 'session_refused_or_uncertain'
         print(json.dumps(dict(error=reason)));raise SystemExit(1) from None

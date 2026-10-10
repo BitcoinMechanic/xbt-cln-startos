@@ -1,3 +1,4 @@
+import market_terms as mt
 """Append bounded, one-hop incoming hints to our unsigned BOLT11 invoice.
 
 Only current approved local channels with an observed remote fee/CLTV policy
@@ -33,14 +34,14 @@ def hints(c, rows):
     for pin in incoming_pins(c):
         found=[ch for ch in rows if pin_matches(ch,pin)]
         require(len(found)==1,'channel_changed');ch=found[0]
-        if ch.get('state')!='CHANNELD_NORMAL' or ch.get('peer_connected') is not True or ch.get('receivable_msat',0)<1000000:
+        if ch.get('state')!='CHANNELD_NORMAL' or ch.get('peer_connected') is not True or ch.get('receivable_msat',0)<mt.amounts(c)['btc']:
             continue
         scid=hint_scid(ch)
         if scid is None:continue
         p=ch.get('updates',{}).get('remote',{})
         keys=('fee_base_msat','fee_proportional_millionths','cltv_expiry_delta')
         if not all(type(p.get(k)) is int and 0<=p[k]<bound for k,bound in zip(keys,(2**32,2**32,2**16))):continue
-        if not (p.get('htlc_minimum_msat',1000001)<=1000000<=p.get('htlc_maximum_msat',0)):continue
+        if not (p.get('htlc_minimum_msat',mt.amounts(c)['btc']+1)<=mt.amounts(c)['btc']<=p.get('htlc_maximum_msat',0)):continue
         result.append(dict(pubkey=pin['peer_id'],short_channel_id=scid,**{k:p[k] for k in keys}))
     require(result,'incoming_route_hints_unavailable')
     return result

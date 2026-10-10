@@ -1,3 +1,4 @@
+import market_terms as mt
 #!/usr/bin/env python3
 """Local one-contract authority and exact-operation RPCs for a reverse pilot.
 
@@ -58,7 +59,7 @@ class Node:
                     require(spend.get('binding')==binding and spend.get('payment_hash')==c['payment_hash'], 'incoming_binding_changed')
                     hs=[h for h in ch.get('htlcs',[]) if h.get('direction')=='in' and h.get('id')==binding[1]]
                     require(ch.get('state')=='CHANNELD_NORMAL' and ch.get('peer_connected') is True and len(hs)==1
-                            and hs[0].get('payment_hash')==c['payment_hash'] and hs[0].get('amount_msat')==3000000
+                            and hs[0].get('payment_hash')==c['payment_hash'] and hs[0].get('amount_msat')==mt.amounts(c)['xbt']
                             and hs[0].get('expiry')==spend.get('cltv_expiry') and hs[0].get('state')=='RCVD_ADD_ACK_REVOCATION'
                             and hs[0].get('local_trimmed',False) is False,'committed_incoming_htlc_required')
                     # Durable once-only actual channel binding, before controller may send.
@@ -73,7 +74,7 @@ class Node:
         return r
     def invoice(self,c,d,deadline):
         expected=dict(valid=True,type='bolt11 invoice',currency='bc',payment_hash=c['payment_hash'],
-            payment_secret=c['payment_secret'],payee=c['recipient'],amount_msat=1500000)
+            payment_secret=c['payment_secret'],payee=c['recipient'],amount_msat=mt.amounts(c)['btc'])
         require(all(d.get(k)==v and type(d.get(k)) is type(v) for k,v in expected.items()),'invoice_changed')
         require(type(d.get('created_at')) is int and type(d.get('expiry')) is int
             and d['created_at']<=int(self.clock()) and d['created_at']+d['expiry']>=deadline+60
@@ -123,8 +124,8 @@ class Node:
         require(type(binding) is list and len(binding)==2 and binding[0]==ch['short_channel_id']
             and type(binding[1]) is int,'incoming_binding_changed')
         spend=self.spend(c)
-        expected=dict(payment_hash=c['payment_hash'],binding=binding,xbt_amount_msat=3000000,
-            btc_amount_msat=1500000,btc_invoice=c['invoice'],pilot=self.gate_profile)
+        expected=dict(payment_hash=c['payment_hash'],binding=binding,xbt_amount_msat=mt.amounts(c)['xbt'],
+            btc_amount_msat=mt.amounts(c)['btc'],btc_invoice=c['invoice'],pilot=self.gate_profile)
         require(all(spend.get(k)==v for k,v in expected.items()),'incoming_terms_changed')
         if routed(c): require(spend.get('cltv_expiry')==r.get('incoming_expiry'),'incoming_expiry_changed')
         return binding,spend
@@ -138,12 +139,13 @@ class Node:
                 now=int(self.clock());require(c['created_at']<=now<c['admission_until'],'admission_expired')
                 require(self.gate_ready(self.rpc('reverse-pilot-info')),'reverse_gate_required')
                 budget=timing(c)
-                terms=dict(payment_hash=c['payment_hash'],payment_secret=secrets.token_hex(32),xbt_amount_msat=3000000,
-                    btc_amount_msat=1500000,btc_invoice=c['invoice'],expires_at=now+120,min_cltv_delta=budget['minimum'],
+                terms=dict(payment_hash=c['payment_hash'],payment_secret=secrets.token_hex(32),xbt_amount_msat=mt.amounts(c)['xbt'],
+                    btc_amount_msat=mt.amounts(c)['btc'],btc_invoice=c['invoice'],expires_at=mt.expiry(c,now),min_cltv_delta=budget['minimum'],
                     max_cltv_delta=budget['maximum'],pilot=self.gate_profile,contract=c)
                 from reverse_invoice import hints,add,unsigned as encode_unsigned
                 invoice_hints=hints(c,self.rpc('listpeerchannels')['channels'])
-                unsigned=encode_unsigned(c['payment_hash'],terms['payment_secret'],budget['invoice'])
+                options=dict(amount_msat=mt.amounts(c)['xbt'],expiry=terms['expires_at']-now) if mt.market(c) else {}
+                unsigned=encode_unsigned(c['payment_hash'],terms['payment_secret'],budget['invoice'],**options)
                 self.intent(r,'publish',dict(terms=terms,unsigned=add(unsigned,invoice_hints)))
             publication=r['publish'];terms=publication['terms']
             if 'invoice' not in publication:
@@ -153,7 +155,7 @@ class Node:
                 invoice=self.rpc('signinvoice',invstring=publication['unsigned'])['bolt11']
                 d=self.rpc('decode',string=invoice)
                 expected=dict(valid=True,currency='xbt',payee=c['nodes']['xbt'],payment_hash=c['payment_hash'],
-                    payment_secret=terms['payment_secret'],amount_msat=3000000,min_final_cltv_expiry=timing(c)['invoice'])
+                    payment_secret=terms['payment_secret'],amount_msat=mt.amounts(c)['xbt'],min_final_cltv_expiry=timing(c)['invoice'])
                 require(all(d.get(k)==v for k,v in expected.items()),'signed_invoice_mismatch')
                 publication['invoice']=invoice;save(self.path,r)
             return dict(invoice=publication['invoice'],terms=terms)
@@ -176,7 +178,7 @@ class Node:
             require(ch.get('state')=='CHANNELD_NORMAL' and type(spend.get('cltv_expiry')) is int
                 and 0<spend['cltv_expiry']-height<=144,'close_deadline_not_reached')
             h=[h for h in ch.get('htlcs',[]) if h.get('id')==binding[1] and h.get('direction')=='in']
-            require(len(h)==1 and h[0].get('payment_hash')==c['payment_hash'] and h[0].get('amount_msat')==3000000
+            require(len(h)==1 and h[0].get('payment_hash')==c['payment_hash'] and h[0].get('amount_msat')==mt.amounts(c)['xbt']
                 and h[0].get('expiry')==spend['cltv_expiry'] and h[0].get('state')=='RCVD_ADD_ACK_REVOCATION'
                 and h[0].get('local_trimmed',False) is False,'original_htlc_required')
             self.intent(r,'close',dict(binding=binding,expiry=spend['cltv_expiry']))
