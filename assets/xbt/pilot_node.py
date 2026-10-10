@@ -296,8 +296,11 @@ def plugin(root,role):
             reply=dict(jsonrpc='2.0',id=request_id,error=dict(code=-32602,message='Pilot operation refused or uncertain; inspect pilot status.'))
             # Only fixed, non-sensitive planning refusals cross this boundary.
             # Keep all mutation errors and unknown exceptions opaque.
-            if method=='swap-reverse-call' and type(msg.get('params')) is dict and msg['params'].get('operation')=='plan':
-                from reverse_contract import PLAN_ERRORS
+            if method in ('swap-session-call','swap-reverse-call') and type(msg.get('params')) is dict and msg['params'].get('operation')=='plan':
+                if method=='swap-session-call':
+                    from pilot_contract import PLAN_ERRORS
+                else:
+                    from reverse_contract import PLAN_ERRORS
                 if isinstance(error,ValueError) and str(error) in PLAN_ERRORS:
                     reply=dict(jsonrpc='2.0',id=request_id,result=dict(route_error=str(error)))
         print(canonical(reply)+'\n',flush=True)

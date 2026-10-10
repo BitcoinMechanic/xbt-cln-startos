@@ -6,7 +6,7 @@ from route_math import plan_with_hints
 
 
 def plan(rpc, invoice, source):
-    require(type(invoice) is str and invoice.startswith('lnxbt') and len(invoice)<=16384, 'invalid_invoice')
+    require(type(invoice) is str and invoice.startswith('lnxbt') and len(invoice)<=16384, 'invalid_recipient_invoice')
     d=rpc('decode',string=invoice)
     require(d.get('valid') is True and d.get('type')=='bolt11 invoice' and d.get('currency')=='xbt'
             and type(d.get('amount_msat')) is int and d['amount_msat']==2000000
