@@ -6,8 +6,8 @@ The dashboard supports XBT wallet addresses, channels, BOLT11 invoices and payme
 
 The node verifies the BLAKE2b backend before creating or opening its wallet. Internally the fork still calls its network and wallet directory `bitcoin`; that name does not mean it is following BTC.
 
-Backups preserve keys and emergency channel recovery data, not a copy of the live channel database. A restored node attempts recovery, asks for a rescan and remains marked as restored. Recover and drain funds before starting fresh. Funded backup recovery still needs validation before release.
+Backups preserve keys and emergency channel recovery data, not a copy of the live channel database. A restored node attempts recovery, asks for a rescan and remains marked as restored. Recover and drain funds before starting fresh. The recovery test must pass before release; actual StartOS backup/restore also remains to be validated. Recovery depends on peers cooperating, and the automatic address window is bounded.
 
 Your existing swap controller and nodes remain in use. The migrated swap modules are bundled but not activated by this package. Do not import an existing experimental XBT wallet or channel directory into it.
 
-For now, use the supplied 0086 build/test command on the packaging VM. It builds node/UI images and runs disposable regtest, without creating an installer or touching installed services.
+Use the supplied 0088b recovery test on the packaging VM after checkpoint 0087 is synced. It retains the validated UI and fixes fee estimation when withdrawing recovered channel funds and tests disposable regtest recovery, without creating an installer or touching installed services.

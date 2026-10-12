@@ -16,6 +16,25 @@ RUN ./configure --prefix=/usr/local --enable-rust --disable-valgrind && \
     make -j"${BUILD_JOBS}" install-program DESTDIR=/dist RUST_PROFILE=release \
       VERSION=v26.06.9-blake2b.7-swap0086
 
+
+# Preserve the cached 0086 engine build, then prove and fix recovery fee weight.
+FROM engine AS engine-fixed
+COPY assets/test-recovery-weight.c /src/bitcoin/test/run-recovery-weight.c
+RUN --network=none make -j"${BUILD_JOBS}" bitcoin/test/run-recovery-weight RUST_PROFILE=release \
+      VERSION=v26.06.9-blake2b.7-swap0086 && \
+    bitcoin/test/run-recovery-weight --expect-underestimate > /baseline-recovery-weight.txt && \
+    cat /baseline-recovery-weight.txt
+COPY assets/engine-recovery-fees.patch /tmp/engine-recovery-fees.patch
+RUN --network=none echo '86c80ef9bb4a9f1f52d31a647b54f04b2a6ca4d55031fd5154603eb0e6984219  /tmp/engine-recovery-fees.patch' | sha256sum -c - && \
+    git apply --check /tmp/engine-recovery-fees.patch && git apply /tmp/engine-recovery-fees.patch && \
+    make -j"${BUILD_JOBS}" install-program bitcoin/test/run-recovery-weight DESTDIR=/dist \
+      RUST_PROFILE=release VERSION=v26.06.9-blake2b.7-swap0088b && \
+    bitcoin/test/run-recovery-weight > /patched-recovery-weight.txt && \
+    cat /patched-recovery-weight.txt && \
+    mkdir -p /dist/usr/local/share/xbt-cln/recovery-fees && \
+    cp /baseline-recovery-weight.txt /patched-recovery-weight.txt /dist/usr/local/share/xbt-cln/recovery-fees/ && \
+    cd /dist && sha256sum usr/local/bin/lightningd > usr/local/share/xbt-cln/recovery-fees/engine.sha256
+
 FROM debian:bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
 FROM base AS bitcoin-cli
@@ -43,7 +62,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libgmp10 libpq5 libsodium23 libsqlite3-0 libssl3 libstdc++6 zlib1g python3 && \
     rm -rf /var/lib/apt/lists/*
-COPY --from=engine /dist/usr/local/ /usr/local/
+COPY --from=engine-fixed /dist/usr/local/ /usr/local/
 COPY --from=bitcoin-cli /usr/bin/bitcoin-cli /usr/bin/bitcoin-cli
 # Bundled separately: no swap plugin discovery or mainnet activation.
 COPY --from=engine /src/tools/swap/ /usr/local/libexec/xbt-swap/

@@ -13,5 +13,12 @@
   "package_id": "xbt-cln",
   "wire_network": "bitcoin",
   "profile": "xbt-privkeyio-v1",
-  "fresh_only": true
+  "fresh_only": true,
+  "engine_patch": {
+    "path": "assets/engine-recovery-fees.patch",
+    "sha256": "86c80ef9bb4a9f1f52d31a647b54f04b2a6ca4d55031fd5154603eb0e6984219",
+    "test_path": "assets/test-recovery-weight.c",
+    "test_sha256": "e11ce68e002ddc33e0aa1b3ed7ffa4bc087f9db0568deb7a881733e5bf071c8c",
+    "version": "v26.06.9-blake2b.7-swap0088b"
+  }
 }

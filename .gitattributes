@@ -1,2 +1,3 @@
 # Embedded upstream diff is data; preserve its exact context whitespace.
 assets/ui-xbt.patch -whitespace
+assets/engine-recovery-fees.patch -whitespace

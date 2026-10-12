@@ -17,6 +17,7 @@ function load(file, mocks = {}) {
 }
 async function main() {
   const policy = load('startos/xbtPolicy.ts')
+  const recovery = load('startos/recovery.ts', {'./xbtPolicy':policy})
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'xbt-package-'))
   const root = path.join(temp, 'volume'); await fs.mkdir(root)
   try {
@@ -52,7 +53,7 @@ async function main() {
     const backup = {setOptions(o){this.options=o;return this},setPreBackup(f){this.before=f;return this},setPostRestore(f){this.after=f;return this}}
     const sdk = {
       volumes:{main:{subpath:p=>path.join(root,p)}},
-      setupMain:f=>f, setupBackups:f=>({createBackup:f,restoreInit:null}),
+      setupMain:f=>f, setupBackups:f=>({createBackup:f,restoreInit:null}), setHealth:async()=>null,
       Backups:{ofVolumes:()=>backup}, action:{createOwnTask:async(...a)=>tasks.push(a)},
       SubContainer:{of:()=>({rootfs:'/test', exec:async args=>{
         const method=args.find(x=>['getblockchaininfo','getdeploymentinfo','getblockhash'].includes(x))
@@ -64,7 +65,7 @@ async function main() {
     const mocks={
       '@start9labs/start-sdk':{FileHelper:{string:()=>({read:()=>({const:async()=>null})})}},
       'bitcoin-core-startos/startos/manifest':{manifest:{}},
-      './sdk':{sdk},'./xbtPolicy':policy,'./fileModels/store.json':{storeJson:store},
+      './sdk':{sdk},'./xbtPolicy':policy,'./recovery':recovery,'./fileModels/store.json':{storeJson:store},
       './fileModels/config':{clnConfig:{read:()=>({const:async()=>({raw:{plugin:[]}})})}},
       './i18n':{i18n:x=>x},'./utils':{rootDir:'/root/.lightning',bitcoinDataDir:'/mnt/bitcoin',bitcoindRpcBridge:async()=>({host:'127.0.0.1',port:8332}),mainMounts:{mountDependency:()=>null}},
       './actions/watchtower/towerUri':{},'./actions/watchtower/watchtower':{},'./actions/watchtower/watchtowerClientInfo':{},
@@ -84,6 +85,11 @@ async function main() {
     assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.requires,['xbt-backend-identity'])
     assert.ok(chain.find(x=>x.id==='cln-application').spec.requires.includes('consume-flags'))
     assert.deepEqual(flags,[]) // Merely reading startup flags never consumes them.
+    const emergency = chain.find(x=>x.id==='emergency-recover').spec()
+    assert.deepEqual((await emergency.exec.fn()).command, recovery.recoveryCommands('/root/.lightning').emergency)
+    assert.deepEqual(chain.find(x=>x.id==='address-pregen').spec().exec.command,
+      recovery.recoveryCommands('/root/.lightning').addresses)
+    assert.deepEqual(flags,[]) // Planning recovery commands must not consume flags either.
     const b=load('startos/backups.ts',mocks)
     await b.createBackup()
     await backup.before()
@@ -96,6 +102,8 @@ async function main() {
     assert.equal(JSON.parse(await fs.readFile(path.join(root,'node-restored.json'),'utf8')).recovery,true)
     const saved=(await fs.readdir(path.join(root,'bitcoin'))).find(x=>x.startsWith('emergency.recover.restored-'))
     assert.equal(await fs.readFile(path.join(root,'bitcoin',saved),'utf8'),'recovery-copy')
+    await chain.find(x=>x.id==='consume-flags').spec().exec.fn()
+    assert.deepEqual(flags, [{restore:true}, {rescan:undefined,restore:undefined}])
     await fs.mkdir(path.join(root,policy.swapDirs[0]))
     await assert.rejects(()=>backup.before())
     await assert.rejects(()=>backup.after({}))

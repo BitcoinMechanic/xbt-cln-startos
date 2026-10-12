@@ -1,3 +1,4 @@
+import { recoveryCommands } from './recovery'
 import { verifyBackend, verifyNode, verifyVolume, requireInactiveSwaps, exists, activationHeight } from './xbtPolicy'
 import { FileHelper } from '@start9labs/start-sdk'
 import { manifest as bitcoinManifest } from 'bitcoin-core-startos/startos/manifest'
@@ -335,11 +336,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
                   result: 'failure',
                 })
                 return {
-                  command: [
-                    'lightning-cli',
-                    `--lightning-dir=${rootDir}`,
-                    'emergencyrecover',
-                  ],
+                  command: recoveryCommands(rootDir).emergency,
                 }
               },
             },
@@ -352,23 +349,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
         ? {
             subcontainer: lightningSub,
             exec: {
-              // A restored database restarts the wallet's address counter at
-              // zero, and CLN only recognizes addresses up to 50 past the
-              // highest known-used index (keyscan_gap, hardcoded upstream).
-              // The node's previous life burned indexes far faster than
-              // on-chain hits advance that window — the web UIs issue a fresh
-              // address per Receive view, observed in the field at ~140/day
-              // (index 4,838 within five weeks of node birth) — so without
-              // this a post-restore rescan silently misses wallet outputs
-              // beyond the first >50-index gap. newaddr persists
-              // bip32_max_index, so pre-registering 10,000 addresses widens
-              // the window for every later rescan. (1,000 was field-tested
-              // and proven too shallow.)
-              command: [
-                'sh',
-                '-c',
-                `i=0; while [ $i -lt 10000 ]; do lightning-cli --lightning-dir=${rootDir} newaddr all > /dev/null || exit 1; i=$((i+1)); done`,
-              ],
+              // The address window must be registered before a later rescan.
+              command: recoveryCommands(rootDir).addresses,
             },
             requires: ['lightningd'],
           }
