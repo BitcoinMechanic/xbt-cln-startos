@@ -5,7 +5,7 @@ export const setDependencies = sdk.setupDependencies(async ({ effects }) => {
     bitcoind: {
       healthChecks: ['bitcoind', 'sync-progress'],
       kind: 'running',
-      versionRange: '>=28.4:14',
+      versionRange: '*' // Backend identity is checked before lightningd starts.,
     },
   }
 })

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "engine": {
+    "repository": "https://github.com/BitcoinMechanic/lightning.git",
+    "commit": "ddd89e1d70d0ba415880a0ff02db7b053c73a298",
+    "tree": "21369587e10687c21634ec2b1d15a5de6db09496"
+  },
+  "ui": {
+    "repository": "https://github.com/ElementsProject/cln-application.git",
+    "commit": "ff2d698b4f64c86d950d6abe61bd6b8a0b52a68c",
+    "version": "26.09"
+  },
+  "package_id": "xbt-cln",
+  "wire_network": "bitcoin",
+  "profile": "xbt-privkeyio-v1",
+  "fresh_only": true
+}

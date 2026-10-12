@@ -1,3 +1,4 @@
+import { verifyVolume, requireInactiveSwaps } from '../xbtPolicy'
 import { clnConfig } from '../fileModels/config'
 import { configJson } from '../fileModels/config.json'
 import { storeJson } from '../fileModels/store.json'
@@ -6,6 +7,8 @@ import { sdk } from '../sdk'
 import { bitcoindRpcBridge } from '../utils'
 
 export const seedFiles = sdk.setupOnInit(async (effects, kind) => {
+  await verifyVolume(sdk.volumes.main.subpath(''), kind === 'install')
+  await requireInactiveSwaps(sdk.volumes.main.subpath(''))
   await storeJson.merge(effects, {})
   await configJson.merge(effects, {})
 

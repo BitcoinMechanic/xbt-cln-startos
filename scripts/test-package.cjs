@@ -1,0 +1,105 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs/promises')
+const { readFileSync } = require('node:fs')
+const path = require('node:path')
+const os = require('node:os')
+const Module = require('node:module')
+const ts = require('typescript')
+function load(file, mocks = {}) {
+  const filename = path.resolve(file)
+  const mod = new Module(filename, module)
+  mod.filename = filename; mod.paths = module.paths
+  mod.require = name => name in mocks ? mocks[name] : require(name)
+  mod._compile(ts.transpileModule(readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText, filename)
+  return mod.exports
+}
+async function main() {
+  const policy = load('startos/xbtPolicy.ts')
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'xbt-package-'))
+  const root = path.join(temp, 'volume'); await fs.mkdir(root)
+  try {
+    const good = { chain: 'main', blocks: policy.activationHeight, initialblockdownload: false, pruned: false }
+    const dep = { blake2b: { active: true, height: policy.activationHeight } }
+    policy.verifyBackend(good, dep, policy.activationHash)
+    for (const override of [{chain:'regtest'}, {pruned:true}, {initialblockdownload:true}, {blocks:0}])
+      assert.throws(() => policy.verifyBackend({...good,...override}, dep, policy.activationHash))
+    assert.throws(() => policy.verifyBackend(good, {}, policy.activationHash))
+    assert.throws(() => policy.verifyBackend(good, dep, '00'.repeat(32)))
+    const hex = n => n.toString(16).padStart(130, '0')
+    const info = {id:'02'+'11'.repeat(32), network:'bitcoin', blockheight:961700,
+      our_features: {init:hex((1n<<512n)|(1n<<515n)), node:hex((1n<<512n)|(1n<<515n)),invoice:hex(1n<<512n)}}
+    policy.verifyNode(info)
+    assert.throws(() => policy.verifyNode({...info,our_features:{init:'00',node:'00',invoice:'00'}}))
+    assert.throws(() => policy.verifyNode({...info,network:'xbt'}))
+    await assert.rejects(() => policy.verifyVolume(root))
+    await policy.verifyVolume(root, true); await policy.verifyVolume(root)
+    await fs.mkdir(path.join(root,'xbt'))
+    await assert.rejects(() => policy.verifyVolume(root, true))
+    await fs.rmdir(path.join(root,'xbt'))
+    await fs.mkdir(path.join(root,'bitcoin'))
+    await fs.mkdir(path.join(root,'bitcoin',policy.swapDirs[0]))
+    await assert.rejects(() => policy.requireInactiveSwaps(root))
+    await fs.rmdir(path.join(root,'bitcoin',policy.swapDirs[0]))
+    const missing = path.join(temp,'unrecognized'); await fs.mkdir(missing); await fs.mkdir(path.join(missing,'bitcoin'))
+    await assert.rejects(() => policy.verifyVolume(missing,true))
+    await fs.unlink(path.join(root,policy.marker))
+    await fs.symlink(path.join(missing,'identity'),path.join(root,policy.marker))
+    await assert.rejects(() => policy.verifyVolume(root,true))
+    await fs.unlink(path.join(root,policy.marker)); await fs.writeFile(path.join(root,policy.marker), JSON.stringify(policy.identity))
+    const chain=[]; const flags=[]; const tasks=[]
+    const backup = {setOptions(o){this.options=o;return this},setPreBackup(f){this.before=f;return this},setPostRestore(f){this.after=f;return this}}
+    const sdk = {
+      volumes:{main:{subpath:p=>path.join(root,p)}},
+      setupMain:f=>f, setupBackups:f=>({createBackup:f,restoreInit:null}),
+      Backups:{ofVolumes:()=>backup}, action:{createOwnTask:async(...a)=>tasks.push(a)},
+      SubContainer:{of:()=>({rootfs:'/test', exec:async args=>{
+        const method=args.find(x=>['getblockchaininfo','getdeploymentinfo','getblockhash'].includes(x))
+        return {exitCode:0,stdout:method==='getblockhash'?policy.activationHash:JSON.stringify(method==='getblockchaininfo'?good:{deployments:dep})}
+      }})},
+      Daemons:{of:()=>({addDaemon(id,spec){chain.push({id,spec});return this},addOneshot(id,spec){chain.push({id,spec});return this},addHealthCheck(id,spec){chain.push({id,spec});return this}})},
+    }
+    const store={read:()=>({once:async()=>({restore:true,customExternalHosts:[],watchtowerClients:[],watchtowerServer:false}),const:async()=>null}),merge:async(_,v)=>flags.push(v)}
+    const mocks={
+      '@start9labs/start-sdk':{FileHelper:{string:()=>({read:()=>({const:async()=>null})})}},
+      'bitcoin-core-startos/startos/manifest':{manifest:{}},
+      './sdk':{sdk},'./xbtPolicy':policy,'./fileModels/store.json':{storeJson:store},
+      './fileModels/config':{clnConfig:{read:()=>({const:async()=>({raw:{plugin:[]}})})}},
+      './i18n':{i18n:x=>x},'./utils':{rootDir:'/root/.lightning',bitcoinDataDir:'/mnt/bitcoin',bitcoindRpcBridge:async()=>({host:'127.0.0.1',port:8332}),mainMounts:{mountDependency:()=>null}},
+      './actions/watchtower/towerUri':{},'./actions/watchtower/watchtower':{},'./actions/watchtower/watchtowerClientInfo':{},
+      './actions/rescanBlockchain':{rescanBlockchain:{}},
+    }
+    const main = load('startos/main.ts',mocks).main
+    await main({effects:{}})
+    const ids=[]
+    for (const entry of chain) {
+      const s=typeof entry.spec==='function'?await entry.spec():entry.spec
+      if (!s) continue
+      for (const dep of s.requires) assert.ok(ids.includes(dep), `${entry.id} needs earlier ${dep}`)
+      ids.push(entry.id)
+    }
+    const backend=chain.find(x=>x.id==='xbt-backend-identity').spec
+    await backend.exec.fn()
+    assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.requires,['xbt-backend-identity'])
+    assert.ok(chain.find(x=>x.id==='cln-application').spec.requires.includes('consume-flags'))
+    assert.deepEqual(flags,[]) // Merely reading startup flags never consumes them.
+    const b=load('startos/backups.ts',mocks)
+    await b.createBackup()
+    await backup.before()
+    for (const name of ['bitcoin/lightningd.sqlite3','bitcoin/lightningd.sqlite3-wal','bitcoin/lightningd.sqlite3-shm','.commando-env']) assert.ok(backup.options.exclude.includes(name))
+    await fs.writeFile(path.join(root,'bitcoin/emergency.recover'),'recovery-copy')
+    await fs.writeFile(path.join(root,'.commando-env'),'discarded-credential')
+    await backup.after({})
+    assert.equal(await policy.exists(path.join(root,'.commando-env')),false)
+    assert.deepEqual(flags,[{restore:true}]);assert.equal(tasks.length,1)
+    assert.equal(JSON.parse(await fs.readFile(path.join(root,'node-restored.json'),'utf8')).recovery,true)
+    const saved=(await fs.readdir(path.join(root,'bitcoin'))).find(x=>x.startsWith('emergency.recover.restored-'))
+    assert.equal(await fs.readFile(path.join(root,'bitcoin',saved),'utf8'),'recovery-copy')
+    await fs.mkdir(path.join(root,policy.swapDirs[0]))
+    await assert.rejects(()=>backup.before())
+    await assert.rejects(()=>backup.after({}))
+    console.log('PASS: backend/profile boundaries, foreign-wallet and symlink refusal, startup ordering, preserved flags, backup exclusions and restore hooks')
+  } finally {await fs.rm(temp,{recursive:true,force:true})}
+}
+main().catch(e=>{console.error(e);process.exitCode=1})

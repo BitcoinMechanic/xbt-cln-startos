@@ -1,0 +1,303 @@
+diff --git a/apps/backend/source/controllers/lightning.ts b/apps/backend/source/controllers/lightning.ts
+index 7aaf650..0f792ec 100755
+--- a/apps/backend/source/controllers/lightning.ts
++++ b/apps/backend/source/controllers/lightning.ts
+@@ -21,9 +21,7 @@ const ALLOWED_METHODS = new Set([
+   'pay',
+   'keysend',
+   'invoice',
+-  'offer',
+   'decode',
+-  'fetchinvoice',
+   'createrune',
+ ]);
+ 
+@@ -33,7 +31,7 @@ export function validateCallRequest(method: unknown, params: unknown): string |
+   if (typeof method !== 'string' || !ALLOWED_METHODS.has(method)) {
+     return 'Method not permitted: ' + String(method);
+   }
+-  if (params !== undefined && (typeof params !== 'object' || params === null)) {
++  if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
+     return 'Invalid params for ' + method;
+   }
+   if (method === 'createrune') {
+diff --git a/apps/backend/source/controllers/shared.ts b/apps/backend/source/controllers/shared.ts
+index acfbec5..24e246b 100644
+--- a/apps/backend/source/controllers/shared.ts
++++ b/apps/backend/source/controllers/shared.ts
+@@ -141,37 +141,8 @@ export class SharedController {
+   };
+ 
+   getFiatRate = async (req: Request, res: Response, next: NextFunction) => {
+-    try {
+-      const fiatCurrency = String(req.params.fiatCurrency);
+-      if (!FIAT_CURRENCIES.includes(fiatCurrency)) {
+-        return handleError(
+-          new APIError(HttpStatusCode.BAD_REQUEST, 'Unsupported fiat currency'),
+-          req,
+-          res,
+-          next,
+-        );
+-      }
+-      const cached = fiatRateCache.get(fiatCurrency);
+-      if (cached && Date.now() - cached.fetchedAt < FIAT_RATE_CACHE_MS) {
+-        return res.status(200).json({ rate: cached.rate });
+-      }
+-      logger.info('Getting Fiat Rate for: ' + fiatCurrency);
+-      const response = await axios.get(FIAT_RATE_API + encodeURIComponent(fiatCurrency));
+-      const rate = response.data?.bitcoin?.[fiatCurrency.toLowerCase()];
+-      if (typeof rate !== 'number') {
+-        return handleError(
+-          new APIError(HttpStatusCode.NOT_FOUND, 'Price value not found'),
+-          req,
+-          res,
+-          next,
+-        );
+-      }
+-      fiatRateCache.set(fiatCurrency, { rate, fetchedAt: Date.now() });
+-      return res.status(200).json({ rate });
+-    } catch (error: any) {
+-      logger.error('Error from Fiat Rate: ' + (error?.message || error));
+-      res.status(200).json({ rate: 0 });
+-    }
++    // BTC fiat prices do not value XBT. No external rate request.
++    res.status(200).json({ rate: 0, available: false });
+   };
+ 
+   saveInvoiceRune = async (req: Request, res: Response, next: NextFunction) => {
+diff --git a/apps/backend/source/service/lightning.service.ts b/apps/backend/source/service/lightning.service.ts
+index 0db7321..cb8b6e8 100755
+--- a/apps/backend/source/service/lightning.service.ts
++++ b/apps/backend/source/service/lightning.service.ts
+@@ -13,6 +13,17 @@ import {
+ import { logger } from '../shared/logger.js';
+ import { setEnvVariables, validateEnvVariables } from '../shared/utils.js';
+ 
++export function requireXbtInvoice(decoded: any) {
++  const features = decoded?.features;
++  if (decoded?.valid !== true || decoded?.type !== 'bolt11 invoice' ||
++      !['bc', 'bcrt'].includes(decoded?.currency) || typeof features !== 'string' ||
++      features.length > 16384 || !/^(?:[0-9a-fA-F]{2})+$/.test(features)) {
++    throw new Error('Use an XBT BOLT11 invoice');
++  }
++  const bits = BigInt('0x' + features);
++  if (!(bits & (1n << 512n)) || (bits & (1n << 513n))) throw new Error('This invoice is not for the XBT chain');
++}
++
+ export class LightningService {
+   private clnService: any = null;
+   private axiosConfig: any = {
+@@ -97,6 +108,12 @@ export class LightningService {
+   };
+ 
+   call = async (method: string, methodParams: Record<string, any>) => {
++    if (method === 'pay') {
++      // The fork deliberately retains Bitcoin HRPs. Generic decode alone is
++      // insufficient; require the XBT invoice bit before submitting a payment.
++      const decoded = await this.call('decode', { string: methodParams?.bolt11 });
++      requireXbtInvoice(decoded);
++    }
+     switch (APP_CONSTANTS.APP_CONNECT) {
+       case AppConnect.REST:
+         return axios
+diff --git a/apps/backend/source/shared/consts.ts b/apps/backend/source/shared/consts.ts
+index f131c10..29756a5 100755
+--- a/apps/backend/source/shared/consts.ts
++++ b/apps/backend/source/shared/consts.ts
+@@ -141,7 +141,7 @@ export const APP_CONSTANTS = {
+   LIGHTNING_GRPC_TLS_CERTS: '',
+ };
+ 
+-export const UI_UNITS = ['MSATS', 'SATS', 'BTC'];
++export const UI_UNITS = ['MSATS', 'SATS', 'XBT'];
+ export const UI_APP_MODES = ['LIGHT', 'DARK'];
+ export const FIAT_CURRENCIES = [
+   'USD',
+diff --git a/apps/frontend/index.html b/apps/frontend/index.html
+index 5a0a10b..d5487f2 100644
+--- a/apps/frontend/index.html
++++ b/apps/frontend/index.html
+@@ -5,9 +5,9 @@
+     <link rel="icon" href="/images/cln-favicon.ico" />
+     <meta name="viewport" content="width=device-width, initial-scale=1" />
+     <meta name="color-scheme" content="light dark">
+-    <meta name="description" content="Core lightning application" />
++    <meta name="description" content="XBT Core Lightning application" />
+     <link rel="apple-touch-icon" href="/images/cln-logo-dark.png" />
+-    <title>Core Lightning</title>
++    <title>XBT Core Lightning</title>
+   </head>
+   <body>
+     <noscript>You need to enable JavaScript to run this app.</noscript>
+diff --git a/apps/frontend/src/components/cln/BTCDeposit/BTCDeposit.tsx b/apps/frontend/src/components/cln/BTCDeposit/BTCDeposit.tsx
+index edbc15d..7025525 100755
+--- a/apps/frontend/src/components/cln/BTCDeposit/BTCDeposit.tsx
++++ b/apps/frontend/src/components/cln/BTCDeposit/BTCDeposit.tsx
+@@ -50,7 +50,7 @@ const BTCDeposit = props => {
+         <Card.Header className="p-0 d-flex align-items-start justify-content-between">
+           <div className="p-0 fw-bold text-primary d-flex align-items-center">
+             <BitcoinWalletSVG svgClassName="svg-small me-2" className="fill-primary" />
+-            <span className="fw-bold">Bitcoin Wallet</span>
++            <span className="fw-bold">XBT Wallet</span>
+           </div>
+           <span className="span-close-svg" onClick={props.onClose}>
+             <CloseSVG />
+diff --git a/apps/frontend/src/components/cln/BTCTransaction/BTCTransaction.tsx b/apps/frontend/src/components/cln/BTCTransaction/BTCTransaction.tsx
+index 48bac12..4e79608 100755
+--- a/apps/frontend/src/components/cln/BTCTransaction/BTCTransaction.tsx
++++ b/apps/frontend/src/components/cln/BTCTransaction/BTCTransaction.tsx
+@@ -101,7 +101,7 @@ const BTCTransaction = (props) => {
+   const nodeInfo = useSelector(selectNodeInfo);
+   
+   const openLinkHandler = (event) => {
+-    window.open('https://blockstream.info/' + (nodeInfo.network === 'testnet' ? 'testnet/' : '') + 'tx/' + event.target.id, '_blank', 'noopener,noreferrer');
++    window.open('https://mempool.guide/' + (nodeInfo.network === 'testnet' ? 'testnet/' : '') + 'tx/' + event.target.id, '_blank', 'noopener,noreferrer');
+   };
+ 
+   const copyHandler = event => {
+diff --git a/apps/frontend/src/components/cln/BTCWallet/BTCWallet.tsx b/apps/frontend/src/components/cln/BTCWallet/BTCWallet.tsx
+index 90d2be5..d06eb30 100755
+--- a/apps/frontend/src/components/cln/BTCWallet/BTCWallet.tsx
++++ b/apps/frontend/src/components/cln/BTCWallet/BTCWallet.tsx
+@@ -54,7 +54,7 @@ const BTCWallet = (props) => {
+             <Col xs={12} className="ps-2 pt-2 d-flex align-items-center justify-content-start">
+               <BitcoinWalletSVG svgClassName="me-4" className="fill-contrast" />
+               <div>
+-                <div className='fs-6 fw-bold'>Bitcoin Wallet</div>
++                <div className='fs-6 fw-bold'>XBT Wallet</div>
+                 { isAuthenticated && walletBalances.isLoading ? 
+                     <Spinner animation='grow' variant='secondary' data-testid="btc-wallet-spinner"/> : 
+                   walletBalances.error ? 
+diff --git a/apps/frontend/src/components/cln/BTCWithdraw/BTCWithdraw.tsx b/apps/frontend/src/components/cln/BTCWithdraw/BTCWithdraw.tsx
+index 7ed4d8d..9995bc5 100755
+--- a/apps/frontend/src/components/cln/BTCWithdraw/BTCWithdraw.tsx
++++ b/apps/frontend/src/components/cln/BTCWithdraw/BTCWithdraw.tsx
+@@ -127,7 +127,7 @@ const BTCWithdraw = (props) => {
+           <Card.Header className='p-0 d-flex align-items-start justify-content-between'>
+             <div className='p-0 fw-bold text-primary d-flex align-items-center'>
+               <BitcoinWalletSVG svgClassName='svg-small me-2' className='fill-primary' />
+-              <span className='fw-bold'>Bitcoin Wallet</span>
++              <span className='fw-bold'>XBT Wallet</span>
+             </div>
+             <span role='button' data-testid='close-button' className='span-close-svg' onClick={props.onClose}><CloseSVG /></span>
+           </Card.Header>
+diff --git a/apps/frontend/src/components/cln/CLNReceive/CLNReceive.tsx b/apps/frontend/src/components/cln/CLNReceive/CLNReceive.tsx
+index b361609..d3f7901 100755
+--- a/apps/frontend/src/components/cln/CLNReceive/CLNReceive.tsx
++++ b/apps/frontend/src/components/cln/CLNReceive/CLNReceive.tsx
+@@ -164,7 +164,7 @@ const CLNReceive = (props) => {
+               <Row className='d-flex align-items-start justify-content-center'>
+                 <Col xs={12} className='mb-3 d-flex align-items-start justify-content-start'>
+                   <Form.Check tabIndex={1} onChange={paymentTypeChangeHandler} checked={paymentType === PaymentType.INVOICE} inline className='text-dark' label='Invoice' name='payType' type='radio' id='Invoice' />
+-                  <Form.Check tabIndex={2} onChange={paymentTypeChangeHandler} checked={paymentType === PaymentType.OFFER} inline className='ms-3 text-dark' label='Offer' name='payType' type='radio' id='Offer' />
++                  <Form.Check tabIndex={2} onChange={paymentTypeChangeHandler} disabled title='BOLT12 support is not enabled in this XBT candidate' checked={paymentType === PaymentType.OFFER} inline className='ms-3 text-dark' label='Offer' name='payType' type='radio' id='Offer' />
+                 </Col>
+                 <Col xs={12}>
+                   <Form.Label className='text-dark'>Description*</Form.Label>
+diff --git a/apps/frontend/src/components/cln/CLNSend/CLNSend.tsx b/apps/frontend/src/components/cln/CLNSend/CLNSend.tsx
+index ab173c9..e08ce77 100755
+--- a/apps/frontend/src/components/cln/CLNSend/CLNSend.tsx
++++ b/apps/frontend/src/components/cln/CLNSend/CLNSend.tsx
+@@ -233,7 +233,7 @@ const CLNSend = (props) => {
+                 <Form.Check
+                   tabIndex={2}
+                   onChange={paymentTypeChangeHandler}
+-                  checked={paymentType === PaymentType.OFFER}
++                  disabled title='BOLT12 support is not enabled in this XBT candidate' checked={paymentType === PaymentType.OFFER}
+                   inline
+                   className="text-dark"
+                   label="Offer"
+diff --git a/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx b/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
+index cb3254e..260b379 100755
+--- a/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
++++ b/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
+@@ -29,7 +29,7 @@ const ChannelDetails = (props) => {
+   const [responseMessage, setResponseMessage] = useState('');
+ 
+   const openLinkHandler = (event) => {
+-    window.open('https://blockstream.info/' + (nodeInfo.network === 'testnet' ? 'testnet/' : '') + 'tx/' + event.target.id, '_blank', 'noopener,noreferrer');
++    window.open('https://mempool.guide/' + (nodeInfo.network === 'testnet' ? 'testnet/' : '') + 'tx/' + event.target.id, '_blank', 'noopener,noreferrer');
+   };
+ 
+   const ChannelCloseHandler = event => {
+diff --git a/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx b/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx
+index ad311b4..f1aed16 100755
+--- a/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx
++++ b/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx
+@@ -7,24 +7,7 @@ import { useSelector } from 'react-redux';
+ import { selectFiatUnit } from '../../../store/rootSelectors';
+ 
+ const FiatBox = props => {
+-  const fiatUnit = useSelector(selectFiatUnit);
+-  const fiatSymbol = FIAT_CURRENCIES.find((fiat => fiat.currency === fiatUnit))?.symbol;
+-
+-  return (
+-    <span
+-      className={'d-flex align-items-center justify-content-start fiat-box-span ' + props.className}
+-      data-testid="fiat-box"
+-    >
+-      {props.symbol || (fiatSymbol?.prefix.startsWith('fa') && fiatSymbol.iconName) ? (
+-        <FontAwesomeIcon icon={props.symbol || fiatSymbol} className={'fa-' + (props.iconSize || 'sm')} />
+-      ) : (
+-        <CurrencySVG className="svg-currency" fiat={props.fiatUnit || 'USD'}></CurrencySVG>
+-      )}
+-      <span className="ms-2px pt-2px">
+-        {formatFiatValue(+props.value || 0, +props.rate, props.fromUnit || Units.SATS)}
+-      </span>
+-    </span>
+-  );
++  return <span className='fiat-unavailable'>Fiat unavailable</span>;
+ };
+ 
+ export default FiatBox;
+diff --git a/apps/frontend/src/components/ui/Header/Header.tsx b/apps/frontend/src/components/ui/Header/Header.tsx
+index ed1d345..fa762d6 100755
+--- a/apps/frontend/src/components/ui/Header/Header.tsx
++++ b/apps/frontend/src/components/ui/Header/Header.tsx
+@@ -60,7 +60,7 @@ const Header = (props) => {
+             </Col>
+             <Col xs={9}>
+               <h4 className="ms-3 m-0 text-dark">
+-                <strong>Core Lightning Node</strong>
++                <strong>XBT Core Lightning Node</strong>
+               </h4>
+               <Row className='header-info-text my-1'>
+                 <Col xs={12} className='d-flex align-items-center text-light'>
+@@ -133,10 +133,10 @@ const Header = (props) => {
+         <Image src={isDarkMode ? '/images/cln-logo-dark.png' : '/images/cln-logo-light.png'} className='header-info-logo me-3 rounded float-start' alt='Core Lightning Logo' />
+         <Row className='header-info-text mt-3'>
+           {(currentScreenSize !== Breakpoints.MD) ?
+-            <h4 className='m-0 text-dark'><strong>Core Lightning Node</strong></h4>
++            <h4 className='m-0 text-dark'><strong>XBT Core Lightning Node</strong></h4>
+             :
+             <Col xs={12} lg={4} className='d-flex align-items-center justify-content-between' data-testid='header-context'>
+-              <h4 className='m-0 text-dark'><strong>Core Lightning Node</strong></h4>
++              <h4 className='m-0 text-dark'><strong>XBT Core Lightning Node</strong></h4>
+               <div className='d-flex align-items-center'>
+                 <Menu />
+                 <Settings onShowConnectWallet={props.onShowConnectWallet} />
+diff --git a/apps/frontend/src/components/ui/Settings/Settings.tsx b/apps/frontend/src/components/ui/Settings/Settings.tsx
+index 4e3acae..c34718a 100755
+--- a/apps/frontend/src/components/ui/Settings/Settings.tsx
++++ b/apps/frontend/src/components/ui/Settings/Settings.tsx
+@@ -55,7 +55,6 @@ const Settings = (props) => {
+             <Dropdown.Item data-bs-toggle='modal' data-bs-target='#staticBackdrop' onClick={() => dispatch(setShowModals({ ...showModals, setPasswordModal: true }))}>Reset Password</Dropdown.Item>
+         }
+         <Dropdown.Divider />
+-        <Dropdown.Item as='div' className='d-flex align-items-center justify-content-between'>Fiat Currency <FiatSelection className='ms-4 fiat-dropdown' /></Dropdown.Item>
+         <Dropdown.Item as='div' className='d-flex align-items-center justify-content-between'>Currency <ToggleSwitch onChange={changeCurrencyUnitHandler} values={CURRENCY_UNITS} selIndex={uiConfigUnit === Units.BTC ? 1 : 0} /></Dropdown.Item>
+       </Dropdown.Menu>
+     </Dropdown>
+diff --git a/apps/frontend/src/utilities/constants.ts b/apps/frontend/src/utilities/constants.ts
+index 3517756..f0ca1d4 100755
+--- a/apps/frontend/src/utilities/constants.ts
++++ b/apps/frontend/src/utilities/constants.ts
+@@ -48,7 +48,7 @@ export enum NumberTypes {
+ export enum Units {
+   MSATS = 'MSATS',
+   SATS = 'SATS',
+-  BTC = 'BTC',
++  BTC = 'XBT',
+ }
+ 
+ export enum ApplicationModes {

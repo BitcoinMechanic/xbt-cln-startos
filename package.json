@@ -1,9 +1,10 @@
 {
-  "name": "cln-startos",
+  "name": "xbt-cln-startos",
   "scripts": {
-    "build": "rm -rf ./javascript && ncc build startos/index.ts -o ./javascript",
+    "build": "rm -rf ./javascript && ncc build startos/index.ts -o ./javascript --no-cache",
     "prettier": "prettier --write startos",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test:package": "node scripts/test-package.cjs"
   },
   "dependencies": {
     "@start9labs/start-sdk": "2.0.9",

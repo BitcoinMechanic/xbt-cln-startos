@@ -45,24 +45,7 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
   const uiReceipt = await uiMultiOrigin.export([ui])
   receipts.push(uiReceipt)
 
-  // RPC
-  const rpcMulti = sdk.MultiHost.of(effects, 'rpc')
-  const rpcMultiOrigin = await rpcMulti.bindPort(rpcPort, {
-    protocol: 'http',
-  })
-  const rpc = sdk.createInterface(effects, {
-    name: i18n('RPC'),
-    id: 'rpc',
-    description: i18n('Listens for JSON-RPC commands over HTTP.'),
-    type: 'api',
-    masked: false,
-    schemeOverride: null,
-    username: null,
-    path: '',
-    query: {},
-  })
-  const rpcReceipt = await rpcMultiOrigin.export([rpc])
-  receipts.push(rpcReceipt)
+  // No HTTP JSON-RPC daemon listens on 8080; native CLNrest is the API.
 
   // Peer
   const peerMulti = sdk.MultiHost.of(effects, peerHostId)
@@ -157,7 +140,7 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
           'CLNRest is a lightweight Python-based built-in Core Lightning plugin (from v23.08) that transforms RPC calls into a REST service.',
         ),
         type: 'api',
-        masked: false,
+        masked: true,
         // Zeus's clnrest parser reads the transport protocol from the scheme:
         // clnrest+https:// / clnrest+http://. A bare clnrest:// is treated as
         // https, so the http (Tor) URL must carry the +http marker.

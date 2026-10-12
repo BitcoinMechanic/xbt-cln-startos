@@ -1,3 +1,4 @@
+import { verifyBackend, verifyNode, verifyVolume, requireInactiveSwaps, exists, activationHeight } from './xbtPolicy'
 import { FileHelper } from '@start9labs/start-sdk'
 import { manifest as bitcoinManifest } from 'bitcoin-core-startos/startos/manifest'
 import { readFile, writeFile } from 'fs/promises'
@@ -29,19 +30,25 @@ export const main = sdk.setupMain(async ({ effects }) => {
    *
    * In this section, we fetch any resources or run any desired preliminary commands.
    */
-  console.info(i18n('Starting Core Lightning!'))
+  await verifyVolume(sdk.volumes.main.subpath(''))
+  await requireInactiveSwaps(sdk.volumes.main.subpath(''))
+  const restored = await exists(sdk.volumes.main.subpath('node-restored.json'))
+  console.info('Starting XBT Core Lightning')
 
   // watch cln config for changes
   const conf = await clnConfig.read().const(effects)
 
   // bitcoind's RPC over the bridge, for the sync-progress bitcoin-cli below.
   const bitcoind = await bitcoindRpcBridge(effects)
+  if (!bitcoind) throw new Error('BLAKE2b Knots RPC is unavailable')
 
   // get store.json but don't watch for changes
   const store = await storeJson.read().once()
   if (!store) {
     throw new Error('no store.json')
   }
+
+  if (store.watchtowerServer || store.watchtowerClients.length) throw new Error('Watchtower compatibility is not enabled for this XBT candidate')
 
   const watchtowerClientLoaded = !!conf?.raw?.plugin?.includes(
     watchtowerClientPlugin,
@@ -95,6 +102,23 @@ export const main = sdk.setupMain(async ({ effects }) => {
     .const(effects)
 
   const baseDaemons = sdk.Daemons.of(effects)
+    .addOneshot('xbt-backend-identity', {
+      subcontainer: lightningSub,
+      exec: { fn: async () => {
+        const rpc = async (method: string, ...args: string[]) => {
+          const res = await lightningSub.exec(['bitcoin-cli',
+            `-rpcconnect=${bitcoind.host}`, `-rpcport=${bitcoind.port}`,
+            '-rpccookiefile=/mnt/bitcoin/.cookie', method, ...args])
+          if (res.exitCode !== 0) throw new Error('BLAKE2b backend inspection unavailable')
+          const text = String(res.stdout).trim()
+          return method === 'getblockhash' ? text : JSON.parse(text)
+        }
+        const chain = await rpc('getblockchaininfo')
+        const deployments = await rpc('getdeploymentinfo')
+        verifyBackend(chain, deployments.deployments, await rpc('getblockhash', String(activationHeight)))
+        return null
+      } }, requires: [],
+    })
     .addDaemon('lightningd', {
       subcontainer: lightningSub,
       exec: {
@@ -119,6 +143,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
             'getinfo',
           ])
           if (res.exitCode === 0) {
+            try { verifyNode(JSON.parse(String(res.stdout))) } catch {
+              return { result: 'failure', message: 'The node does not report the required XBT features' }
+            }
             return {
               message: i18n('The RPC interface is ready'),
               result: 'success',
@@ -130,7 +157,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }
         },
       },
-      requires: [],
+      requires: ['xbt-backend-identity'],
     })
     .addOneshot('commando-config', {
       subcontainer: lightningSub,
@@ -174,55 +201,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
           await writeFile(
             commandoEnv,
             `LIGHTNING_PUBKEY="${pubkey}"\nLIGHTNING_RUNE="${rune}"\n`,
+            { mode: 0o600 },
           )
 
           return null
         },
       },
       requires: ['lightningd'],
-    })
-    .addDaemon('cln-application', {
-      subcontainer: sdk.SubContainer.of(
-        effects,
-        {
-          imageId: 'ui',
-        },
-        mainMounts,
-        'cln-application-sub',
-      ),
-      exec: {
-        command: ['node', '/app/apps/backend/dist/server.js'],
-        env: {
-          BITCOIN_NETWORK: 'bitcoin',
-          LIGHTNING_DATA_DIR: rootDir,
-          APP_PROTOCOL: 'https',
-          APP_HOST: '0.0.0.0',
-          APP_PORT: String(uiPort),
-          APP_CONFIG_FILE: `${rootDir}/data/app/config.json`,
-          APP_LOG_FILE: `${rootDir}/data/app/application-cln.log`,
-          LIGHTNING_VARS_FILE: `${rootDir}/.commando-env`,
-          // Talk to lightningd over CLNrest, not commando. Commando rides the
-          // Lightning peer protocol, and this build advertises a required
-          // feature bit, so it refuses any peer that does not also adopt the
-          // fork. The UI is not such a peer and would be disconnected.
-          APP_CONNECT: 'REST',
-          LIGHTNING_WS_PORT: String(wsPort),
-          LIGHTNING_REST_PORT: String(clnrestPort),
-          // clnrest runs plaintext (clnrest-protocol=http); the app defaults
-          // this to https and would otherwise look for TLS certs.
-          LIGHTNING_REST_PROTOCOL: 'http',
-          LIGHTNING_GRPC_PORT: String(grpcPort),
-        },
-      },
-      ready: {
-        display: i18n('Web Interface'),
-        fn: () =>
-          sdk.healthCheck.checkPortListening(effects, uiPort, {
-            successMessage: i18n('The Web Interface is ready'),
-            errorMessage: i18n('The Web Interface is not ready'),
-          }),
-      },
-      requires: ['lightningd', 'commando-config'],
     })
     .addHealthCheck('check-synced', {
       ready: {
@@ -602,4 +587,55 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }
         : null,
     )
+    .addHealthCheck('xbt-restored', () =>
+      restored ? {
+        ready: { display: 'Recovered XBT wallet', gracePeriod: 0,
+          fn: async () => ({ result: 'failure' as const, message: 'This wallet was restored. Recover and drain funds; do not reuse it for new channels or swaps.' }) },
+        requires: ['lightningd'],
+      } : null,
+    )
+    .addDaemon('cln-application', {
+      subcontainer: sdk.SubContainer.of(
+        effects,
+        {
+          imageId: 'ui',
+        },
+        mainMounts,
+        'cln-application-sub',
+      ),
+      exec: {
+        command: ['node', '/app/apps/backend/dist/server.js'],
+        env: {
+          BITCOIN_NETWORK: 'bitcoin',
+          LIGHTNING_DATA_DIR: rootDir,
+          APP_PROTOCOL: 'https',
+          APP_HOST: '0.0.0.0',
+          APP_PORT: String(uiPort),
+          APP_CONFIG_FILE: `${rootDir}/data/app/config.json`,
+          APP_LOG_FILE: `${rootDir}/data/app/application-cln.log`,
+          LIGHTNING_VARS_FILE: `${rootDir}/.commando-env`,
+          // Talk to lightningd over CLNrest, not commando. Commando rides the
+          // Lightning peer protocol, and this build advertises a required
+          // feature bit, so it refuses any peer that does not also adopt the
+          // fork. The UI is not such a peer and would be disconnected.
+          APP_CONNECT: 'REST',
+          LIGHTNING_WS_PORT: String(wsPort),
+          LIGHTNING_REST_PORT: String(clnrestPort),
+          // clnrest runs plaintext (clnrest-protocol=http); the app defaults
+          // this to https and would otherwise look for TLS certs.
+          LIGHTNING_REST_PROTOCOL: 'http',
+          LIGHTNING_REST_HOST: '127.0.0.1',
+          LIGHTNING_GRPC_PORT: String(grpcPort),
+        },
+      },
+      ready: {
+        display: i18n('Web Interface'),
+        fn: () =>
+          sdk.healthCheck.checkPortListening(effects, uiPort, {
+            successMessage: i18n('The Web Interface is ready'),
+            errorMessage: i18n('The Web Interface is not ready'),
+          }),
+      },
+      requires: store.restore ? ['lightningd', 'commando-config', 'consume-flags'] : ['lightningd', 'commando-config'],
+    })
 })
