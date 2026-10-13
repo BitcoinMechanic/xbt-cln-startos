@@ -21,8 +21,11 @@ async function main() {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'xbt-package-'))
   const root = path.join(temp, 'volume'); await fs.mkdir(root)
   try {
-    const good = { chain: 'main', blocks: policy.activationHeight, initialblockdownload: false, pruned: false }
-    const dep = { blake2b: { active: true, height: policy.activationHeight } }
+    // Recorded public RPC responses from the real backend that exposed 0090's bug.
+    const recorded = JSON.parse(readFileSync('scripts/fixtures/knots-mainnet-20261012.json', 'utf8'))
+    const good = recorded.getblockchaininfo
+    const dep = recorded.getdeploymentinfo
+    assert.equal(recorded.getblockhash, policy.activationHash)
     policy.verifyBackend(good, dep, policy.activationHash)
     for (const override of [{chain:'regtest'}, {pruned:true}, {initialblockdownload:true}, {blocks:0}])
       assert.throws(() => policy.verifyBackend({...good,...override}, dep, policy.activationHash))
@@ -50,6 +53,8 @@ async function main() {
     await assert.rejects(() => policy.verifyVolume(root,true))
     await fs.unlink(path.join(root,policy.marker)); await fs.writeFile(path.join(root,policy.marker), JSON.stringify(policy.identity))
     const chain=[]; const flags=[]; const tasks=[]
+    let rpcReplies = structuredClone(recorded)
+    const rpcCalls = []
     const backup = {setOptions(o){this.options=o;return this},setPreBackup(f){this.before=f;return this},setPostRestore(f){this.after=f;return this}}
     const sdk = {
       volumes:{main:{subpath:p=>path.join(root,p)}},
@@ -57,7 +62,8 @@ async function main() {
       Backups:{ofVolumes:()=>backup}, action:{createOwnTask:async(...a)=>tasks.push(a)},
       SubContainer:{of:()=>({rootfs:'/test', exec:async args=>{
         const method=args.find(x=>['getblockchaininfo','getdeploymentinfo','getblockhash'].includes(x))
-        return {exitCode:0,stdout:method==='getblockhash'?policy.activationHash:JSON.stringify(method==='getblockchaininfo'?good:{deployments:dep})}
+        rpcCalls.push({method,args})
+        return {exitCode:0,stdout:method==='getblockhash'?rpcReplies[method]:JSON.stringify(rpcReplies[method])}
       }})},
       Daemons:{of:()=>({addDaemon(id,spec){chain.push({id,spec});return this},addOneshot(id,spec){chain.push({id,spec});return this},addHealthCheck(id,spec){chain.push({id,spec});return this}})},
     }
@@ -82,6 +88,31 @@ async function main() {
     }
     const backend=chain.find(x=>x.id==='xbt-backend-identity').spec
     await backend.exec.fn()
+    assert.deepEqual(rpcCalls.map(x=>x.method), ['getblockchaininfo','getdeploymentinfo','getblockhash'])
+    assert.equal(rpcCalls[2].args.at(-1), String(policy.activationHeight))
+    const rejected = [
+      ['ordinary BTC', r=>{delete r.getdeploymentinfo.blake2b}],
+      ['nested-only metadata', r=>{r.getdeploymentinfo.deployments.blake2b=r.getdeploymentinfo.blake2b; delete r.getdeploymentinfo.blake2b}],
+      ['inactive fork', r=>{r.getdeploymentinfo.blake2b.active=false}],
+      ['wrong activation', r=>{r.getdeploymentinfo.blake2b.height++}],
+      ['string activation', r=>{r.getdeploymentinfo.blake2b.height=String(policy.activationHeight)}],
+      ['missing activation', r=>{delete r.getdeploymentinfo.blake2b.height}],
+      ['null fork metadata', r=>{r.getdeploymentinfo.blake2b=null}],
+      ['wrong checkpoint', r=>{r.getblockhash='00'.repeat(32)}],
+      ['wrong chain', r=>{r.getblockchaininfo.chain='regtest'}],
+      ['still syncing', r=>{r.getblockchaininfo.initialblockdownload=true}],
+      ['pruned backend', r=>{r.getblockchaininfo.pruned=true}],
+      ['pre-activation tip', r=>{r.getblockchaininfo.blocks=policy.activationHeight-1}],
+      ['missing tip', r=>{delete r.getblockchaininfo.blocks}],
+    ]
+    for (const [name, change] of rejected) {
+      rpcReplies=structuredClone(recorded); change(rpcReplies)
+      await assert.rejects(()=>backend.exec.fn(), /XBT requires/, name)
+      assert.deepEqual(flags, [])
+    }
+    rpcReplies=structuredClone(recorded)
+    await backend.exec.fn()
+    console.log('PASS: real Knots response through the actual startup hook; '+rejected.length+' invalid backend cases refused')
     assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.requires,['xbt-backend-identity'])
     assert.ok(chain.find(x=>x.id==='cln-application').spec.requires.includes('consume-flags'))
     assert.deepEqual(flags,[]) // Merely reading startup flags never consumes them.
@@ -90,6 +121,28 @@ async function main() {
     assert.deepEqual(chain.find(x=>x.id==='address-pregen').spec().exec.command,
       recovery.recoveryCommands('/root/.lightning').addresses)
     assert.deepEqual(flags,[]) // Planning recovery commands must not consume flags either.
+    const { VersionGraph } = require('@start9labs/start-sdk')
+    const { ExtendedVersion } = Module.createRequire(require.resolve('@start9labs/start-sdk'))('@start9labs/start-core/exver')
+    const current = load('startos/versions/current.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).current
+    const graph = VersionGraph.of({current, other:[]})
+    const from = ExtendedVersion.parse('#privkeyio:26.6.9:0')
+    const to = ExtendedVersion.parse('#privkeyio:26.6.9:1')
+    assert.ok(graph.canMigrateFrom().satisfiedBy(from))
+    for (const version of ['26.6.9:0','#privkeyio:26.6.8:0','#privkeyio:26.6.9:2','#legacy:26.6.9:0']) {
+      assert.equal(graph.canMigrateFrom().satisfiedBy(ExtendedVersion.parse(version)),false)
+    }
+    assert.equal(graph.canMigrateTo().satisfiedBy(from),false)
+    const savedVersions=[]
+    const migrationEffects={setDataVersion:async({version})=>savedVersions.push(version)}
+    const identityBefore=await fs.readFile(path.join(root,policy.marker),'utf8')
+    await graph.migrate({effects:migrationEffects,from,to})
+    assert.equal(await fs.readFile(path.join(root,policy.marker),'utf8'),identityBefore)
+    assert.equal(savedVersions.at(-1),to.toString())
+    await fs.mkdir(path.join(root,policy.swapDirs[0]))
+    await assert.rejects(()=>graph.migrate({effects:migrationEffects,from,to}))
+    await fs.rmdir(path.join(root,policy.swapDirs[0]))
+    assert.deepEqual(flags,[])
+    console.log('PASS: SDK migration accepts only the prior candidate, preserves identity/flags and refuses swap state')
     const b=load('startos/backups.ts',mocks)
     await b.createBackup()
     await backup.before()

@@ -116,7 +116,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         }
         const chain = await rpc('getblockchaininfo')
         const deployments = await rpc('getdeploymentinfo')
-        verifyBackend(chain, deployments.deployments, await rpc('getblockhash', String(activationHeight)))
+        verifyBackend(chain, deployments, await rpc('getblockhash', String(activationHeight)))
         return null
       } }, requires: [],
     })

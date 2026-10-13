@@ -7,10 +7,11 @@ export const identity = { schema: 1, profile: 'xbt-privkeyio-v1', layout: 'bitco
 export const marker = 'xbt-package-identity.json'
 export const swapDirs = ['bounded-authority-v1', 'remote-authority-v1', 'customer-remote-v1', 'customer-invoices-v1', 'swap-gate-v1']
 
-export function verifyBackend(chain: any, deployments: any, checkpoint: unknown) {
+export function verifyBackend(chain: any, deploymentInfo: any, checkpoint: unknown) {
+  // Knots reports its BLAKE2b hard fork beside `deployments`, not inside it.
   if (chain?.chain !== 'main' || chain.initialblockdownload !== false ||
       chain.pruned !== false || !Number.isSafeInteger(chain.blocks) || chain.blocks < activationHeight ||
-      deployments?.blake2b?.active !== true || deployments.blake2b.height !== activationHeight ||
+      deploymentInfo?.blake2b?.active !== true || deploymentInfo.blake2b.height !== activationHeight ||
       checkpoint !== activationHash) {
     throw new Error('XBT requires synced, unpruned BLAKE2b Knots with the pinned activation checkpoint')
   }

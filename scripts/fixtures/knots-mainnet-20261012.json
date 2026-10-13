@@ -1,0 +1,40 @@
+{
+  "getblockchaininfo": {
+    "chain": "main",
+    "blocks": 976949,
+    "headers": 976949,
+    "bestblockhash": "00000000000000000b3d1323bc6fd64c275be1f4e1732e333edf976767a8db41",
+    "bits": "1900d82a",
+    "target": "0000000000000000d82a00000000000000000000000000000000000000000000",
+    "difficulty_blake2b": 2.184621452915951e+19,
+    "time": 1791856520,
+    "mediantime": 1791854630,
+    "verificationprogress": 0.9999905213643029,
+    "initialblockdownload": false,
+    "chainwork": "00000000000000000000000000000000000000013e003e8c0976db010e1dd050",
+    "size_on_disk": 868155613602,
+    "pruned": false,
+    "warnings": []
+  },
+  "getdeploymentinfo": {
+    "hash": "00000000000000000b3d1323bc6fd64c275be1f4e1732e333edf976767a8db41",
+    "height": 976949,
+    "deployments": {
+      "bip34": {"type": "buried", "active": true, "height": 227931},
+      "bip66": {"type": "buried", "active": true, "height": 363725},
+      "bip65": {"type": "buried", "active": true, "height": 388381},
+      "csv": {"type": "buried", "active": true, "height": 419328},
+      "segwit": {"type": "buried", "active": true, "height": 481824},
+      "taproot": {
+        "type": "bip9", "height": 709632, "active": true,
+        "bip9": {"start_time": 1619222400, "timeout": 1628640000, "min_activation_height": 709632,
+                 "status": "active", "since": 709632, "status_next": "active"}
+      },
+      "reduced_data": {"type": "flagday", "height": 961640, "expiry_time": 1819756800, "active": true},
+      "long_coinbase_maturity": {"type": "flagday", "height": 973440, "height_end": 979919,
+                                "coinbase_start_height": 973440, "maturity": 6480, "active": true}
+    },
+    "blake2b": {"height": 961640, "active": true}
+  },
+  "getblockhash": "0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb"
+}
