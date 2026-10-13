@@ -32,3 +32,31 @@ For Rescan Blockchain, a negative number selects an absolute starting block:
 `-976900` means start at block 976900. A positive number is a rewind depth and
 can unintentionally select almost the entire chain. Funded recovery must cover
 the wallet's relevant history; `-1` scans from block 1 and can take many hours.
+
+## 0092 coordinator administration prerequisite
+
+The operator reported the fresh 0090b nodes paid 10,000 XBT sats A to B,
+1,000 B to A, and 1,000 each direction after both services restarted. Funding
+and UI passwords were retained. This is operator-reported node/UI acceptance;
+it does not establish live swap execution, funded StartOS restore or migration
+of legacy channels.
+
+0092 adds local, bounded grant review/confirmation in the isolated migration
+engine sources. Eligible channels are selected automatically; no SCID entry.
+A 120-second review records exact channel funding and limits before confirmation.
+A lost confirmation recovers the same grant; it cannot renew, unpause or enlarge
+it. Saved grants are never reconstructed from missing authority state. Incoming
+liquidity must cover the amount cap; outgoing liquidity also covers the fee cap.
+More than eight eligible channels is refused pending a separate selection UX.
+
+Restored swap journals now observe both their own restored.json and the shared
+swap-restored.json or existing node-restored.json parent markers. Gate hooks
+cannot fall through or disclose a saved preimage after a restore marker appears.
+This is a refusal barrier, not a funded swap recovery or credential-revocation
+solution. A marker on a restored copy does not revoke a still-running original.
+
+All migrated swap execution remains regtest-only. No installer, StartOS grant
+menus, backup enablement or mainnet activation is included. The package backup
+and update guards also recognize coordinator-admin-v1, so introducing the new
+journal cannot bypass the existing coordinator-state refusal. Deadline/on-chain
+protection and coordinator-aware backup/restore must precede live activation.

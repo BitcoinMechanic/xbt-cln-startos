@@ -5,7 +5,7 @@ export const activationHeight = 961640
 export const activationHash = '0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb'
 export const identity = { schema: 1, profile: 'xbt-privkeyio-v1', layout: 'bitcoin' }
 export const marker = 'xbt-package-identity.json'
-export const swapDirs = ['bounded-authority-v1', 'remote-authority-v1', 'customer-remote-v1', 'customer-invoices-v1', 'swap-gate-v1']
+export const swapDirs = ['coordinator-admin-v1', 'bounded-authority-v1', 'remote-authority-v1', 'customer-remote-v1', 'customer-invoices-v1', 'swap-gate-v1']
 
 export function verifyBackend(chain: any, deploymentInfo: any, checkpoint: unknown) {
   // Knots reports its BLAKE2b hard fork beside `deployments`, not inside it.
