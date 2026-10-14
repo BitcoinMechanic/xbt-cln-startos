@@ -1,3 +1,10 @@
+## Migration runtime validation (0098)
+
+This source checkpoint adds isolated regtest runtime-image validation. It does
+not change your installed service or provide a new installer. Normal restarts
+and image replacement are tested with the original data and open channels.
+No backup restore or force-close exercise is part of this step.
+
 # XBT Core Lightning
 
 This migration candidate adds a wallet and channel dashboard to the XBT node. It requires synced, unpruned BLAKE2b Knots. It is not yet an update for your installed experimental XBT node.

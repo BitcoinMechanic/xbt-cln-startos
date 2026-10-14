@@ -1,0 +1,14 @@
+# 0098 regtest runtime candidate. Build context is exported and verified by the bundle.
+ARG ENGINE_IMAGE
+FROM ${ENGINE_IMAGE} AS engine
+FROM debian:bookworm-slim
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    ca-certificates libgmp10 libpq5 libsodium23 libsqlite3-0 libssl3 libstdc++6 zlib1g python3 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=engine /opt/xbt/ /opt/xbt/
+COPY runtime/ /usr/local/libexec/swap-node/
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+RUN python3 -B -I -c "import sys; sys.path.insert(0,'/usr/local/libexec/swap-node'); import package_verify; package_verify.verify('/usr/local/libexec/swap-node','node')" \
+    && /opt/xbt/bin/lightningd --version \
+    && test -x /opt/xbt/libexec/c-lightning/plugins/clnrest
+CMD ["/opt/xbt/bin/lightningd", "--version"]
