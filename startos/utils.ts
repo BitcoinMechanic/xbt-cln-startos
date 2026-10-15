@@ -14,18 +14,11 @@ export const watchtowerPort = 9814
 export const websocketPort = 7272
 export const grpcPort = 2106
 
-export const rootDir = '/root/.lightning'
+export { rootDir, mainMounts } from './volume'
 export const bitcoinDataDir = '/mnt/bitcoin'
 
 /** Host path of the rune the CLN Application UI authenticates with. */
 export const commandoEnv = '/media/startos/volumes/main/.commando-env'
-
-export const mainMounts = sdk.Mounts.of().mountVolume({
-  volumeId: 'main',
-  subpath: null,
-  mountpoint: rootDir,
-  readonly: false,
-})
 
 /**
  * bitcoind's RPC bridge address, resolved through `sdk.host.getBridgeAddress` and
