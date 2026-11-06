@@ -1,0 +1,29 @@
+0097 checkpoint-tool validation — 2026-10-14
+
+The operator reported the 0096a final verifier and READY output at:
+/tmp/privkeyio-0096a-results.3pjwbd73
+Actual VM files are checked during export; the report alone is not accepted
+as the runtime evidence. No new build or funded-test run is required here.
+
+Local isolated workflow test passed using actual source trees, synthetic
+annotated checkpoint histories/receipts and local bare Git remotes:
+
+- Exact 0096a source and complete raw receipt export; correct three patches.
+- Strict current retirement/default-fee/service and historical BTC/XBT validators.
+- Missing or corrupted funded cases, wrong outcomes/types, skipped units,
+  altered source, BTC fee estimate, signed weights, XBT hash or old baseline refused.
+- Missing/symlinked raw evidence and unexpected/staged source changes refused.
+- Repeated export preserves sources, indexes, stashes and original result bytes.
+- Unlisted operator files and private journal/log material excluded from export.
+- Existing tower clones reused via detached worktrees; dirty original checkout
+  files, HEADs and staging indexes preserved, including SSH origin without .git.
+- Three source commits/four annotated tags; divergent remotes and staged work
+  refused before mutation; interrupted pushes resume without duplicate commits.
+- VM sync checks all repositories before stashing; unexpected source/remote
+  changes refused. Interruption after stash but before merge resumes correctly.
+- Older and new stashes retained; repeated completed sync is idempotent.
+- Python compilation, shell syntax and ZIP member/checksum checks passed.
+
+All test Git commits/pushes used disposable local remotes. No actual GitHub
+push, source checkout edit, installer build or live-node operation occurred.
+Synthetic verification inputs are not shipped as acceptance evidence.

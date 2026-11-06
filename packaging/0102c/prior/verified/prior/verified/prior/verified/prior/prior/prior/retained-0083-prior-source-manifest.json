@@ -1,0 +1,281 @@
+{
+  "lightning": {
+    "branch": "privkeyio-swaps",
+    "before_tree": "7746f2d1dee1169d3cb55826eee769f8d6d10d30",
+    "tree": "7953111c652d66e56c9f836f94f7c1a47fb32d19",
+    "pins": {
+      "external/gheap": "67fc83bc953324f4759e52951921d730d7e65099",
+      "external/jsmn": "18e9fe42cbfe21d65076f5c77ae2be379ad1270f",
+      "external/libbacktrace": "793921876c981ce49759114d7bb89bb89b2d3a2d",
+      "external/libwally-core": "0c41f38fb1c201786e9c3ac9eae4f5f80c051399"
+    },
+    "origin": "https://github.com/BitcoinMechanic/lightning.git",
+    "base_tag": "privkeyio-cross-worker-20261012",
+    "base_anchor": "482c8c521166ddc9e244cd6d44a2d8a55bd0d529",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "88d4707a6d2855f50b46779c7ebff16e624b5ef4",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "887d5af1affe60e14fcde3c5522c4593b1cf7d88",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "c58fcd05f59cbd7a4092c4936185df72dcf0f244",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "4b573074e95a7a6787dad2ebc166dece405928b4",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "33d099923dfbf993b2c0806f3634fa76385a611c",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "45d99f93e565b851b941bec1aed5d0b9567fe34a",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "185c768045321a6126c7c1c85d9b019a1c6ff8c9",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "7746f2d1dee1169d3cb55826eee769f8d6d10d30",
+        "new_commit": true
+      }
+    ],
+    "files": {
+      "tools/swap/customer_https.py": {
+        "before": null,
+        "prior": "f23d58fb57a827bf0badde916a4bff10c106631564b84ea4a4d5ab52143850cf",
+        "after": "f23d58fb57a827bf0badde916a4bff10c106631564b84ea4a4d5ab52143850cf"
+      },
+      "tools/swap/worker_pairing.py": {
+        "before": null,
+        "prior": "ccec9efe82e2aea2bb31c8a65f349315df6fe372f0d0ae23d7c876fba4acaa5e",
+        "after": "c17abab5fb12cee0c9f001d22d4d21df10979bbfb5a464c8d28b2b4ddbf8f2ff"
+      },
+      "tools/swap/test_customer_https.py": {
+        "before": null,
+        "prior": "831dfeb75c2730c2f3ee45e06ad25db6203414a2f5f31287bc202e5e9071f9a9",
+        "after": "ee817e66fdc41f0c64c5660c8e3c7482b87877ac45a27cdf3d4f625b549701ea"
+      },
+      "tools/swap/fixture_https_worker.py": {
+        "before": null,
+        "prior": "6e53f662a28196d7d1436382f4f2682e409e1edc3ff96b7fe3132ad6c91004f0",
+        "after": "6e53f662a28196d7d1436382f4f2682e409e1edc3ff96b7fe3132ad6c91004f0"
+      },
+      "tools/swap/test_https_engine.py": {
+        "before": null,
+        "prior": "33ea5e89ab39ab2b9835d81a318ec7de8a330337e9fb82a340641a76589564d5",
+        "after": "33ea5e89ab39ab2b9835d81a318ec7de8a330337e9fb82a340641a76589564d5"
+      },
+      "tools/swap/test_https_fixture.py": {
+        "before": null,
+        "prior": "1ca498b8dca72160e1973a2f38fdf18b89123a7094cb29bca4d1d10531fea0f3",
+        "after": "1ca498b8dca72160e1973a2f38fdf18b89123a7094cb29bca4d1d10531fea0f3"
+      },
+      "tools/swap/test_cross_engine.py": {
+        "before": "74fa067962a8adfa00492e3af63405eb08859f528be62e70520174b9104c1162",
+        "prior": "6a0774541a4dd1e3e02a514597c0af28b84628cf17323ec706979caa15851478",
+        "after": "6a0774541a4dd1e3e02a514597c0af28b84628cf17323ec706979caa15851478"
+      },
+      "tools/swap/coordinator-port.md": {
+        "before": "ce87fbf3a1f6c96070cf84da2b7545c4c31fd7e3693d16c680a3680dcf47912b",
+        "prior": "a7e2682f2576de4e34f2cf51c5c38396661bc9f491ee493869d7a5f7e9954265",
+        "after": "1514e6f7b670aaf8df74dc2b4184a214ee88880b0b1868c060ab3448800ef99a"
+      },
+      "tools/swap/README.md": {
+        "before": "5f500e8631881c449a7888e721d033f556a0435c3503b19946590b821db9ac13",
+        "prior": "9e3da1c2b0d9b4283a5fdbb6baa8e6dc4b26d9b65a811676093556ebf21fbba3",
+        "after": "9e3da1c2b0d9b4283a5fdbb6baa8e6dc4b26d9b65a811676093556ebf21fbba3"
+      },
+      "tools/swap/cross_worker.py": {
+        "before": "0482951e7f46a9f23e361c76a46c963ed4f0af8d05f0b64faf6b6e09724cbb5b",
+        "prior": "0482951e7f46a9f23e361c76a46c963ed4f0af8d05f0b64faf6b6e09724cbb5b",
+        "after": "b3b769077a0514721618f692f2a312944275a070d9755a0ae1c6c0d4814f491d"
+      },
+      "tools/swap/test_cross_worker.py": {
+        "before": "2b917ac16da3799b64ab637d0d4265f1fd549041b7741f38728306e80b1c7fad",
+        "prior": "2b917ac16da3799b64ab637d0d4265f1fd549041b7741f38728306e80b1c7fad",
+        "after": "20c08240f37a0c4d87754bab598c1e3fd5939a70822467d69de9d94db6a2a488"
+      }
+    },
+    "prior_tree": "b8db3d4f8047f1be17971949ceaf86f219574c96"
+  },
+  "xbt-cln-startos": {
+    "branch": "privkeyio-node",
+    "before_tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+    "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+    "pins": {
+      "clboss": "49ffd76ad0ff7607d92b53b98adada233790c15c",
+      "rust-teos": "be344ecc5286dd9436bf343d30954135da8ad4ac"
+    },
+    "origin": "https://github.com/BitcoinMechanic/xbt-cln-startos.git",
+    "base_tag": "privkeyio-cross-worker-20261012",
+    "base_anchor": "16e1171cb6ee7441fb9942d741ae4e695621ee76",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      }
+    ],
+    "files": {},
+    "prior_tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71"
+  },
+  "btc-cln-startos": {
+    "branch": "privkeyio-compat",
+    "before_tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+    "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+    "pins": {
+      "clboss": "49ffd76ad0ff7607d92b53b98adada233790c15c",
+      "rust-teos": "be344ecc5286dd9436bf343d30954135da8ad4ac"
+    },
+    "origin": "https://github.com/BitcoinMechanic/btc-cln-startos.git",
+    "base_tag": "privkeyio-cross-worker-20261012",
+    "base_anchor": "dda31edb70e3631e2cd2d01764380804fb7546f7",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      }
+    ],
+    "files": {},
+    "prior_tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e"
+  },
+  "swap-controller-startos": {
+    "branch": "privkeyio-compat",
+    "before_tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+    "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+    "pins": {},
+    "origin": "https://github.com/BitcoinMechanic/swap-controller-startos.git",
+    "base_tag": "privkeyio-cross-worker-20261012",
+    "base_anchor": "a4f74742e1ef1b4cf1db4c18077bb7414bcc1eb6",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      }
+    ],
+    "files": {},
+    "prior_tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0"
+  }
+}

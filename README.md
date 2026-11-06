@@ -1,3 +1,36 @@
+# 0102 dedicated live integration candidate
+
+Build this candidate with the verified 0102 bundle runner. It binds exact engine,
+UI and Python-runtime image IDs into an isolated packaging copy and compiles the
+installed StartOS registry. The source manifest alone is not an installer.
+
+Start the native node, wait for chain synchronization, and open/fund channels
+normally. Open Enable Swap Coordinator and confirm once. Restart the service;
+then review and confirm separate incoming/outgoing bounded grants. Copy each
+bounded controller credential into the controller pairing action. No SCID entry
+is required. The actual incoming channel is bound when the payment arrives.
+
+The CLNrest interface must be enabled. Use its StartOS HTTPS URL (without a wallet
+scheme prefix or embedded rune) and the corresponding root CA when pairing.
+The native web UI and ordinary payments remain available.
+
+This revision can update the accepted privkeyio XBT candidate :1 to :2 on the
+same volume. Existing identity, unified-signature channels, UI password and
+journals remain in place. It refuses the old experimental XBT wallet layout.
+
+Ordinary restart/update is not backup restoration. Restored wallets remain fenced
+from new coordinator authority; recovery may force-close channels. Incoming
+swap deadline protection can also close the actual receiving channel if a swap
+cannot resolve before its approved deadline. Grants require explicit review.
+
+0102 validation distinguishes synthetic mainnet policy checks, actual funded
+regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
+does not claim a mainnet swap or StartOS host test from a regtest receipt.
+
+## Historical development notes
+
+The following records describe earlier checkpoints and their original scope.
+
 ## Packaged migration runtime candidate (0098)
 
 The separate runtime Dockerfiles and `tools/swap/package_runtime.py` export an
@@ -193,3 +226,17 @@ or upgrade acceptance. No installer is produced.
 
 See the controller repository's `docs/migrated-startos-actions.md` for the
 candidate action flow, retained boundaries and remaining activation work.
+
+## gRPC runtime repair (`26.6.9:3`)
+
+The 0102 runtime omitted `cln-grpc` while the installed configuration required
+`grpc-port` and `grpc-host`, preventing startup. `Dockerfile.live` now adds the
+previously accepted plugin with an enforced SHA256. Its Rust sources and Cargo
+lockfile match this checkout. Supply `GRPC_IMAGE` from the retained 0090 image
+(recorded in the repair receipt); the default local tag is prepared by the repair
+workflow. The launcher explicitly registers gRPC and the already bundled CLNrest as important
+plugins because the retained
+engine has a compiled list of builtin plugins. The native daemon, swap runtime
+and UI remain byte-for-byte unchanged.
+The version graph retains the :1-to-:2 migration and adds a guarded :2-to-:3 edge.
+This is a same-volume update and does not restore or replace wallet state.

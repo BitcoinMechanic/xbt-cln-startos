@@ -5,7 +5,7 @@ import { verifyVolume, requireInactiveSwaps, exists } from './xbtPolicy'
 
 // Shared with the funded recovery fixture. Never back up a resumable channel DB.
 export const backupExcludes = [
-  'bitcoin/lightning-rpc', 'bitcoin/lightningd.sqlite3',
+  'bitcoin/swap-coordinator-v1', 'bitcoin/.swap-setup-*', 'bitcoin/lightning-rpc', 'bitcoin/lightningd.sqlite3',
   'bitcoin/lightningd.sqlite3-wal', 'bitcoin/lightningd.sqlite3-shm',
   'bitcoin/gossip_store', '.commando-env',
   'data/app/application-cln.log', 'bitcoin/*.log',

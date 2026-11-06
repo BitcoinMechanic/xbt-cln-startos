@@ -1,0 +1,15 @@
+Checkpoint packaged swap runtimes and open-channel continuity
+
+Build separate BTC, XBT and controller runtime images from the accepted native
+engines and explicit Python import closures. Verify packaged entry points,
+native dependencies and extracted image contents independently of fixture code.
+
+Record 0098a acceptance: 177 units and six funded bidirectional regtest cases
+covering off-chain failure, ordinary restart and image-content replacement.
+Preserve original channels, credentials, invoices, HTLCs, payment attempts and
+all twelve balances without channel closures. Correct the public-directory
+test fixture to set its permissions explicitly under the runner's umask 0077.
+
+Retain historical evidence with its original provenance. No StartOS installer,
+mainnet activation, arbitrary schema upgrade or backup/restore exercise is
+included; existing restore protections remain enforced.

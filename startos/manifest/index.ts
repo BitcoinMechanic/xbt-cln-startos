@@ -15,7 +15,7 @@ export const manifest = setupManifest({
     lightning: {
       source: {
         dockerBuild: {
-          dockerfile: 'Dockerfile',
+          dockerfile: 'Dockerfile.live',
           workdir: '.',
         },
       },

@@ -1,0 +1,20 @@
+{
+  "checkpoint": "privkeyio-live-startup-20261106",
+  "date": "2026-11-06",
+  "evidence_source": "User reports in this session; no remote live-node inspection by this agent",
+  "confirmed": [
+    "XBT same-volume repair update starts successfully",
+    "Web UI accessible",
+    "User ran listpeerchannels and confirmed CHANNELD_NORMAL"
+  ],
+  "pending": [
+    "Explicit original node ID and funding transaction comparison",
+    "Explicit synchronization completion",
+    "Small ordinary payment",
+    "Fresh BTC and controller host acceptance",
+    "Routed swaps in both directions"
+  ],
+  "known_followup": "Inspect BTC native plugin registration and gRPC packaging before host installation",
+  "historical_build_receipt": "grpc-repair-20261106/build-receipt.json",
+  "source_export_sha256": "dc01bc602df5f8298442ae10bf85815d744c22a6b106fb0aa001b81691b199f8"
+}

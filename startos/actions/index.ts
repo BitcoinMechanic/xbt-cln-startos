@@ -1,3 +1,4 @@
+import { createActions } from '../live/actions'
 import { sdk } from '../sdk'
 import { experimental } from './config/experimental'
 import { config } from './config/config'
@@ -13,7 +14,7 @@ import { rescanBlockchain } from './rescanBlockchain'
 import { nodeInfo } from './nodeInfo'
 import { displaySeed } from './displaySeed'
 
-export const actions = sdk.Actions.of()
+const nodeActions = sdk.Actions.of()
   .addAction(config)
   .addAction(displaySeed)
   .addAction(experimental)
@@ -25,3 +26,5 @@ export const actions = sdk.Actions.of()
   .addAction(nodeInfo)
 
 // @TODO generate-lnlink
+
+export const actions = createActions(undefined, nodeActions)

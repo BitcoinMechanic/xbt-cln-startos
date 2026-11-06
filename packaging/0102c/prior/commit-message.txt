@@ -1,0 +1,17 @@
+Checkpoint compiled StartOS swap actions and funded runtime continuity
+
+Add separate candidate SDK forms for local grant review, explicit confirmation,
+scoped credential export, directional pairing, invoice review and confirmation,
+saved payment invoices, settings and history. Export an automatic controller
+daemon definition that resumes existing state without initializing it.
+
+Record 0100 acceptance: all three package typechecks, actual SDK form and command
+checks, four synthetic TLS process cases, and six funded bidirectional cases
+through the compiled handlers. Preserve exact grants, channels, invoices, HTLCs,
+payment attempts, credentials and twelve balances through ordinary restart and
+image-content replacement without channel closes.
+
+Keep the accepted native engines and sealed Python runtimes unchanged. Retain
+historical evidence under its original provenance. Installed registries, live
+startup and restore policy remain unchanged. This is a regtest source checkpoint;
+it includes no installer, live activation or StartOS host upgrade acceptance.

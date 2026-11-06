@@ -1,0 +1,7 @@
+{
+  "external/gheap": "67fc83bc953324f4759e52951921d730d7e65099",
+  "external/jsmn": "18e9fe42cbfe21d65076f5c77ae2be379ad1270f",
+  "external/libbacktrace": "793921876c981ce49759114d7bb89bb89b2d3a2d",
+  "external/libwally-core": "0c41f38fb1c201786e9c3ac9eae4f5f80c051399",
+  "external/libwally-core/src/secp256k1": "45f6f0f158c5ae80a2c8a53398ea4adbf19af6dc"
+}

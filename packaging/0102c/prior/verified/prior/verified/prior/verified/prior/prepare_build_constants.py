@@ -1,0 +1,6 @@
+"""Pinned engine provenance shared by the 0094 receipt verifier."""
+PARENT='sha256:7d7a8401fd07014fb0d4d82a71fb1d135f80fc3559c1f86c9362cee4926cbffa'
+COMPILED='69df9aa51c5fa594c7e4854954264ffac46f3924'
+BTC_SHA='ac37b1b6c41b6c60cf06dd8cd7500f1fab04411cf2f3bc126838d8cafab4538d'
+PEER_BEFORE='0bf34c9765565ea9927360d2712cab79374a287042f21ae1b2ec4e9f9eb1a2b6'
+PLUGIN_AFTER='ab1df9bdd13bcfca1fe1516ba0ee76cd2a2c3a48fa859c49cc9ba3cd4224ea8f'

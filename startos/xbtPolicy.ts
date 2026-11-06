@@ -54,8 +54,8 @@ export async function verifyVolume(root: string, fresh = false) {
 }
 
 export async function requireInactiveSwaps(root: string) {
-  // No active coordinator adapter is registered by this node-only candidate.
-  // Unknown authority must never be silently omitted and later re-created.
+  // Legacy flat journals must not be imported into the new namespace.
+  // The separately activated swap-coordinator-v1 namespace is preserved.
   for (const base of [root, join(root, 'bitcoin')]) {
     for (const name of swapDirs) if (await exists(join(base, name))) throw new Error('Swap state requires coordinator-aware backup and restore')
   }

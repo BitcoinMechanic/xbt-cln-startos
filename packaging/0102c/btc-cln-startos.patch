@@ -1,0 +1,712 @@
+diff --git a/Dockerfile.live b/Dockerfile.live
+new file mode 100644
+index 0000000000000000000000000000000000000000..8d027c7fd3a13c3057d3f02aa7fd8c395c8b2a16
+--- /dev/null
++++ b/Dockerfile.live
+@@ -0,0 +1,12 @@
++# 0102: requires exact accepted image IDs and sealed runtime staged by the bundle.
++ARG CLI_IMAGE
++ARG PARENT_IMAGE
++FROM ${CLI_IMAGE} AS cli
++FROM ${PARENT_IMAGE}
++USER root
++RUN rm -rf /usr/local/libexec/swap-node
++COPY runtime/ /usr/local/libexec/swap-node/
++COPY --from=cli /usr/bin/bitcoin-cli /usr/local/bin/bitcoin-cli
++ENV PATH="/opt/btc/bin:${PATH}"
++RUN ln -sf /opt/btc/bin/lightning-cli /usr/local/bin/lightning-cli && ln -sf /opt/btc/bin/lightningd /usr/local/bin/lightningd
++RUN apt-get update && apt-get install -y --no-install-recommends wireguard-tools iptables iproute2 procps && rm -rf /var/lib/apt/lists/*
+diff --git a/README.md b/README.md
+index d60fb060d95e9cf2a0fc8c037e5bbfc4229187e0..0a7579528bea66e0a49c95d416b06532be551cdc 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,35 @@
++# 0102 dedicated live integration candidate
++
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
++
++Start the native node, wait for chain synchronization, and open/fund channels
++normally. Open Enable Swap Coordinator and confirm once. Restart the service;
++then review and confirm separate incoming/outgoing bounded grants. Copy each
++bounded controller credential into the controller pairing action. No SCID entry
++is required. The actual incoming channel is bound when the payment arrives.
++
++The CLNrest interface must be enabled. Use its StartOS HTTPS URL (without a wallet
++scheme prefix or embedded rune) and the corresponding root CA when pairing.
++The native web UI and ordinary payments remain available.
++
++This BTC candidate is a fresh-install-only version branch. Do not install it
++over the existing BTC coordinator to attempt an untested wallet migration.
++
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
++
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
++
++## Historical development notes
++
++The following records describe earlier checkpoints and their original scope.
++
+ ## Packaged migration runtime candidate (0098)
+ 
+ The separate runtime Dockerfiles and `tools/swap/package_runtime.py` export an
+diff --git a/docs/live-integration-0102.md b/docs/live-integration-0102.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..d2145098901e1f732d694cb7402332806c433ba2
+--- /dev/null
++++ b/docs/live-integration-0102.md
+@@ -0,0 +1,27 @@
++# 0102 dedicated live integration candidate
++
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
++
++Start the native node, wait for chain synchronization, and open/fund channels
++normally. Open Enable Swap Coordinator and confirm once. Restart the service;
++then review and confirm separate incoming/outgoing bounded grants. Copy each
++bounded controller credential into the controller pairing action. No SCID entry
++is required. The actual incoming channel is bound when the payment arrives.
++
++The CLNrest interface must be enabled. Use its StartOS HTTPS URL (without a wallet
++scheme prefix or embedded rune) and the corresponding root CA when pairing.
++The native web UI and ordinary payments remain available.
++
++This BTC candidate is a fresh-install-only version branch. Do not install it
++over the existing BTC coordinator to attempt an untested wallet migration.
++
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
++
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
+diff --git a/instructions.md b/instructions.md
+index 9818050a09e04b186627f85dc8a88bf1c69627f5..d2145098901e1f732d694cb7402332806c433ba2 100644
+--- a/instructions.md
++++ b/instructions.md
+@@ -1,247 +1,27 @@
+-## Migration runtime validation (0098)
++# 0102 dedicated live integration candidate
+ 
+-This source checkpoint adds isolated regtest runtime-image validation. It does
+-not change your installed service or provide a new installer. Normal restarts
+-and image replacement are tested with the original data and open channels.
+-No backup restore or force-close exercise is part of this step.
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
+ 
+-# Core Lightning
++Start the native node, wait for chain synchronization, and open/fund channels
++normally. Open Enable Swap Coordinator and confirm once. Restart the service;
++then review and confirm separate incoming/outgoing bounded grants. Copy each
++bounded controller credential into the controller pairing action. No SCID entry
++is required. The actual incoming channel is bound when the payment arrives.
+ 
+-## Market pricing (0064)
++The CLNrest interface must be enabled. Use its StartOS HTTPS URL (without a wallet
++scheme prefix or embedded rune) and the corresponding root CA when pairing.
++The native web UI and ordinary payments remain available.
+ 
+-After the packaging VM reports READY, finish any active swap and install all
+-three packages: BTC 26.6.9:9, XBT 0.1.0:27 and Swap Controller 0.1.0:24.
+-Existing fixed-price grants and historical records retain their original terms.
++This BTC candidate is a fresh-install-only version branch. Do not install it
++over the existing BTC coordinator to attempt an untested wallet migration.
+ 
+-To use Neoxa pricing for a direction, explicitly create new grants on **both**
+-coordinators under **Swap Grants**. Enable **Neoxa market-priced swaps**, choose
+-matching per-swap and total BTC/XBT limits, and enable **New grant** when replacing
+-an existing grant. Finish all existing swaps first. Leave the channel field empty
+-for the normal routed flow. Follow any requested coordinator restart, then pair
+-both credentials for that direction in **Swap Controller → Swap Setup**.
+-Do not delete old swap records or reuse an old grant as market authority.
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
+ 
+-In **Swap Setup → Market Pricing**, operator markup defaults to **0%**. The field
+-uses basis points: 0 = 0%, 100 = 1%, 500 = 5%. Changes affect new quotes only.
+-The coordinator's selected outgoing routing fee is included before markup and
+-whole-satoshi rounding. Fees paid by your sending wallet are additional. The
+-exchange bid/ask spread still applies at 0% markup. No exchange account or
+-trading credentials are needed; this does not place a trade on Neoxa.
+-
+-Use a fresh recipient invoice for a whole number of sats, within the saved
+-grant limits, with at least 33 minutes remaining and final CLTV at most 40.
+-Include private routing hints where needed. Then:
+-
+-- **New BTC to XBT Swap** → review → **Confirm BTC to XBT Swap** → pay BTC.
+-- **New XBT to BTC Swap** → review → **Confirm XBT to BTC Swap** → pay XBT.
+-
+-Review both amounts, the Neoxa price, markup, route fee and expiry. A quote lasts
+-**two minutes from the price fetch**, including review and payment. Confirm and
+-pay before that deadline. An expired unapproved draft can be cancelled and a
+-new quote requested; it is never silently repriced. No SCID entry is needed in
+-the controller. One payment part and one outgoing attempt are supported.
+-
+-BTC → XBT uses available Neoxa asks; XBT → BTC uses bids. Quotes require enough
+-ordinary order-book depth and fresh, plausible ticker data. Synthetic AMM levels
+-are excluded. Stale/unavailable data or insufficient depth stops new market
+-quotes; there is no fallback to the old fixed rate. This price is a reference
+-for the swap, not an exchange fill guarantee or an automatically hedged trade.
+-
+-Default market limits are 10,000 BTC sats / 500,000 XBT sats per swap and
+-50,000 BTC sats / 2,500,000 XBT sats over the grant. Outgoing fees count toward
+-these limits. Choose smaller limits if appropriate. Approval reserves one slot
+-and the quoted amounts; failed or expired approved swaps do not replenish them.
+-Grant enrollment still expires after 24 hours. Pause/expiry blocks new swaps
+-while preserving the recovery rights of already enrolled swaps.
+-
+-**Swap Status** is read-only and shows expiry, slots, market limits and remaining
+-amount budgets. It does not guarantee a route. Route limits remain four hops,
+-10 sats of the outgoing asset, and 80 blocks forward / 288 blocks for new
+-reverse grants. Existing direct/fixed grants keep their old caps and fixed
+-1,000 BTC → 2,000 XBT or 3,000 XBT → 1,500 BTC amounts.
+-
+-Check the appropriate swap history and recipient receipt after paying. If a
+-reply is uncertain, preserve the record and let the worker recover the original
+-attempt; do not repeat the payment. Accepted payments keep their saved amounts,
+-route and incoming-channel binding across restarts and price-source outages.
+-On-chain recovery requires separate claim/sweep verification; it is not a
+-settled result. Historical pilot tools remain hidden unless an older record
+-requires inspection. **Advanced / Recovery → Worker Status** remains available.
+-
+-
+-## Documentation
+-
+-- [Start9 Bitcoin Guides](https://docs.start9.com/bitcoin-guides/) — connecting wallets and dashboards to a Lightning node on StartOS, and how that node reaches Bitcoin.
+-- [Core Lightning documentation](https://docs.corelightning.org/docs/) — the upstream operator and developer reference.
+-
+-## What you get on StartOS
+-
+-- A **Core Lightning** node (`lightningd`) running mainnet, with an auto-created wallet on first start.
+-- A **Web UI** (CLN Application) for managing channels, payments, and invoices, with its own password set on first access.
+-- A **JSON-RPC** interface, a **gRPC** interface, and (when enabled) a **CLNrest** REST interface that publishes a URL containing a pre-generated rune for wallet apps.
+-- An optional **Clams Websocket** endpoint for Clams Remote.
+-- A bundled set of plugins built into the image: **CLBOSS** (automated channel management), **Sling** (channel rebalancing), and **TEOS** for watchtower client and server functionality.
+-- A required dependency on **Bitcoin** — install and fully sync Bitcoin first; CLN will not start without it.
+-
+-## Getting set up
+-
+-1. Install and fully sync **Bitcoin** if you haven't already.
+-2. Start Core Lightning. The wallet is created automatically on first start; no seed phrase setup is required.
+-3. Open the **Web UI** interface and set the UI password on first access. Save this password — it is independent of your StartOS credentials. After 5 wrong passwords within 15 minutes, the Web UI pauses logins for everyone for 15 minutes; restart Core Lightning to clear it sooner.
+-4. To connect a wallet app or other client, run the **Create Rune** action to generate an unrestricted rune, or use the rune embedded in the **CLNrest** interface URL.
+-
+-## Using Core Lightning
+-
+-### Interfaces
+-
+-- **Web UI** — the CLN Application web dashboard for day-to-day node operation.
+-- **RPC** — JSON-RPC over HTTP for `lightning-cli` and scripts.
+-- **Peer** — the Lightning peer-to-peer port; share this address with peers who want to open channels with you.
+-- **grpc** — the gRPC API for apps and plugins that prefer typed RPC.
+-- **CLNrest** — REST API. When enabled, the published URL contains the rune wallet apps need to authenticate. The scheme tells wallets like Zeus which protocol to use: `clnrest+http://` for plain-HTTP addresses (use this for Tor onion addresses — Tor already encrypts) and `clnrest+https://` for SSL addresses (LAN/clearnet).
+-- **Clams Websocket** — websocket endpoint for Clams Remote, shown when the `clams-remote-websocket` option is on.
+-- **TEOS Watchtower** — present only when the watchtower server is enabled.
+-
+-### Actions
+-
+-- **Node Info** — display your node ID and peer URI(s) to share with channel partners.
+-- **Display BIP-39 Seed** — show the 12-word BIP-39 seed for on-chain recovery. Hidden if your wallet predates BIP-39 support in CLN; the seed alone does not recover channel state.
+-- **Create Rune** — generate an unrestricted rune for app integrations.
+-- **Revoke All Runes** — blacklist every rune this node has issued, so none of them can authenticate again. Run it if a rune may have been copied or exposed, or if an app with RPC access to your node may have created one without your knowledge — for example if you run BTCPay Server, which reaches Core Lightning over its admin RPC socket and shipped an actively exploited vulnerability in versions before 2.4.2. Core Lightning restarts afterwards to issue the web UI a fresh rune; re-issue any other integration's rune with **Create Rune**.
+-- **General Settings** — set alias, color, fee base and rate, minimum channel capacity, funding confirmations, Tor-only mode, Clams Websocket, a custom external host, and the Bitcoin retry timeout.
+-  - **Bitcoin Retry Timeout** is how long Core Lightning keeps retrying Bitcoin before it shuts down with "The Bitcoin backend died". The default is 60 seconds; raise it if that happens while Bitcoin is busy, such as during a reindex.
+-  - **Custom External Host** announces an external tunnel or VPN endpoint, as your node's public address. It is announced in place of any public IP StartOS detects, so peers are not handed the home IP the tunnel exists to hide; your Tor address is still announced. Core Lightning resolves the name once at startup, so restart it if the endpoint moves to a new address. Nothing is announced while Tor-only mode is on, because Core Lightning cannot resolve a hostname with every connection forced through the proxy — a failing **Custom External Host** health check appears while both are set, to tell you so.
+-- **Plugins** — enable or disable CLNrest, Sling, and CLBOSS, with sub-settings for CLBOSS (min on-chain reserve, auto-close, zero base fee, channel size limits).
+-- **Experimental Features** — toggle shutdown-wrong-funding and dual funding / liquidity ads (with policy, fuzz percentage, fund probability, and merchant lease-fee settings). Dual-funding amounts are in satoshis, except Channel Fee Max Base, which is in millisatoshis.
+-- **Watchtower Settings** — enable the TEOS watchtower server, enable the watchtower client, and add tower URIs to register with. A tower URI is `<pubkey>@<host>:<port>`, reached over plain HTTP; prefix the host with `https://` for a tower that serves its API over TLS. Give each tower an optional label, such as who runs it, so you know who to contact if it goes offline. While you subscribe to towers, the **Watchtowers** health check shows whether each one is reachable.
+-- **Watchtower Info** — visible when the watchtower server is enabled; shows the server URI and stats.
+-- **Watchtower Client Info** — visible when at least one tower is configured; shows registered towers and subscription state. Towers you add are registered automatically the next time Core Lightning starts, and stay registered across restarts and updates. If this list is empty, give the service a minute after startup and check it again — registration runs shortly after Core Lightning is up. Tower URIs are usually `.onion` addresses, which need Tor installed and running to reach.
+-- **Rescan Blockchain** — rescan the blockchain from a given depth or block height. **Required after restoring from backup** — the wallet balance reads zero until a rescan completes.
+-- **Reset UI Password** — clear the CLN Application UI password so you can set a new one on your next visit from its `.local`, IP, or `.onion` address.
+-- **Delete Gossip Store** — delete a corrupted `gossip_store`; CLN will rebuild it from peers on next start. Available when the service is stopped.
+-- **CLBOSS** — available while CLBOSS is enabled in **Plugins** and the service is running:
+-  - **CLBOSS Status** — what CLBOSS sees and is doing: connectivity, its view of on-chain fees, whether it is managing on-chain funds, peers you have excluded, and its swap totals.
+-  - **Ignore On-chain Funds** — stop CLBOSS from putting on-chain funds into channels for a number of hours, so you can open a channel or withdraw funds yourself. **Resume On-chain Management** ends it early.
+-  - **Unmanage Peer** — stop CLBOSS managing fees, channel opens, channel closes, or rebalancing for one peer, for example to set your own fees on a channel to a friend. Run it again with nothing selected to hand the peer back.
+-
+-### Paying and receiving
+-
+-**Pay Invoice** pays a Lightning invoice from your node without a wallet app: paste it, enter an amount only if the invoice leaves it open, set the most you are willing to pay in routing fees, and confirm. Verify the decoded amount, destination, and description before sending; payments cannot be reversed. The result shows what was paid and the preimage. A service that needs a payment from you can raise the same prompt with those details disclosed and the invoice locked.
+-
+-**Receive Payment** creates an invoice for someone to pay you: set an amount (or leave it empty to let them choose), a description they will see, and how long it stays payable, then show them the QR code or send them the invoice text. Both live under **Payments**.
+-
+-### Backups and restore
+-
+-StartOS backs up the `main` volume, excluding live database files and the gossip store. Restoring brings back your keys and settings, but **not** the wallet's record of its own coins — so right after a restore, your on-chain balance reads **zero**. This is expected and your funds are not lost.
+-
+-After a restore, Core Lightning automatically:
+-
+-- runs `emergencyrecover` to attempt recovery of channel funds via peer cooperation (best-effort — it depends on peers responding),
+-- pre-registers your wallet's addresses so the rescan below finds all of your coins,
+-- saves an untouched copy of the channel-recovery file as `bitcoin/emergency.recover.restored-<date>` for support and manual recovery,
+-- prompts you with a task to run **Rescan Blockchain**.
+-
+-Run the rescan with a blockheight from before your node was created, prefixed with a hyphen (e.g. `-800000`). It takes hours; the **Synced** health check stays red while it works — leave Core Lightning and Bitcoin running until it turns green, then check your balance.
+-
+-If the balance is still missing funds after the rescan completes, contact support: your funds are recoverable — the wallet's public descriptors can locate every coin exactly, even ones the rescan missed.
+-
+-Once any recovered channels have resolved, sweep remaining funds to another wallet and reinstall fresh if you want to keep using the node. Restore only what you must: restoring an old backup over a working node replaces its live records with stale ones.
+-
+-### Moving an existing node to StartOS
+-
+-You can bring a Core Lightning node from another machine, keeping its node ID and channels, by copying its data into this service.
+-
+-1. **Stop Core Lightning on the old machine and make sure it cannot start again.** Two running copies of one node will broadcast old channel states and lose funds. Leave it stopped for good once the move is done.
+-2. Install Core Lightning here, start it once so it creates its data directory, then stop it.
+-3. From the old node's lightning directory (usually `~/.lightning/bitcoin/`), copy these files to your server's home directory, for example with `scp`: `hsm_secret`, `lightningd.sqlite3`, and `emergency.recover`, plus `lightningd.sqlite3-wal`, `lightningd.sqlite3-shm` and `accounts.sqlite3` if they exist. The gossip store is not needed; the node rebuilds it.
+-4. SSH into your server and copy the files into the service's data, replacing the ones there:
+-
+-   ```
+-   sudo cp ~/hsm_secret ~/lightningd.sqlite3 ~/emergency.recover /media/startos/data/package-data/volumes/c-lightning/data/main/bitcoin/
+-   ```
+-
+-   Add any of the optional files you copied to the same command.
+-
+-5. Start Core Lightning and watch its logs. Settings such as alias and fees are not carried over; set them in **General Settings**.
+-
+-The old node must run the same Core Lightning version as this service or an older one; its database is upgraded automatically on first start, but it cannot be downgraded. If your `hsm_secret` is encrypted, decrypt it on the old machine with `lightning-hsmtool decrypt` before copying it — this service cannot ask for its password at startup.
+-
+-## Limitations
+-
+-- **Mainnet only.** Testnet, signet, and regtest are not exposed.
+-- **Bitcoin authentication is cookie-based.** `bitcoin-rpcuser` and `bitcoin-rpcpassword` are intentionally not configurable; CLN uses the mounted Bitcoin cookie file.
+-- **The `config` file is managed through actions.** Manual edits will be overwritten on the next config sync.
+-
+-
+-## Coordinator setup and grants
+-
+-Existing paired installations can keep their saved setup after this update.
+-For a fresh coordinator, use **Swap Setup → Coordinator Readiness**, then
+-**Prepare Coordinator** with explicit confirmation. Preparation checks identity,
+-chain synchronization, recovery state and pending HTLCs; it grants no payment
+-authority. Use **Create or Show Read-only Controller Credential** to obtain the
+-restricted monitoring rune for **Pair Coordinator Nodes** in Swap Controller.
+-Use that node's verified HTTPS interface and authenticated StartOS root CA.
+-
+-Create or retrieve the node's separate **Inspection Credential** under
+-**Swap Setup**, then save both node inspection credentials in the controller.
+-These allow invoice, reserve and channel checks without payment authority.
+-Keep them private. Do not substitute an administrator rune, delete interrupted
+-credential records, or bypass a restore barrier.
+-
+-Enable the bounded swap gate when the setup action requests it. On the XBT
+-coordinator, reverse swaps require **Enable Bounded XBT Swap Gate**, followed by
+-a restart if indicated and **XBT Swap Gate Status**. The BTC grant setup reports
+-any required BTC gate restart. Gate activation alone does not authorize a swap.
+-Grant controls under **Swap Grants** separately approve the fixed amounts,
+-route limits, selected channels and enrollment budget. Review those bounds
+-before confirming, then pair the credentials for that direction in the controller.
+-
+-For routed BTC to XBT grants, explicitly enable **Allow routed swaps** and leave
+-the optional channel field empty to approve all currently eligible local channels
+-(up to eight). Existing direct grants keep their mode unless explicitly replaced.
+-XBT to BTC grants automatically select eligible local channels. New reverse
+-grants allow up to 288 BTC route-delay blocks; old grants retain 80 or 144.
+-A status check never renews or widens a grant.
+-
+-After adding or closing channels, finish existing swaps before explicitly
+-replacing grants and pairing the new credentials. More receiving liquidity does
+-not resolve a fee/dust protection refusal. Preserve records if the outcome of
+-any earlier payment or grant operation is uncertain.
+-
+-Development fixtures and historical release details are documented in README.md.
+-
+-## Recipient hints and preparation errors
+-
+-A recipient invoice needs a route the paying coordinator can discover. Private
+-hints being enabled does not guarantee a hint was included: CLN can omit a
+-channel whose peer appears to be a dead end. If preparation reports an unavailable
+-coordinator request while Swap Status says ready, check the recipient invoice's
+-actual hint count and channel readiness. A read-only route/history diagnostic
+-can distinguish a route refusal from an authority or transport problem. Keep
+-existing grants and records while diagnosing.
+-
+-On a customer CLN node, explicitly selecting eligible local channels in the
+-invoice's exposeprivatechannels array can provide hints omitted by the boolean
+-setting. Select from current connected, normal channels with sufficient receiving
+-liquidity and verify that the new invoice contains a hint; never invent a SCID.
+-This does not widen grant authority or route limits. The forward preparation UI
+-can still mask a specific route refusal as a generic coordinator-request error.
+-
+-
+-## StartOS action integration candidate (0100)
+-
+-`startos/migration/` contains a separate set of real SDK forms and handlers for
+-the accepted packaged swap runtime. It is not registered by `startos/index.ts`
+-and does not change the installed menus, node startup, restore policy or UI.
+-The protocol and candidate commands still require disposable regtest.
+-
+-The 0100 runner compiles the handlers and exercises them around the unchanged
+-0098a runtime images. Its six funded cases cover both directions, failure,
+-ordinary restart and executable-image replacement on the same volumes, with
+-original channels, credentials, HTLCs and payment attempts retained. The
+-StartOS effects boundary is a subprocess fixture: this is not host installation
+-or upgrade acceptance. No installer is produced.
+-
+-See the controller repository's `docs/migrated-startos-actions.md` for the
+-candidate action flow, retained boundaries and remaining activation work.
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
+diff --git a/startos/actions/index.ts b/startos/actions/index.ts
+index 35caf7497a8d7d8ae34a11a4c857a3470cf5fe98..ef9751e3238810400d1b85585c0e3420575344c7 100644
+--- a/startos/actions/index.ts
++++ b/startos/actions/index.ts
+@@ -1,68 +1,30 @@
+-import { enableReverseSession, pauseReverseSession } from './reverseSession'
+-import { enableSwapSession, pauseSwapSession } from './swapSession'
+-import { authorizeForwardPilot } from './forwardPilot'
+-import { inspectionCredentialStatus, inspectionCredentialCreate, inspectionCredentialRevoke } from './inspectionCredential'
+-import { gateCredentialStatus, gateCredentialCreate, gateCredentialRevoke } from './gateCredential'
+-import { btcGateStatus, activateBtcGate } from './gate'
+-import { controllerCredentialStatus, controllerCredentialCreate, controllerCredentialRevoke } from './controllerCredential'
+-import { coordinatorStatus, prepareCoordinator } from './coordinator'
++import { createActions } from '../live/actions'
+ import { sdk } from '../sdk'
+-import { experimental } from './config/experimental'
+ import { config } from './config/config'
+-import { plugins } from './config/plugins'
+-import { watchtower } from './watchtower/watchtower'
++import { displaySeed } from './displaySeed'
++import { experimental } from './config/experimental'
+ import { createRune } from './generateRune'
+ import { revokeRunes } from './revokeRunes'
+ import { deleteGossipStore } from './deleteGossipStore'
+ import { resetPassword } from './resetPassword'
+-import { watchtowerInfo } from './watchtower/watchtowerInfo'
+-import { watchtowerClientInfo } from './watchtower/watchtowerClientInfo'
+ import { rescanBlockchain } from './rescanBlockchain'
+ import { nodeInfo } from './nodeInfo'
+-import { displaySeed } from './displaySeed'
+ import { clearnetVpn } from './clearnetVpn'
+ import { payInvoice } from './payInvoice'
+ import { receivePayment } from './receivePayment'
+-import {
+-  clbossIgnoreOnchain,
+-  clbossNoticeOnchain,
+-  clbossStatus,
+-  clbossUnmanage,
+-} from './clboss'
+ 
+-export const actions = sdk.Actions.of().addAction(enableReverseSession).addAction(pauseReverseSession).addAction(authorizeForwardPilot).addAction(enableSwapSession).addAction(pauseSwapSession)
++const nodeActions = sdk.Actions.of()
+   .addAction(config)
+   .addAction(displaySeed)
+   .addAction(experimental)
+-  .addAction(plugins)
+-  .addAction(watchtower)
+   .addAction(createRune)
+   .addAction(revokeRunes)
+   .addAction(deleteGossipStore)
+   .addAction(resetPassword)
+-  .addAction(watchtowerInfo)
+-  .addAction(watchtowerClientInfo)
+   .addAction(rescanBlockchain)
+   .addAction(nodeInfo)
+   .addAction(clearnetVpn)
+   .addAction(payInvoice)
+   .addAction(receivePayment)
+-  .addAction(clbossStatus)
+-  .addAction(clbossIgnoreOnchain)
+-  .addAction(clbossNoticeOnchain)
+-  .addAction(clbossUnmanage)
+-  .addAction(gateCredentialStatus)
+-  .addAction(gateCredentialCreate)
+-  .addAction(gateCredentialRevoke)
+-  .addAction(inspectionCredentialStatus)
+-  .addAction(inspectionCredentialCreate)
+-  .addAction(inspectionCredentialRevoke)
+-  .addAction(btcGateStatus)
+-  .addAction(activateBtcGate)
+-  .addAction(coordinatorStatus)
+-  .addAction(prepareCoordinator)
+-  .addAction(controllerCredentialStatus)
+-  .addAction(controllerCredentialCreate)
+-  .addAction(controllerCredentialRevoke)
+ 
+-// @TODO generate-lnlink
++export const actions = createActions(undefined, nodeActions)
+diff --git a/startos/backups.ts b/startos/backups.ts
+index 6da15b025353a01057aee9ad80489dace51ef7db..6137c11b52483b9589728a6ae10b07a85c462738 100644
+--- a/startos/backups.ts
++++ b/startos/backups.ts
+@@ -17,7 +17,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(
+           'btc-gate.lock',
+           'coordinator-preparation.json',
+           'coordinator-preparation.lock',
+-          'bitcoin/lightning-rpc',
++          'bitcoin/swap-coordinator-v1', 'bitcoin/.swap-setup-*', 'bitcoin/lightning-rpc',
+           'bitcoin/lightningd.sqlite3',
+           'bitcoin/lightningd.sqlite3-wal',
+           'bitcoin/lightningd.sqlite3-shm',
+@@ -26,6 +26,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(
+         ],
+       })
+       .setPostRestore(async (effects) => {
++        await writeFile(sdk.volumes.main.subpath('node-restored.json'), JSON.stringify({schema:1,recovery:true}), {mode:0o600})
+       await writeFile(sdk.volumes.main.subpath('forward-pilot-restored.json'), JSON.stringify({blocked:true}), {mode:0o600})
+         await writeFile('/media/startos/volumes/main/btc-gate-restored.json', JSON.stringify({ schema: 1, blocked: true }), { mode: 0o600 })
+         await unlink('/media/startos/volumes/main/btc-gate-activation.json').catch((error: NodeJS.ErrnoException) => {
+diff --git a/startos/live/actions.ts b/startos/live/actions.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..1254332de18e4e3038c5954110c9af0ff14f6f1c
+--- /dev/null
++++ b/startos/live/actions.ts
+@@ -0,0 +1,104 @@
++import { T } from '@start9labs/start-sdk'
++import { sdk } from '../sdk'
++import { mainMounts, rootDir } from '../volume'
++
++export const profile = 'btc-cln-v1'
++export const directory = rootDir + '/bitcoin'
++export const adminCommand = ['/usr/local/libexec/swap-node/package_admin.py', '--mainnet', '--network-directory', directory, '--profile', profile]
++export type Call = (effects: T.Effects, request: Record<string, unknown>) => Promise<any>
++const refuse = () => new Error('Coordinator request refused or reply unavailable. Inspect grant status and preserve its records. Private details withheld.')
++const hex = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v)
++export async function executeRequest(request: Record<string, unknown>, exec: (argv: string[], options?: { input: string }) => Promise<any>) {
++    const run = async (argv: string[], options?: { input: string }) => {
++      try { return await exec(argv, options) } catch { throw refuse() }
++    }
++    if (request.action === 'credential') {
++      if (!hex(request.grant_id) || request.confirmed !== true || Object.keys(request).sort().join() !== 'action,confirmed,grant_id') throw refuse()
++      const cli = ['/opt/btc/bin/lightning-cli', '--lightning-dir=' + rootDir, '--network=bitcoin', '--json', '--notifications=none', '-k']
++      const ask = async (method: string, args: string[]) => {
++        const r = await run([...cli, method, ...args])
++        if (r.exitCode !== 0) throw refuse()
++        try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
++      }
++      const credential = await ask('swap-customer-credential', ['grant_id=' + request.grant_id, 'confirmed=true'])
++      const info = await ask('swap-customer-call', ['grant_id=' + request.grant_id, 'operation=info', 'body={}'])
++      if (typeof credential?.rune !== 'string' || !/^[A-Za-z0-9_=-]{32,8192}$/.test(credential.rune) || info?.regtest_only !== false ||
++          info?.grant?.chain?.profile !== profile || info?.grant?.chain?.environment !== 'mainnet') throw refuse()
++      return { credential: { grant: info.grant, rune: credential.rune } }
++    }
++    if (request.action === 'setup') {
++      if (request.confirmed !== true || Object.keys(request).sort().join() !== 'action,confirmed') throw refuse()
++      const r = await run(['/usr/local/libexec/swap-node/package_node.py', '--mainnet', '--root', rootDir, '--profile', profile, 'prepare'], { input: JSON.stringify({ confirmed: true }) })
++      if (r.exitCode !== 0) throw refuse()
++      try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
++    }
++    const r = await run(adminCommand, { input: JSON.stringify(request) })
++    if (r.exitCode !== 0) throw refuse()
++    try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
++}
++export const invoke: Call = async (effects, request) => sdk.SubContainer.withTemp(
++  effects, { imageId: 'lightning' }, mainMounts, 'migrated-grant-action', sub => executeRequest(request, (argv, options) => sub.exec(argv, options)))
++const text = (name: string) => sdk.Value.text({ name, masked: false, required: true, default: null, placeholder: null })
++const number = (name: string, value: number, min: number, max: number) => sdk.Value.number({ name, default: value, required: true, integer: true, min, max })
++const confirm = () => sdk.Value.toggle({ name: 'Confirm this exact grant and its channel protection authority', default: false })
++const meta = (name: string) => async () => ({ name, group: 'Swap Coordinator', allowedStatuses: 'only-running' as const,
++  visibility: 'enabled' as const, description: 'Bounded coordinator grants for explicitly confirmed BTC/XBT swaps.',
++  warning: 'Incoming protection may force-close the actual receiving channel, including other payments, near the agreed deadline.' })
++export function display(report: any): T.ActionResult & { version: '1' } {
++  if (!report || typeof report !== 'object') throw refuse()
++  const rows: any[] = []
++  const add = (name: string, value: string, copyable = false, masked = false) => rows.push({ name, value, copyable, masked, type: 'single', description: null, qr: false })
++  if (report.credential) {
++    const c = report.credential
++    if (typeof c.rune !== 'string' || !c.grant || c.grant.chain?.profile !== profile || c.grant.chain?.environment !== 'mainnet') throw refuse()
++    add('Bounded controller credential', JSON.stringify({ grant: c.grant, rune: c.rune }), true, true)
++  }
++  const records = Array.isArray(report.reviews) ? report.reviews : [report]
++  for (const r of records) {
++    if (hex(r?.confirmation)) add('Grant confirmation', r.confirmation, true)
++    if (['incoming', 'outgoing'].includes(r?.kind)) add('Role', r.kind)
++    if (['review', 'intent', 'saved', 'cancelled'].includes(r?.phase)) add('Phase', r.phase)
++    for (const k of ['blocked', 'current', 'paused', 'initialized', 'restart_required', 'existing_records', 'recovery_preserved']) if (typeof r?.[k] === 'boolean') add(k, String(r[k]))
++    if (Number.isSafeInteger(r?.channel_count) && r.channel_count >= 0 && r.channel_count <= 8) add('Automatically selected channels', String(r.channel_count))
++    for (const k of ['max_swaps', 'max_amount_msat', 'total_amount_msat', 'max_fee_msat', 'max_delay_blocks', 'max_hops', 'min_cltv_delta', 'max_cltv_delta', 'close_before_blocks']) {
++      if (Number.isSafeInteger(r?.limits?.[k]) && r.limits[k] >= 0) add(k, String(r.limits[k]))
++    }
++    for (const k of ['expires_at', 'confirm_before']) if (Number.isSafeInteger(r?.[k]) && r[k] >= 0 && r[k] <= 2 ** 35) add(k + ' (UTC)', new Date(r[k] * 1000).toISOString())
++  }
++  return { version: '1', title: 'Coordinator Grant', message: report.restart_required === true ? 'Coordinator state is ready. Restart this node, then review and confirm bounded grants.' : 'Review the automatically selected channels and bounded amounts, then confirm the exact grant. Existing swap records remain recoverable.', result: { type: 'group', value: rows } }
++}
++export function createActions(call: Call = invoke, base = sdk.Actions.of()) {
++  let actions = base
++  const add = (a: any) => { actions = actions.addAction(a) }
++  add(sdk.Action.withInput('migrated-admin-init', meta('Enable Swap Coordinator'), sdk.InputSpec.of({ confirmed: confirm() }), async () => ({ confirmed: false }),
++    async ({ effects, input }) => {
++      if (input.confirmed !== true) throw refuse()
++      return display(await call(effects, { action: 'setup', confirmed: true }))
++    }))
++  for (const kind of ['incoming', 'outgoing'] as const) {
++    const bounds = { maxSwaps: number('Maximum swaps', 4, 1, 10), maxAmount: number('Maximum amount per swap (millisats)', 10000000, 1, 1000010000),
++      totalAmount: number('Total grant budget (millisats)', 30000000, 1, 10000100000), lifetime: number('Grant lifetime (seconds)', 86400, 300, 86400) }
++    const timing: Record<string, ReturnType<typeof number>> = kind === 'incoming' ? { minDelay: number('Minimum incoming delay (blocks)', 350, 216, 2016), maxDelay: number('Maximum incoming delay (blocks)', 2016, 216, 2016) }
++      : { maxFee: number('Maximum routing fee (millisats)', 10000, 0, 10000), maxDelay: number('Maximum outgoing delay (blocks)', 288, 1, 288), maxHops: number('Maximum hops', 4, 1, 4) }
++    add(sdk.Action.withInput('migrated-review-' + kind, meta('Review ' + kind + ' Grant'), sdk.InputSpec.of({ ...bounds, ...timing }), async () => {},
++      async ({ effects, input }: any) => {
++        if (input.totalAmount < input.maxAmount) throw new Error('The total budget must cover at least one swap at the per-swap maximum.')
++        if (kind === 'incoming' && input.maxDelay < input.minDelay) throw new Error('The maximum incoming delay must be at least the minimum.')
++        const limits = { max_swaps: input.maxSwaps, max_amount_msat: input.maxAmount, total_amount_msat: input.totalAmount,
++          ...(kind === 'incoming' ? { min_cltv_delta: input.minDelay, max_cltv_delta: input.maxDelay, close_before_blocks: 72 }
++            : { max_fee_msat: input.maxFee, max_delay_blocks: input.maxDelay, max_hops: input.maxHops }) }
++        return display(await call(effects, { action: 'review', kind, limits, lifetime_seconds: input.lifetime }))
++      }))
++  }
++  for (const action of ['confirm', 'cancel', 'pause', 'credential'] as const) add(sdk.Action.withInput('migrated-grant-' + action,
++    meta({ confirm: 'Confirm Reviewed Grant', cancel: 'Cancel Grant Review', pause: 'Pause Grant', credential: 'Show Bounded Controller Credential' }[action]),
++    sdk.InputSpec.of({ confirmation: text('Exact grant confirmation'), confirmed: confirm() }), async () => ({ confirmed: false }),
++    async ({ effects, input }) => {
++      if (!hex(input.confirmation) || input.confirmed !== true) throw refuse()
++      const field = action === 'pause' || action === 'credential' ? 'grant_id' : 'confirmation'
++      return display(await call(effects, { action, [field]: input.confirmation, ...(action === 'cancel' ? {} : { confirmed: true }) }))
++    }))
++  add(sdk.Action.withInput('migrated-grant-status', meta('Grant Status'), sdk.InputSpec.of({}), async () => {}, async ({ effects }) => display(await call(effects, { action: 'status' }))))
++  return actions
++}
++export const actions = createActions()
+diff --git a/startos/main.ts b/startos/main.ts
+index 2e502ccb4edc1a15ce985be1f14bf5adbd46d556..2d215b9ee36dbec29d680930ed0c5d21392476ec 100644
+--- a/startos/main.ts
++++ b/startos/main.ts
+@@ -1,3 +1,4 @@
++import { verifyBackend } from './migration/backend'
+ import { FileHelper } from '@start9labs/start-sdk'
+ import { manifest as bitcoinManifest } from 'bitcoin-core-startos/startos/manifest'
+ import { createHash } from 'node:crypto'
+@@ -48,12 +49,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
+   // bitcoind's RPC over the bridge, for the sync-progress bitcoin-cli below.
+   const bitcoind = await bitcoindRpcBridge(effects)
+ 
++  if (!bitcoind) throw new Error('BTC backend RPC is unavailable')
++
+   // get store.json but don't watch for changes
+   const store = await storeJson.read().once()
+   if (!store) {
+     throw new Error('no store.json')
+   }
+ 
++  if (store.watchtowerServer || store.watchtowerClients.length || conf?.raw?.plugin?.length) throw new Error('External plugins are not enabled in this dedicated coordinator candidate')
++
+   const watchtowerClientLoaded = !!conf?.raw?.plugin?.includes(
+     watchtowerClientPlugin,
+   )
+@@ -126,24 +131,34 @@ export const main = sdk.setupMain(async ({ effects }) => {
+     .digest('hex')
+ 
+   const baseDaemons = sdk.Daemons.of(effects)
++    .addOneshot('btc-backend-identity', {
++      subcontainer: lightningSub, requires: [], exec: { fn: async () => {
++        const rpc = async (method: string, ...args: string[]) => {
++          const r = await lightningSub.exec(['bitcoin-cli', `-rpcconnect=${bitcoind.host}`, `-rpcport=${bitcoind.port}`,
++            '-rpccookiefile=/mnt/bitcoin/.cookie', method, ...args])
++          if (r.exitCode !== 0) throw new Error('BTC backend inspection unavailable')
++          return String(r.stdout).trim()
++        }
++        const c = JSON.parse(await rpc('getblockchaininfo'))
++        const h = await rpc('getblockhash', '961640')
++        verifyBackend(c, h, await rpc('getblockheader', h, 'false'))
++        return null
++      } },
++    })
+     .addOneshot('vpn', {
+       subcontainer: lightningSub,
+       exec: {
+         command: ['sh', '-c', vpn ? vpnUpScript : vpnDownScript],
+         env: { STARTOS_VPN_CONFIG_HASH: vpnConfigHash },
+       },
+-      requires: [],
++      requires: ['btc-backend-identity'],
+     })
+     .addDaemon('lightningd', {
+       subcontainer: lightningSub,
+       exec: {
+         command: [
+-          '/usr/bin/python3',
+-          '/usr/local/libexec/btc-controller/gate.py',
+-          'launch',
+-          rootDir,
+-          'lightningd',
+-          `--lightning-dir=${rootDir}`,
++          '/usr/local/libexec/swap-node/package_node.py',
++          '--mainnet', '--profile', 'btc-cln-v1', '--root', rootDir, 'launch',
+           `--conf=${rootDir}/config`,
+           ...lightningdArgs,
+         ],
+diff --git a/startos/manifest/index.ts b/startos/manifest/index.ts
+index c425c80f8ddd00e1327df79b469ea161eea9534b..e4614c319727da36a00d149cf421a536450a7d23 100644
+--- a/startos/manifest/index.ts
++++ b/startos/manifest/index.ts
+@@ -3,7 +3,7 @@ import { depBitcoindDescription, long, short } from './i18n'
+ 
+ export const manifest = setupManifest({
+   id: 'c-lightning',
+-  title: 'Core Lightning (Swap Preparation)',
++  title: 'BTC Core Lightning (Coordinator Candidate)',
+   license: 'mit',
+   packageRepo: 'https://github.com/BitcoinMechanic/btc-cln-startos',
+   upstreamRepo: 'https://github.com/ElementsProject/lightning',
+@@ -16,7 +16,7 @@ export const manifest = setupManifest({
+     lightning: {
+       source: {
+         dockerBuild: {
+-          dockerfile: 'Dockerfile',
++          dockerfile: 'Dockerfile.live',
+           workdir: '.',
+         },
+       },
+diff --git a/startos/migration/backend.ts b/startos/migration/backend.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ff29e819d541ccfde99e99fd2d2c1c69383958d6
+--- /dev/null
++++ b/startos/migration/backend.ts
+@@ -0,0 +1,11 @@
++// Network/genesis alone are shared with XBT. Require the configured SHA256
++// backend's post-activation header shape as well, before starting this engine.
++export function verifyBackend(chain: any, checkpoint: unknown, header: unknown) {
++  if (chain?.chain !== 'main' || chain.initialblockdownload !== false || chain.pruned !== false ||
++      !Number.isSafeInteger(chain.blocks) || chain.blocks < 961640 ||
++      typeof checkpoint !== 'string' || !/^[0-9a-f]{64}$/.test(checkpoint) ||
++      checkpoint === '0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb' ||
++      typeof header !== 'string' || !/^[0-9a-f]{160}$/.test(header)) {
++    throw new Error('BTC requires a synced, unpruned SHA256 mainnet backend')
++  }
++}
+diff --git a/startos/versions/current.ts b/startos/versions/current.ts
+index 9b86a44ed658741bc1ce4ea0d39d6739313c63f2..6f82e51f185e7cafc65e4187e95387ba2c9d3620 100644
+--- a/startos/versions/current.ts
++++ b/startos/versions/current.ts
+@@ -1,7 +1,6 @@
+ import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
+-
+ export const current = VersionInfo.of({
+-  version: '26.6.9:9',
+-  releaseNotes: { en_US: 'Add Neoxa market-priced swaps in both directions with configurable 0% default markup, exact saved quotes and explicitly enabled amount/budget grants. Preserve fixed-price grants and existing recovery records.' },
+-  migrations: { up: async () => {}, down: IMPOSSIBLE },
++  version: '#privkeyio:26.6.9:0',
++  releaseNotes: { en_US: 'Dedicated BTC coordinator test candidate: native CLN and bounded swap authority with explicit setup. Fresh installation only; no legacy package migration.' },
++  migrations: { up: IMPOSSIBLE, down: IMPOSSIBLE },
+ })
+diff --git a/startos/versions/index.ts b/startos/versions/index.ts
+index a106d396ae4b8b2c6ba537f91abcab15f37b6c38..2212b73c8d30e5c1e323e95e167b192270f62db1 100644
+--- a/startos/versions/index.ts
++++ b/startos/versions/index.ts
+@@ -1,11 +1,3 @@
+-import { v_26_6_8_6 } from './v26.6.8_6'
+-import { v_26_6_8_5 } from './v26.6.8_5'
+ import { VersionGraph } from '@start9labs/start-sdk'
+ import { current } from './current'
+-import { v_26_6_2_0 } from './v26.6.2_0'
+-import { v_26_6_8_3 } from './v26.6.8_3'
+-
+-export const versionGraph = VersionGraph.of({
+-  current,
+-  other: [v_26_6_8_6, v_26_6_8_5, v_26_6_2_0, v_26_6_8_3],
+-})
++export const versionGraph = VersionGraph.of({ current, other: [] })

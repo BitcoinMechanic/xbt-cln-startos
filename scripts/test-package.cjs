@@ -115,6 +115,7 @@ async function main() {
     console.log('PASS: real Knots response through the actual startup hook; '+rejected.length+' invalid backend cases refused')
     assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.requires,['xbt-backend-identity'])
     assert.ok(chain.find(x=>x.id==='cln-application').spec.requires.includes('consume-flags'))
+    assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.exec.command.slice(0,7), ['/usr/local/libexec/swap-node/package_node.py','--mainnet','--profile','xbt-privkeyio-v1','--root','/root/.lightning','launch'])
     assert.deepEqual(flags,[]) // Merely reading startup flags never consumes them.
     const emergency = chain.find(x=>x.id==='emergency-recover').spec()
     assert.deepEqual((await emergency.exec.fn()).command, recovery.recoveryCommands('/root/.lightning').emergency)
@@ -124,29 +125,37 @@ async function main() {
     const { VersionGraph } = require('@start9labs/start-sdk')
     const { ExtendedVersion } = Module.createRequire(require.resolve('@start9labs/start-sdk'))('@start9labs/start-core/exver')
     const current = load('startos/versions/current.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).current
-    const graph = VersionGraph.of({current, other:[]})
-    const from = ExtendedVersion.parse('#privkeyio:26.6.9:0')
-    const to = ExtendedVersion.parse('#privkeyio:26.6.9:1')
+    const v2 = load('startos/versions/v2.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).v2
+    const graph = load('startos/versions/index.ts', {'./current':{current},'./v2':{v2}}).versionGraph
+    const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
+    const to = ExtendedVersion.parse('#privkeyio:26.6.9:3')
+    const fromV2 = ExtendedVersion.parse('#privkeyio:26.6.9:2')
+    assert.ok(graph.canMigrateFrom().satisfiedBy(fromV2))
     assert.ok(graph.canMigrateFrom().satisfiedBy(from))
-    for (const version of ['26.6.9:0','#privkeyio:26.6.8:0','#privkeyio:26.6.9:2','#legacy:26.6.9:0']) {
+    for (const version of ['26.6.9:0','#privkeyio:26.6.8:0','#privkeyio:26.6.9:0','#legacy:26.6.9:0']) {
       assert.equal(graph.canMigrateFrom().satisfiedBy(ExtendedVersion.parse(version)),false)
     }
     assert.equal(graph.canMigrateTo().satisfiedBy(from),false)
     const savedVersions=[]
     const migrationEffects={setDataVersion:async({version})=>savedVersions.push(version)}
     const identityBefore=await fs.readFile(path.join(root,policy.marker),'utf8')
+    await fs.mkdir(path.join(root,'bitcoin/swap-coordinator-v1'))
+    await fs.writeFile(path.join(root,'bitcoin/swap-coordinator-v1/sentinel'),'existing-journal')
     await graph.migrate({effects:migrationEffects,from,to})
+    await graph.migrate({effects:migrationEffects,from:fromV2,to})
+    assert.equal(await fs.readFile(path.join(root,'bitcoin/swap-coordinator-v1/sentinel'),'utf8'),'existing-journal')
     assert.equal(await fs.readFile(path.join(root,policy.marker),'utf8'),identityBefore)
     assert.equal(savedVersions.at(-1),to.toString())
     await fs.mkdir(path.join(root,policy.swapDirs[0]))
     await assert.rejects(()=>graph.migrate({effects:migrationEffects,from,to}))
+    await assert.rejects(()=>graph.migrate({effects:migrationEffects,from:fromV2,to}))
     await fs.rmdir(path.join(root,policy.swapDirs[0]))
     assert.deepEqual(flags,[])
     console.log('PASS: SDK migration accepts only the prior candidate, preserves identity/flags and refuses swap state')
     const b=load('startos/backups.ts',mocks)
     await b.createBackup()
     await backup.before()
-    for (const name of ['bitcoin/lightningd.sqlite3','bitcoin/lightningd.sqlite3-wal','bitcoin/lightningd.sqlite3-shm','.commando-env']) assert.ok(backup.options.exclude.includes(name))
+    for (const name of ['bitcoin/swap-coordinator-v1','bitcoin/.swap-setup-*','bitcoin/lightningd.sqlite3','bitcoin/lightningd.sqlite3-wal','bitcoin/lightningd.sqlite3-shm','.commando-env']) assert.ok(backup.options.exclude.includes(name))
     await fs.writeFile(path.join(root,'bitcoin/emergency.recover'),'recovery-copy')
     await fs.writeFile(path.join(root,'.commando-env'),'discarded-credential')
     await backup.after({})

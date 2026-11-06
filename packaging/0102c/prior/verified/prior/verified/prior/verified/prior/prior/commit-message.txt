@@ -1,0 +1,14 @@
+Checkpoint reviewed coordinator grants and populated restore refusal
+
+Port local initialize/review/confirm/cancel/pause/status administration with
+finite grants, automatic eligible-channel selection and idempotent recovery.
+Honor shared restore markers across coordinator and controller execution.
+Recognize coordinator-admin state in the XBT package backup refusal policy.
+
+0092a regtest evidence: eight grant setups, six automatic bidirectional swaps,
+120 unit tests and stopped-state restore checks with populated journals.
+Historical engine, node/UI, recovery and swap evidence keeps its provenance;
+it is not counted as rerun under this source revision.
+
+Three source commits and four annotated migration checkpoint tags. No new
+installer or production coordinator activation. Mainnet guards remain.

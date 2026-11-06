@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "fixture": "0070",
+  "source_tree": "69df9aa51c5fa594c7e4854954264ffac46f3924",
+  "source_checkpoint": null,
+  "base_image": "sha256:0bbd5f0546d53e0c2372fb69aa0bcee4efa87e8609b3da6c6a37d339c02fa0b9",
+  "btc_source_sha256": "ac37b1b6c41b6c60cf06dd8cd7500f1fab04411cf2f3bc126838d8cafab4538d",
+  "xbt_original_binary_sha256": "dda0d9d4dab15fd23379851f30f4ffec5e451cf032cac8c9a3d4b1886b51641a",
+  "core_patch_sha256": "fdc65eeaea337064ab4d1858a0414749e231e23bac570dada0177a29cf781621",
+  "plugin_c_sha256": "ab1df9bdd13bcfca1fe1516ba0ee76cd2a2c3a48fa859c49cc9ba3cd4224ea8f",
+  "gitlinks": {
+    "external/gheap": "67fc83bc953324f4759e52951921d730d7e65099",
+    "external/jsmn": "18e9fe42cbfe21d65076f5c77ae2be379ad1270f",
+    "external/libbacktrace": "793921876c981ce49759114d7bb89bb89b2d3a2d",
+    "external/libwally-core": "0c41f38fb1c201786e9c3ac9eae4f5f80c051399",
+    "external/libwally-core/src/secp256k1": "45f6f0f158c5ae80a2c8a53398ea4adbf19af6dc"
+  },
+  "versions": {
+    "btc": "v26.06.9-swap0070",
+    "xbt": "v26.06.9-blake2b.7-swap0070"
+  },
+  "rust": false,
+  "regtest_only": true,
+  "installer": false
+}

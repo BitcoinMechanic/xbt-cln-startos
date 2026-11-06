@@ -1,0 +1,44 @@
+{
+  "version": "#privkeyio:26.6.9:3",
+  "sha256": "50248a864bce081c606a7324f4781b5ad092fa6cf6bd05da27f495a2ef1f8f5d",
+  "inputs": {
+    "parent": "sha256:2458f914ac3a04649ce381d1106ca9c2ce920d74748b39af0aa28bd70e196393",
+    "grpc_donor": "sha256:43086764a667319b24437899dd118e7d7b264794ea4905b1c10ae6be4ab6503e",
+    "grpc_build_image": "sha256:fc23e72857046e62b4ff769fd03aaf357f88b006844d1d4ffc957d1368e51c88",
+    "original_results": "/home/start9packaging/code/cln-blake/privkeyio-migration/build-results/privkeyio-0102c-results.uf22u5mp",
+    "funded_tests_rerun": false
+  },
+  "runtime_image": "sha256:a92aa0563d3f4b4616b1981942f35bb3bd6ed806d5fca311f5c068c72028eb93",
+  "checks": [
+    "full_typecheck",
+    "package_regressions",
+    "installed_registry",
+    "original_runtime_and_native_bytes_preserved",
+    "grpc_source_equality",
+    "regtest_startup_restart",
+    "packed_manifest",
+    "packed_javascript",
+    "packed_native_and_runtime",
+    "packed_ui"
+  ],
+  "live_StartOS_acceptance": false,
+  "funded_swaps_rerun": false,
+  "results": "/home/start9packaging/code/cln-blake/privkeyio-migration/build-results/grpc-repair-20261106",
+  "source_archive_sha256": "51f6720eb4e012d9054f6fe7bcfc034bd4996a14ec61fc5a043ecbee737e217e",
+  "source_hashes_sha256": "48b7c9a7239b76eb807fdffea2ae98ffbe6bda611c52ca3bb9a672383304d5bf",
+  "start_cli": "start-cli 2.7.0",
+  "image_archives": {
+    "lightning": "be95f528fb1cc6037a8c94477dafb91f9b34cb1fd3786370f64fe93c45b3e04f",
+    "ui": "288f01750c99b238fa8d9d1c153b53f64a0e46c4de58afbb3e91138ae3445dc0"
+  },
+  "compiler": {
+    "node": "v22.23.2",
+    "sdk": "2.0.9",
+    "typescript": "6.0.3",
+    "ncc": "0.38.4",
+    "entries": {
+      "javascript": "startos/index.ts"
+    },
+    "full_typecheck": true
+  }
+}

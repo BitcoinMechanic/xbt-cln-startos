@@ -1,0 +1,8 @@
+Starting XBT Core Lightning
+PASS: real Knots response through the actual startup hook; 13 invalid backend cases refused
+Migrating #privkeyio:26.6.9:1 -> #privkeyio:26.6.9:2 -> #privkeyio:26.6.9:3
+Migrating #privkeyio:26.6.9:2 -> #privkeyio:26.6.9:3
+Migrating #privkeyio:26.6.9:1 -> #privkeyio:26.6.9:2 -> #privkeyio:26.6.9:3
+Migrating #privkeyio:26.6.9:2 -> #privkeyio:26.6.9:3
+PASS: SDK migration accepts only the prior candidate, preserves identity/flags and refuses swap state
+PASS: backend/profile boundaries, foreign-wallet and symlink refusal, startup ordering, preserved flags, backup exclusions and restore hooks

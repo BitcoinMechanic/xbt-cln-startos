@@ -1,0 +1,12 @@
+{
+  "lightning": {
+    "ociLayout": {
+      "path": "/home/start9packaging/code/cln-blake/privkeyio-migration/build-results/grpc-repair-20261106/lightning-image.tar"
+    }
+  },
+  "ui": {
+    "ociLayout": {
+      "path": "/home/start9packaging/code/cln-blake/privkeyio-migration/build-results/grpc-repair-20261106/ui-image.tar"
+    }
+  }
+}

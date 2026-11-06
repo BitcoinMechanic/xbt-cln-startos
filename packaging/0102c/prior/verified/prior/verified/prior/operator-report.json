@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "kind": "operator-reported-regtest-result",
+  "date": "2026-10-14",
+  "milestone": "0096a",
+  "reported": {
+    "funded_retirement_cases": 6,
+    "funded_service_regressions": 6,
+    "btc_signed_and_serialized_fee_controls": true,
+    "default_fee_recovered_input_funding": true,
+    "xbt_engine_unchanged": true,
+    "historical_provenance_retained": true,
+    "exact_0095_checkpoint_verified": true,
+    "regtest_only": true,
+    "installer": false
+  },
+  "results_directory": "/tmp/privkeyio-0096a-results.3pjwbd73",
+  "evidence_basis": "Operator supplied READY output. Export separately validates actual raw receipts, retained provenance and exact source trees."
+}

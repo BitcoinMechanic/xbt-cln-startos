@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "kind": "operator-reported-regtest-result",
+  "date": "2026-10-13",
+  "milestone": "0094a",
+  "reported": {
+    "funded_deadline_cases": 6,
+    "funded_service_regressions": 6,
+    "compiled_engines_unchanged_in_fixture_repair": true,
+    "original_baseline_evidence_retained": true,
+    "exact_0093_checkpoint_verified": true,
+    "regtest_only": true,
+    "installer": false
+  },
+  "results_directory": "/tmp/privkeyio-0094a-results.dG9bfyO7",
+  "evidence_basis": "Operator supplied READY output. Export separately validates the actual raw receipts, full retained provenance and exact source trees."
+}

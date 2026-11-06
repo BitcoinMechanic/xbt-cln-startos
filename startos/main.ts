@@ -124,9 +124,12 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: lightningSub,
       exec: {
         command: [
-          'lightningd',
-          `--lightning-dir=${rootDir}`,
+          '/usr/local/libexec/swap-node/package_node.py',
+          '--mainnet', '--profile', 'xbt-privkeyio-v1', '--root', rootDir, 'launch',
           `--conf=${rootDir}/config`,
+          // The retained engine's compiled builtin list predates this plugin.
+          '--important-plugin=/opt/xbt/libexec/c-lightning/plugins/cln-grpc',
+          '--important-plugin=/opt/xbt/libexec/c-lightning/plugins/clnrest',
           ...lightningdArgs,
         ],
         // watchtower-client keeps its identity key and registered towers in

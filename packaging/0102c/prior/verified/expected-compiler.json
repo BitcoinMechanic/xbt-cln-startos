@@ -1,0 +1,23 @@
+{
+  "xbt": {
+    "sdk": "2.0.9",
+    "typescript": "6.0.3",
+    "ncc": "0.38.4",
+    "entry": "startos/migration/actions.ts",
+    "full_typecheck": true
+  },
+  "btc": {
+    "sdk": "2.0.9",
+    "typescript": "6.0.3",
+    "ncc": "0.38.4",
+    "entry": "startos/migration/actions.ts",
+    "full_typecheck": true
+  },
+  "controller": {
+    "sdk": "2.0.9",
+    "typescript": "6.0.3",
+    "ncc": "0.38.4",
+    "entry": "startos/migration/candidate.ts",
+    "full_typecheck": true
+  }
+}

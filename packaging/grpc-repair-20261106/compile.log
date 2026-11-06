@@ -1,0 +1,5 @@
+ncc: Version 0.38.4
+ncc: Compiling file index.js into CJS
+ncc: Using typescript@6.0.3 (local user-provided)
+2843kB  javascript/index.js
+2843kB  [3096ms] - ncc 0.38.4

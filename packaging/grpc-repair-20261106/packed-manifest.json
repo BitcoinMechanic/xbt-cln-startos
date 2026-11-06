@@ -1,0 +1,69 @@
+{
+  "id": "xbt-cln",
+  "version": "#privkeyio:26.6.9:3",
+  "canMigrateTo": "=#privkeyio:26.6.9:3",
+  "canMigrateFrom": "(=#privkeyio:26.6.9:1 || =#privkeyio:26.6.9:2) || =#privkeyio:26.6.9:3",
+  "title": "XBT Core Lightning",
+  "description": {
+    "short": {
+      "en_US": "XBT Lightning node with wallet and channel dashboard"
+    },
+    "long": {
+      "en_US": "Core Lightning on the BLAKE2b chain, with the CLN Application dashboard. Requires synced, unpruned BLAKE2b Knots. Fresh-wallet candidate; importing existing Lightning state and migrating installed experimental XBT channels are not supported. Bounded swap coordinator support requires explicit setup and reviewed grants."
+    }
+  },
+  "releaseNotes": {
+    "en_US": "Restore the bundled native gRPC plugin and explicitly load gRPC and CLNrest as required by the node configuration. Preserve the existing wallet, channels, UI and swap journals during a normal update."
+  },
+  "gitHash": null,
+  "license": "mit",
+  "packageRepo": "https://github.com/BitcoinMechanic/xbt-cln-startos",
+  "upstreamRepo": "https://github.com/BitcoinMechanic/lightning",
+  "marketingUrl": "https://blockstream.com/lightning",
+  "donationUrl": null,
+  "osVersion": "0.4.0-beta.10",
+  "sdkVersion": "2.0.9",
+  "hardwareAcceleration": false,
+  "userspaceFilesystems": false,
+  "virtualNetworking": false,
+  "hardwareVirtualization": false,
+  "plugins": [],
+  "satisfies": [],
+  "images": {
+    "lightning": {
+      "source": "packed",
+      "arch": [
+        "x86_64"
+      ],
+      "emulateMissing": false,
+      "nvidiaContainer": false
+    },
+    "ui": {
+      "source": "packed",
+      "arch": [
+        "x86_64"
+      ],
+      "emulateMissing": false,
+      "nvidiaContainer": false
+    }
+  },
+  "volumes": [
+    "main"
+  ],
+  "dependencies": {
+    "bitcoind": {
+      "description": {
+        "en_US": "Synced, unpruned BLAKE2b Knots with the pinned activation checkpoint. The bitcoind package ID alone does not identify the chain."
+      },
+      "optional": false,
+      "versionRange": null
+    }
+  },
+  "hardwareRequirements": {
+    "device": [],
+    "ram": null,
+    "arch": [
+      "x86_64"
+    ]
+  }
+}

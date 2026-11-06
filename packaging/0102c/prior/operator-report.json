@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "kind": "operator-reported-regtest-result",
+  "date": "2026-10-14",
+  "milestone": "0100",
+  "reported": {
+    "compiled_sdk_actions": true,
+    "funded_cases": 6,
+    "same_volume_restart": true,
+    "image_content_replacement": true,
+    "original_channels_and_runtimes_retained": true,
+    "closed_channels": 0,
+    "regtest_only": true,
+    "installer": false,
+    "startos_host_acceptance": false
+  },
+  "results_directory": "/tmp/privkeyio-0100-results.l8yon5ti",
+  "evidence_basis": "Operator supplied READY output. Export separately validates actual raw receipts, exact compiled/source hashes and checkpoint provenance."
+}

@@ -1,0 +1,14 @@
+network=bitcoin
+bitcoin-datadir=/mnt/bitcoin
+grpc-port=2106
+grpc-host=0.0.0.0
+bind-addr=0.0.0.0:9735
+bind-addr=ws::4269
+xpay-handle-pay=true
+disable-plugin=cln-currencyrate
+disable-plugin=cln-lsps-client
+disable-plugin=cln-lsps-service
+disable-plugin=cln-bip353
+clnrest-host=0.0.0.0
+clnrest-port=3010
+clnrest-protocol=http

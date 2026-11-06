@@ -1,0 +1,27 @@
+0095 checkpoint workflow validation — 2026-10-14 UTC
+
+Validated against exact source trees in disposable repositories and local bare
+remotes. All runtime receipts used in these workflow tests were synthetic;
+they are not included in the bundle and are not funded acceptance evidence.
+The actual packaging VM export must read the passing 0094a raw results.
+
+Passed:
+- Exact 0093 -> tested 0094a source application and checkpoint ancestry.
+- Full retained historical evidence, compiled-source/engine/fee controls,
+  original-binary controls, six deadline cases and six service regressions.
+- Thirteen corrupt or incomplete summary refusals, missing raw deadline,
+  regression, engine, fee and baseline receipt refusals, and symlink refusal.
+- Idempotent export preserving source files, indexes, stashes and raw results.
+- Exclusion of unlisted operator files from the archive.
+- Existing tower clones reused through detached worktrees; staged edits in
+  original tower checkouts preserved. SSH origin without .git accepted.
+- Exact three commits and four annotated tags; remote divergence refusal.
+- Interrupted push resumed without creating duplicate commits.
+- All-repository VM preflight before stashing; unexpected source retained.
+- Interrupted stash-before-merge resumed; old and new stashes retained.
+- Idempotent tower and VM reruns.
+- Python/shell syntax, archive CRC and every checksum-listed member.
+
+No GitHub, Docker, daemon, installer or live-node operation was performed by
+these local tests. This bundle exports/checkpoints existing tested source; it
+does not rerun funded matrices or alter the tested implementation.

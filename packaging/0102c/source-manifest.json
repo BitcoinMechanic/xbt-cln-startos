@@ -1,0 +1,733 @@
+{
+  "lightning": {
+    "branch": "privkeyio-swaps",
+    "before_tree": "05dd3d881199984de7742268182938dec9f9ed70",
+    "tree": "0fe05e7c50fdc9aba95d8b08a1eee0cf25c64d87",
+    "pins": {
+      "external/gheap": "67fc83bc953324f4759e52951921d730d7e65099",
+      "external/jsmn": "18e9fe42cbfe21d65076f5c77ae2be379ad1270f",
+      "external/libbacktrace": "793921876c981ce49759114d7bb89bb89b2d3a2d",
+      "external/libwally-core": "0c41f38fb1c201786e9c3ac9eae4f5f80c051399"
+    },
+    "origin": "https://github.com/BitcoinMechanic/lightning.git",
+    "base_tag": "privkeyio-startos-actions-20261014",
+    "base_anchor": "482c8c521166ddc9e244cd6d44a2d8a55bd0d529",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "88d4707a6d2855f50b46779c7ebff16e624b5ef4",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "887d5af1affe60e14fcde3c5522c4593b1cf7d88",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "c58fcd05f59cbd7a4092c4936185df72dcf0f244",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "4b573074e95a7a6787dad2ebc166dece405928b4",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "33d099923dfbf993b2c0806f3634fa76385a611c",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "45d99f93e565b851b941bec1aed5d0b9567fe34a",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "185c768045321a6126c7c1c85d9b019a1c6ff8c9",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "7746f2d1dee1169d3cb55826eee769f8d6d10d30",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-https-worker-20261012",
+        "tree": "fd5b18552d75bea2fd97d5b7cbef7965bf8bdd16",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-controller-service-20261012",
+        "tree": "21369587e10687c21634ec2b1d15a5de6db09496",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-node-ui-20261012",
+        "tree": "21369587e10687c21634ec2b1d15a5de6db09496",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-backup-recovery-20261012",
+        "tree": "21369587e10687c21634ec2b1d15a5de6db09496",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-startos-empty-20261012",
+        "tree": "21369587e10687c21634ec2b1d15a5de6db09496",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-coordinator-admin-20261013",
+        "tree": "61262dc08e0f2239c8bdc838638770275ffa516f",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-deadline-20261013",
+        "tree": "64d4de388c46de41a644e3708660dfa67be1501e",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-retirement-20261014",
+        "tree": "827df4fcf2885585bbb2954a46e2a9be96ec6246",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-packaged-runtimes-20261014",
+        "tree": "952ebadaaed9801b712d7ae70fb97030d59ac19a",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-startos-actions-20261014",
+        "tree": "05dd3d881199984de7742268182938dec9f9ed70",
+        "new_commit": true
+      }
+    ],
+    "files": {
+      "tools/swap/authority_plugin.py": {
+        "before": "de9b817e1399d6b76e53a42aba4eddfe9fa60fb620f0434b0b45050b3491e73d",
+        "after": "b9cd5dfeebe9efc465f369b52816b960120a28eb00ac4531f7a0f3aae1862d24"
+      },
+      "tools/swap/bounded_authority.py": {
+        "before": "f116bbc42fcf5a0a5f6c6219bb3b975b8f47a1edbed6b0c3e95a9885560e34e7",
+        "after": "f58bd9189427cebef78cdded41d349b544eb0589189309b45ee346953ace337c"
+      },
+      "tools/swap/chain_identity.py": {
+        "before": "fea8a32a10f0d6eae207d1e3534f71727e8bbdeac8577b8cd58ec3ef13d2cbda",
+        "after": "1996610f3066083722b6e8582e94484427b608840ed13fe960166c78e5acc58c"
+      },
+      "tools/swap/coordinator_admin.py": {
+        "before": "7592c45bdf83870c9ce50b738adec00150ae070b808fa309f87cd84edbb210cd",
+        "after": "abb0ee6b6e87a46774a13c3f89c27810ab2cc2971ac2329d4a9e4ab5de69884d"
+      },
+      "tools/swap/coordinator_admin_cli.py": {
+        "before": "8a8e61fd5e4e9106a0bfd1f87dc13bd4daedd5e17d933f5df2bfcc73fa02ed77",
+        "after": "42f7bf34da71d0d1f9107c69c8efe02a802e1d9c46233ef4f7ae5feec7fb67ad"
+      },
+      "tools/swap/cross_contract.py": {
+        "before": "9083509399363eb3b2687e10c5b5887fef7e08012148ce641f74024eb10deb7b",
+        "after": "e34655bd0717cf144540969c7e6d6325a481e5519454195f888281cb09ddfae8"
+      },
+      "tools/swap/cross_worker.py": {
+        "before": "f86965b2a94031d00aca6e6210ec4c36bb14c6fe0918205cf5c46553ac8071e9",
+        "after": "aba47036b530482a16927bbef13222a97fde9a34aecd4c7fbcadfbecb643de50"
+      },
+      "tools/swap/customer_https.py": {
+        "before": "efdd811c997f8452799c15a11f6111ca06e74f9f57270b5cb40bc6ffcbc45020",
+        "after": "259bd80edafe56e198ef7a11199b96f8d5f7368717cee287112df6f0ff673832"
+      },
+      "tools/swap/customer_invoice.py": {
+        "before": "be13243a221a18c7cf0f9a72ccf8af34c6f7bd47a32dab4df7becb845ae2d041",
+        "after": "62b012ef5800c99af3dce975259513e137425d23fde4f55fad79e000363f3469"
+      },
+      "tools/swap/customer_plugin.py": {
+        "before": "7a834e7abcadd7ef82c2c5bcff53e0aeceafaa84743e60bd211efb9d51370083",
+        "after": "cfcca3f2fffae75624ebc0ce80490384d97fbe67ce141c0d0e997cb084c3993e"
+      },
+      "tools/swap/deadline_protection.py": {
+        "before": "eebbd05d4e0337f655a0c0a7d533cbf040714525ed343b808a5ce329a022063e",
+        "after": "c323e6c89446893fc007492b245a0763560305348fa82caeb1e7ea9427cf18e2"
+      },
+      "tools/swap/gate_plugin.py": {
+        "before": "92de4aa6561738cc332489f08fd44afe1a8be81332ec9c401f0b572eafc41c0a",
+        "after": "9bb34ce2ca0094f928f41a1cfbd8fdbd3f6709604d6b25a849dd1b6c2135309c"
+      },
+      "tools/swap/held_gate.py": {
+        "before": "c0f5e8245604faf11b3291d1980dc14d78ec466ac1d88481b04040fe00e0e262",
+        "after": "3dba1559dfb2317aa6cc6b5b8e97d93750687334f566aac104d5448d9e55ae22"
+      },
+      "tools/swap/node_bootstrap.py": {
+        "before": null,
+        "after": "5425068785a798f20ccc95f711437880e5b2af9198293c60db7a7c4a15c44ab8"
+      },
+      "tools/swap/node_cli.py": {
+        "before": null,
+        "after": "49d1dafcfbcdef0c63579c9d6cafc089b8bb6229b932b2bb06983aa07d58eb23"
+      },
+      "tools/swap/onchain_retirement.py": {
+        "before": "55793af2ebd79b60ea5aecd9f57b6adbeaf5fd282d2660bb10f405beedc4d827",
+        "after": "8c23e5c30dbad746ac604fafe6255ee2ab36eaa21a880299462b9a777be9bbb2"
+      },
+      "tools/swap/package_admin.py": {
+        "before": "c2d0d478a929a06f0c1256bee275dda3fd8368c859538ad403cfb77189f85248",
+        "after": "90440f9bc9f9398ea5a8933de84a6de36dd80e7303bdbeb3fcee37f8ca33cc10"
+      },
+      "tools/swap/package_customer.py": {
+        "before": "eeef9d38b62c246a884227f98cf26e366df0c95eb52d9b899fa9a287a8d6d236",
+        "after": "b3d8a003fc5b107b92f29bec43d298bb54f73bf033f59384c552f8ddae6a2c2e"
+      },
+      "tools/swap/package_gate.py": {
+        "before": "3e91bdf3015b498ef38f1d23911d0342c30e126672a8051933ef5c67ccfc3692",
+        "after": "6e80b9ee768d4312bc84d324134bdb560b8c8ba3d15a94f889e1819198127e2e"
+      },
+      "tools/swap/package_node.py": {
+        "before": null,
+        "after": "3886d9c7b1efac31a9e3c24d2f9cecfc60a23f11d374ddf3a9f1633e7746aede"
+      },
+      "tools/swap/package_runtime.py": {
+        "before": "678d333d6fc83fc0cbdcbef064263e971e537255ab1d4d010927f5ea94c2a365",
+        "after": "55385dc5fae3be5107f170894eb7f06f519f7cd39dd3781580898f54a01fe287"
+      },
+      "tools/swap/package_verify.py": {
+        "before": "6cd428c31a6f0a12147f27ee21ddf49a155fd13969453558baefd2fe65f9567b",
+        "after": "76dc6a1038f33a1dada16ba57feb1aed38b65a11fecb5f1ef00ee4310c684408"
+      },
+      "tools/swap/remote_authority.py": {
+        "before": "8119c58defdb3c9b38b4f82e0ae722db84b6d5cdfcba019f7f96fa6444187e7b",
+        "after": "f9e4c157a3aca94041713e255668bdfe21173918d8c943248278c8a23ff4cf33"
+      },
+      "tools/swap/restore_barrier.py": {
+        "before": "b22226be30ad966652bf5fd39f03eb281180516653e6fd58d5cdb24eac8a32e6",
+        "after": "502251697353357c4338af2c93f58a80a8756e2400c1227856f912ef145279df"
+      },
+      "tools/swap/route_plan.py": {
+        "before": "9009ca272783c0a5cb9d52cb3def6eb657c8ebbf90701285a95d47af5951b0e4",
+        "after": "3c148795b39c0a130a7845a56e869600b911d9eeafee80016cd3ec4898fb7460"
+      },
+      "tools/swap/test_held_gate.py": {
+        "before": "49e5fd6280e5949a6f0487f9232348a64941a12a8ed45d5b1a5a6c8b908e95fd",
+        "after": "38de0ff032c7131613970154fb846c521d4f302f04e659665bc814690692c834"
+      },
+      "tools/swap/test_live_bootstrap.py": {
+        "before": null,
+        "after": "19c8649f3824f1ed09910439e910209134baf107d3ca56b4279b6622a937254a"
+      },
+      "tools/swap/test_live_policy.py": {
+        "before": null,
+        "after": "8323d16f5b2e6809cfdd5517cca362eefad199a61cac410d168d9bfe5dd69444"
+      },
+      "tools/swap/test_package_runtime.py": {
+        "before": "f47962dc0957bf0d3209600fef9ca6e8972f04267472ddba8f78c323d5d4fde7",
+        "after": "c2510b0881efd9d19be8352a371ef8c8f72cd71a8df3f273d658850e0ea27408"
+      },
+      "tools/swap/test_remote_authority.py": {
+        "before": "26f44868ed6dee4f025eac892e182fceec0b2aa15c9d45b801160c410fd45055",
+        "after": "bbb824a864fb0e3adc23cfcd789536efeef8fc7836116a38b55eb6877ae24f17"
+      },
+      "tools/swap/test_startos_actions.py": {
+        "before": "ce2fe2ada72de275c05c554189f091e4f2e5224147a336882968503992516f37",
+        "after": "64bc709e6c5f750cc165d012233c4664b6af2bbf4e78f2fb348969cd6cbda9ad"
+      },
+      "tools/swap/worker_pairing.py": {
+        "before": "a4d0604ad59016f272e012bb73a93affd2e21fd8dea51ae44d25a07f1c0c6424",
+        "after": "3f70e78889c618cff05b84730dfa82f7d4f10d2a2ce6e1ba6f5f846aee791d3a"
+      }
+    },
+    "new_commit": true
+  },
+  "xbt-cln-startos": {
+    "branch": "privkeyio-node",
+    "before_tree": "52624bdce6a46d86c2f7dee84de190410f160ed7",
+    "tree": "16680f3189f393db15ced00dab5318bbcae79d46",
+    "pins": {
+      "clboss": "49ffd76ad0ff7607d92b53b98adada233790c15c",
+      "rust-teos": "be344ecc5286dd9436bf343d30954135da8ad4ac"
+    },
+    "origin": "https://github.com/BitcoinMechanic/xbt-cln-startos.git",
+    "base_tag": "privkeyio-startos-actions-20261014",
+    "base_anchor": "16e1171cb6ee7441fb9942d741ae4e695621ee76",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-https-worker-20261012",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-controller-service-20261012",
+        "tree": "cb06998a32bf6a7643e19c4e10aa661b56fb1a71",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-node-ui-20261012",
+        "tree": "da74814c72f9064be513f58451d8d480993ae432",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-backup-recovery-20261012",
+        "tree": "e77f570ad430b53b435d96c4d6e4b8b61b4154af",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-startos-empty-20261012",
+        "tree": "1632404dbb1d0a86b22c2a8d0f914f9e528f623d",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-coordinator-admin-20261013",
+        "tree": "7258ae5b223cbbc84255a88257556ab9708da7f7",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-deadline-20261013",
+        "tree": "b575ed069d82992a6d16627cff04c069ed7dfe1f",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-retirement-20261014",
+        "tree": "02423e23e2625475a47ccee9520763af1ecd8895",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-packaged-runtimes-20261014",
+        "tree": "556bb73b96e490949114c27d57d67c82baf80dce",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-startos-actions-20261014",
+        "tree": "52624bdce6a46d86c2f7dee84de190410f160ed7",
+        "new_commit": true
+      }
+    ],
+    "files": {
+      "Dockerfile.live": {
+        "before": null,
+        "after": "7cef97779a3e6878f146a638327e904c8bd9d6fd8e7ed3f99712a54a87e4cdac"
+      },
+      "README.md": {
+        "before": "7bf8d5f52b4d5eb54205b2ba7859b242b5708319d05749c92114765d8d01bd4b",
+        "after": "cb618ea6a7b6c227ce9526539dec91c0f6fa71b86a221cc530cc02eb39dacdb5"
+      },
+      "docs/live-integration-0102.md": {
+        "before": null,
+        "after": "a7086fc3c6acb98478ff3a4705d5cabecf80a1f23c904c6ed31844805753c91f"
+      },
+      "instructions.md": {
+        "before": "908936d4dac9d89ff1b0e18629d5bbffd01f8359a0d0d5aa54e22652f161b1b2",
+        "after": "a7086fc3c6acb98478ff3a4705d5cabecf80a1f23c904c6ed31844805753c91f"
+      },
+      "scripts/test-package.cjs": {
+        "before": "dc4b74ce2119838088d8a76c300b05afa2c6a2ee60ef77de252975319e6f84f5",
+        "after": "ca94c967c742e7da5979994638445d503976ffe54c6c30701363ad238111485b"
+      },
+      "startos/actions/index.ts": {
+        "before": "0ba75d8186a9d44a7434ef849cae5aac194017337d6c2efb8ef2f827f4ac76d7",
+        "after": "715a9fc1c9ffb5e4c7edbdd8a451bd307d8c7ed50d72ed528db7548068f879d4"
+      },
+      "startos/live/actions.ts": {
+        "before": null,
+        "after": "29d244c1cabd6b4183e21b7a6cbab6caeeda9b4a99009bdbbefd5d49833c37c5"
+      },
+      "startos/main.ts": {
+        "before": "68e73b1ca87737d984209fb8be78e38568dcc810a37bfea6a6930c034c5127f0",
+        "after": "f1755ea41863bc53c24518385087d45ca111baa58efae8ec9447f105104fb586"
+      },
+      "startos/manifest/i18n.ts": {
+        "before": "008bde81e204f8206e18bcec0314bc8805818b753eac74cffbcf4098d6a0223f",
+        "after": "e5fbb5ee941fb01720e5c613b8b49506d485f5164a32a6544fd296754f7c8402"
+      },
+      "startos/manifest/index.ts": {
+        "before": "682b6b6ff17b280bd5787b8e817099bc21516a69f0a80591b56efc003e9354f3",
+        "after": "3d3117d6d8cc600d304d91cf9cae1f295b748ae1f838a1afcd9ee1b80bb8a2bd"
+      },
+      "startos/recovery.ts": {
+        "before": "ea48183ff76f902267129558fd84342b4103dcfd8e9bea48b3c0852109f831bd",
+        "after": "6f33ea0fc3883ed781ee7e81793db18c27d4e977db9d6fd9ab99cb1614013fd4"
+      },
+      "startos/versions/current.ts": {
+        "before": "73dd07850572fd1cb684ec33b3bde66dd5b370dd7486c72983952b4bd5438a29",
+        "after": "9a80f93f9cb2878ce9cff7834811ab1c2674ab7d601cfe8fe653c08be6dc3a1a"
+      },
+      "startos/xbtPolicy.ts": {
+        "before": "7847941ce41ced39ec62cf64cefba55fddd9fdf2d812b0d38d60a9a3be5382fe",
+        "after": "cb98c75b4cb221493f022584e9eaf39c3bf0dd85d1fa78c1d1bcffe73c3e2fac"
+      }
+    },
+    "new_commit": true
+  },
+  "btc-cln-startos": {
+    "branch": "privkeyio-compat",
+    "before_tree": "8dda2bed517c7ab1319392fca0ef916da950e901",
+    "tree": "6aebe2ddad7f4cfa83a5606de0cf99ca1b5f45ce",
+    "pins": {
+      "clboss": "49ffd76ad0ff7607d92b53b98adada233790c15c",
+      "rust-teos": "be344ecc5286dd9436bf343d30954135da8ad4ac"
+    },
+    "origin": "https://github.com/BitcoinMechanic/btc-cln-startos.git",
+    "base_tag": "privkeyio-startos-actions-20261014",
+    "base_anchor": "dda31edb70e3631e2cd2d01764380804fb7546f7",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-https-worker-20261012",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-controller-service-20261012",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-node-ui-20261012",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-backup-recovery-20261012",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-startos-empty-20261012",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-coordinator-admin-20261013",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-deadline-20261013",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-retirement-20261014",
+        "tree": "ed73b9d707642c4cd7cc2f32d5f48632120d417e",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-packaged-runtimes-20261014",
+        "tree": "51e394a18aa92821700c60026ad7cd66e543479c",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-startos-actions-20261014",
+        "tree": "8dda2bed517c7ab1319392fca0ef916da950e901",
+        "new_commit": true
+      }
+    ],
+    "files": {
+      "Dockerfile.live": {
+        "before": null,
+        "after": "4b54727b22120b1432f6b9d9563c5892248b248276ab2d2fbe85a15a814cf404"
+      },
+      "README.md": {
+        "before": "5b404801ecb442df406ac2d87193c6e85c656b18289ac67b2407e45a4c1eeabe",
+        "after": "ac49c6bd45d1363915e2d7c77f70e09abdc874bb0fb89ecb199723aba066c1b7"
+      },
+      "docs/live-integration-0102.md": {
+        "before": null,
+        "after": "d5d8a1964254d2f1c2acbe04eb4fceb4823408bff6b04dd6d7e550c8d2d729fc"
+      },
+      "instructions.md": {
+        "before": "9e88f2bd01c3b6cb9570847ab9238742f273e272a9a21c7a252bb0aee6b33324",
+        "after": "d5d8a1964254d2f1c2acbe04eb4fceb4823408bff6b04dd6d7e550c8d2d729fc"
+      },
+      "startos/actions/index.ts": {
+        "before": "7fc072fcdad2d959e939e2b1659e003bf41599434c96d441b15d19f970bef74a",
+        "after": "7d6b33348eae1d3c1873f5d04cb1cb4dda872ba5ab4a67441624246c4631b462"
+      },
+      "startos/backups.ts": {
+        "before": "f4c85dac72050bcf3e2643c0b3f18bd14a47b22677ba5eacbed981f5420a4a92",
+        "after": "52f6eb0fe89d9ce45b83249e1d4278f59412d8aa69d7f65d480d7bc0386af8e3"
+      },
+      "startos/live/actions.ts": {
+        "before": null,
+        "after": "ec66957c398f5a647565aed8dea840457dcc8a7fc7f94dde77573ab74dbddf2d"
+      },
+      "startos/main.ts": {
+        "before": "e2d71f2b2a358a258f41d5edf83bc213a3fd4d6e5f2e52da90faf2aac04442b3",
+        "after": "0ee5b34e4ab6645ae6212549e9dccd7bdf860810a18dcc713640d659829d3d00"
+      },
+      "startos/manifest/index.ts": {
+        "before": "c11fe668f18905c386c2641ffde4562c02358b858ca2fc98e0ae2186840456d6",
+        "after": "d5e4b887696ee40c659ce3c498eb08f6eacddf96f8a0e34f490ef8d0e704ada1"
+      },
+      "startos/migration/backend.ts": {
+        "before": null,
+        "after": "e15ab2bb717c8b4b8c35b242d526a84fc0d271c9e876ea73e3bc6aba70f07657"
+      },
+      "startos/versions/current.ts": {
+        "before": "6556ed6e350bc457e2f6a5a9d0b41d7fa28e6b50e9cca03d938ca11a28e1b527",
+        "after": "b99efd7e37c13e9a02691ba1533b66ae6f431a67bf25429c42a0d7b04ee1aba7"
+      },
+      "startos/versions/index.ts": {
+        "before": "4be18193227fb3451d8ca01559314231f9f372b25a74bd2f01fdfa35b5de3c99",
+        "after": "a04aa0dcf6cc3293e7eacd36d321ce0d3000a426d8efb87a49934fc5899e0ee6"
+      }
+    },
+    "new_commit": true
+  },
+  "swap-controller-startos": {
+    "branch": "privkeyio-compat",
+    "before_tree": "fe9e6565892b942a6933d1d2beb9dff897b5353f",
+    "tree": "59ab1c79723ebffc1e69d8df87ec3346cee3c974",
+    "pins": {},
+    "origin": "https://github.com/BitcoinMechanic/swap-controller-startos.git",
+    "base_tag": "privkeyio-startos-actions-20261014",
+    "base_anchor": "a4f74742e1ef1b4cf1db4c18077bb7414bcc1eb6",
+    "checkpoint_chain": [
+      {
+        "tag": "privkeyio-engine-20261010",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-gate-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-plugin-crash-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-routes-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-authority-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-remote-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-customer-20261011",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-cross-worker-20261012",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-https-worker-20261012",
+        "tree": "d7829ec27b342d8294bfe6cd9ff7d497e07d76a0",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-controller-service-20261012",
+        "tree": "f3bc2bc4b726a1e029a70ecf589a4c060a87f1f3",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-node-ui-20261012",
+        "tree": "f3bc2bc4b726a1e029a70ecf589a4c060a87f1f3",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-backup-recovery-20261012",
+        "tree": "f3bc2bc4b726a1e029a70ecf589a4c060a87f1f3",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-startos-empty-20261012",
+        "tree": "f3bc2bc4b726a1e029a70ecf589a4c060a87f1f3",
+        "new_commit": false
+      },
+      {
+        "tag": "privkeyio-coordinator-admin-20261013",
+        "tree": "a2a7e3a8889f639fcb487082c63e5a5c6d5920d8",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-deadline-20261013",
+        "tree": "d4383335f96ee519718a88c2d76a0f020b54b532",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-retirement-20261014",
+        "tree": "e302f1df31b019da94e0c1bfa8686aeea292c9b4",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-packaged-runtimes-20261014",
+        "tree": "a13e4e2a0cd6148032bb511f38cb290fbfe3fb64",
+        "new_commit": true
+      },
+      {
+        "tag": "privkeyio-startos-actions-20261014",
+        "tree": "fe9e6565892b942a6933d1d2beb9dff897b5353f",
+        "new_commit": true
+      }
+    ],
+    "files": {
+      "Dockerfile.live": {
+        "before": null,
+        "after": "b726201ffda333d05d78323f23b82911651fab67432764d14b608db16a6bddfe"
+      },
+      "README.md": {
+        "before": "26af7a6bb2eba5bcd9573478c9c334ad4cbce5865a8c6d0091d037338e480e86",
+        "after": "2878e06d5e9f3c5100a549aadc85af7949379ebbc1fd0225098e0328792b19dd"
+      },
+      "docs/live-integration-0102.md": {
+        "before": null,
+        "after": "c896a043adc8a07217af252abf1e67b14bfedce9e05143abe99975464ea419d5"
+      },
+      "instructions.md": {
+        "before": "9a20f1095229a38fc7b268e3ebff69c2432a7ffc58b607c1486237f5e2d4cea4",
+        "after": "c896a043adc8a07217af252abf1e67b14bfedce9e05143abe99975464ea419d5"
+      },
+      "migration/package_service.py": {
+        "before": "1acf3004c07fe3c20ef4abde693ee23887a5bcbc59c7e25eab49759243178c1e",
+        "after": "f552675c6e49c7912a4584f57afddd46b29e47da82c9ba8de953e84c55714340"
+      },
+      "migration/service.py": {
+        "before": "0f2c0881052cb62ca079c2c87f168d9544cfa997b4523f32d6d5e2b49fe9c0d8",
+        "after": "3ee619b51c1e748b5add2f7a0431916ab0d7e998ae2a1eb9d248f50133973b9a"
+      },
+      "migration/service_cli.py": {
+        "before": "361692f40b74b23e76b0ec5a04a04753aeb3c2ad5bd4d0f1750ce1fab6531d4e",
+        "after": "d867efbd09b672335692ac6d1f1eb152fe32b3cc22fcdbee667d4ee0d0a8cc9a"
+      },
+      "scripts/test-live-actions.cjs": {
+        "before": null,
+        "after": "764f923ecbe6baeac6519721a6e7622db68fe23728c85d461ae31b04fd988cb7"
+      },
+      "startos/actions/index.ts": {
+        "before": "99e9771270bb2568a277eb190ac3a5ff89f102efe23ea813c90a51289a42b6a2",
+        "after": "49b07e12b84f390ef2eae9e044b11e83b3e6a772c4e82e9df28eda824ea03592"
+      },
+      "startos/backups.ts": {
+        "before": "0c2ae4b37bdb387d618367b153936dec3efc490c3edd5538222d24ec3493cd1a",
+        "after": "6ff13c8c09ad2e24b247147cc5835658fc3317a097e4e2660d0eff717a6e4524"
+      },
+      "startos/init/index.ts": {
+        "before": "9aa4ee794b575cea933e9efc70595b6e859797fe5e95cae848b94f08d9f06aae",
+        "after": "747a89b6f94fdf366368802346bada034478bcdb2c6c19897419ffcf60b4f0b7"
+      },
+      "startos/live/actions.ts": {
+        "before": null,
+        "after": "0bcae1f8fc9767791acc902d1a551e4eefc0ab2032dbfc9b0a241f3df1e02fd3"
+      },
+      "startos/live/candidate.ts": {
+        "before": null,
+        "after": "dc9c542b7803989988606c2ee880e9521cfe62724d49c48984318c31d6fd3359"
+      },
+      "startos/live/main.ts": {
+        "before": null,
+        "after": "3d06439f28d43b952dd03fd77ecef35791bbb232b29189fd4db619d21addff1e"
+      },
+      "startos/main.ts": {
+        "before": "83ac2ef08d1ddb412e01b6a3aadee4efb2a89fba745a9f856d3b56636331302c",
+        "after": "31b9dd00ef1fc98cfcef574c1d6ea99a519ccfbcd0d24d066692bb2cc32579b9"
+      },
+      "startos/manifest/i18n.ts": {
+        "before": "342f70d64ae97d452417bf4e60924bb22c5395ab55ba7e0a649fa91feea17ca6",
+        "after": "72853c1633bbcde55c920517e744fbbb308b44174d6075cdd2f216053d912679"
+      },
+      "startos/manifest/index.ts": {
+        "before": "0db8d76d258eed7148852fe0e3194f2c81bbbed1e490b9019c8b620cbbd5e4a1",
+        "after": "5fba833800a1d138d7362e8558af238b5fa8451ad08949e591719eb938c4462e"
+      },
+      "startos/versions/current.ts": {
+        "before": "2c7751921352ca382665edbd33828d076bb3fca77b56666c6fa25e89846d62f0",
+        "after": "fa6e452bfb2d1d625a130d88682c3133d4540838269e083bc843e96953351ea4"
+      },
+      "startos/versions/index.ts": {
+        "before": "916fe71fef6978cedd2e4133d2fd65ccb7310f7d226e27e423a5777bf63c7fb6",
+        "after": "a04aa0dcf6cc3293e7eacd36d321ce0d3000a426d8efb87a49934fc5899e0ee6"
+      }
+    },
+    "new_commit": true
+  }
+}

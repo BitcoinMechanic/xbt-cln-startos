@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "fixture": "0086",
+  "package_tree": "da74814c72f9064be513f58451d8d480993ae432",
+  "source_lock": {
+    "schema": 1,
+    "engine": {
+      "repository": "https://github.com/BitcoinMechanic/lightning.git",
+      "commit": "ddd89e1d70d0ba415880a0ff02db7b053c73a298",
+      "tree": "21369587e10687c21634ec2b1d15a5de6db09496"
+    },
+    "ui": {
+      "repository": "https://github.com/ElementsProject/cln-application.git",
+      "commit": "ff2d698b4f64c86d950d6abe61bd6b8a0b52a68c",
+      "version": "26.09"
+    },
+    "package_id": "xbt-cln",
+    "wire_network": "bitcoin",
+    "profile": "xbt-privkeyio-v1",
+    "fresh_only": true
+  },
+  "files": {
+    "Dockerfile": "3f739711fd88e1c9c6bec2739d22554fcdb3971d7ae243a56b3467bf8a9a8768",
+    "Dockerfile.ui": "53eb0f0cff341470663d2ce24275a9223a3937efb73c205e06c546f5b3676122",
+    "assets/ui-xbt.patch": "d7d91442485ae90896f15d904534989aa29ffd00b288b531b2094f5f49cae7dc",
+    "scripts/test_node_ui.py": "86782a8516a1dfcb6cbca8d0a004d2e2be6ab4ec48c9ed36df3e13f0f0ba1e92",
+    "scripts/test-ui.mjs": "e162afa70d51a17c81a9849dd430dd865fdf62202d1f17141d8d7e1ace4f532c"
+  },
+  "fixture_dockerfile_sha256": "385d75da6f6c9dd897266e89a899dabee1b41351d8f5573d15782292f7e45f01",
+  "regtest_only": true,
+  "installer": false
+}

@@ -1,0 +1,1026 @@
+diff --git a/Dockerfile.live b/Dockerfile.live
+new file mode 100644
+index 0000000000000000000000000000000000000000..ed3ed10cae5f84f22cad0a5589e63fd0b7e6c22b
+--- /dev/null
++++ b/Dockerfile.live
+@@ -0,0 +1,8 @@
++# 0102: requires exact accepted image IDs and sealed runtime staged by the bundle.
++ARG CLI_IMAGE
++ARG PARENT_IMAGE
++FROM ${CLI_IMAGE} AS cli
++FROM ${PARENT_IMAGE}
++USER root
++RUN rm -rf /usr/local/libexec/swap-controller
++COPY runtime/ /usr/local/libexec/swap-controller/
+diff --git a/README.md b/README.md
+index 285cfda8f78b68a0cd33be8b697c4e04e0920f0c..4954c35b79d120435b1c3719df6e5499fa59bcab 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,35 @@
++# 0102 dedicated live integration candidate
++
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
++
++Use a fresh dedicated installation. The legacy controller volume/authority is
++not migrated. Complete the Initialize Swap Service task while stopped, then
++start the service. Pair reviewed incoming/outgoing credentials for each direction
++using the coordinator HTTPS address and its StartOS root CA. Credentials are
++masked and sent privately, never included in public status.
++
++New swap: recipient invoice → review Neoxa price and limits → explicit confirmation
++→ pay the published incoming invoice once. The automatic worker preserves the
++saved price, exact incoming HTLC and one outgoing attempt across restarts. Pricing
++uses the existing fixed Neoxa market/depth policy; markup defaults to 0% and is
++configurable. An unavailable market prevents new quotes, not saved recovery.
++
++
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
++
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
++
++## Historical development notes
++
++The following records describe earlier checkpoints and their original scope.
++
+ ## Packaged migration runtime candidate (0098)
+ 
+ The separate runtime Dockerfiles and `tools/swap/package_runtime.py` export an
+diff --git a/docs/live-integration-0102.md b/docs/live-integration-0102.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..630fc94a824049c03ea0163dc24dcfcd6c3bc3c1
+--- /dev/null
++++ b/docs/live-integration-0102.md
+@@ -0,0 +1,27 @@
++# 0102 dedicated live integration candidate
++
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
++
++Use a fresh dedicated installation. The legacy controller volume/authority is
++not migrated. Complete the Initialize Swap Service task while stopped, then
++start the service. Pair reviewed incoming/outgoing credentials for each direction
++using the coordinator HTTPS address and its StartOS root CA. Credentials are
++masked and sent privately, never included in public status.
++
++New swap: recipient invoice → review Neoxa price and limits → explicit confirmation
++→ pay the published incoming invoice once. The automatic worker preserves the
++saved price, exact incoming HTLC and one outgoing attempt across restarts. Pricing
++uses the existing fixed Neoxa market/depth policy; markup defaults to 0% and is
++configurable. An unavailable market prevents new quotes, not saved recovery.
++
++
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
++
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
+diff --git a/instructions.md b/instructions.md
+index 211cd09753ee7bd5f7b3b80774575d9d1fe16602..630fc94a824049c03ea0163dc24dcfcd6c3bc3c1 100644
+--- a/instructions.md
++++ b/instructions.md
+@@ -1,237 +1,27 @@
+-## Migration runtime validation (0098)
++# 0102 dedicated live integration candidate
+ 
+-This source checkpoint adds isolated regtest runtime-image validation. It does
+-not change your installed service or provide a new installer. Normal restarts
+-and image replacement are tested with the original data and open channels.
+-No backup restore or force-close exercise is part of this step.
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
+ 
+-# Swap Controller
++Use a fresh dedicated installation. The legacy controller volume/authority is
++not migrated. Complete the Initialize Swap Service task while stopped, then
++start the service. Pair reviewed incoming/outgoing credentials for each direction
++using the coordinator HTTPS address and its StartOS root CA. Credentials are
++masked and sent privately, never included in public status.
+ 
+-## Migration development branch
++New swap: recipient invoice → review Neoxa price and limits → explicit confirmation
++→ pay the published incoming invoice once. The automatic worker preserves the
++saved price, exact incoming HTLC and one outgoing attempt across restarts. Pricing
++uses the existing fixed Neoxa market/depth policy; markup defaults to 0% and is
++configurable. An unavailable market prevents new quotes, not saved recovery.
+ 
+-0066 prepares and tests compatibility with the new XBT engine. It produces no
+-installer and requires no changes to your installed services or saved grants.
+-Continue using the checkpointed packages while this port is tested. Pairing the
+-new engine for real swaps will be enabled in a later, validated package.
+ 
+-## Market pricing (0064)
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
+ 
+-After the packaging VM reports READY, finish any active swap and install all
+-three packages: BTC 26.6.9:9, XBT 0.1.0:27 and Swap Controller 0.1.0:24.
+-Existing fixed-price grants and historical records retain their original terms.
+-
+-To use Neoxa pricing for a direction, explicitly create new grants on **both**
+-coordinators under **Swap Grants**. Enable **Neoxa market-priced swaps**, choose
+-matching per-swap and total BTC/XBT limits, and enable **New grant** when replacing
+-an existing grant. Finish all existing swaps first. Leave the channel field empty
+-for the normal routed flow. Follow any requested coordinator restart, then pair
+-both credentials for that direction in **Swap Controller → Swap Setup**.
+-Do not delete old swap records or reuse an old grant as market authority.
+-
+-In **Swap Setup → Market Pricing**, operator markup defaults to **0%**. The field
+-uses basis points: 0 = 0%, 100 = 1%, 500 = 5%. Changes affect new quotes only.
+-The coordinator's selected outgoing routing fee is included before markup and
+-whole-satoshi rounding. Fees paid by your sending wallet are additional. The
+-exchange bid/ask spread still applies at 0% markup. No exchange account or
+-trading credentials are needed; this does not place a trade on Neoxa.
+-
+-Use a fresh recipient invoice for a whole number of sats, within the saved
+-grant limits, with at least 33 minutes remaining and final CLTV at most 40.
+-Include private routing hints where needed. Then:
+-
+-- **New BTC to XBT Swap** → review → **Confirm BTC to XBT Swap** → pay BTC.
+-- **New XBT to BTC Swap** → review → **Confirm XBT to BTC Swap** → pay XBT.
+-
+-Review both amounts, the Neoxa price, markup, route fee and expiry. A quote lasts
+-**two minutes from the price fetch**, including review and payment. Confirm and
+-pay before that deadline. An expired unapproved draft can be cancelled and a
+-new quote requested; it is never silently repriced. No SCID entry is needed in
+-the controller. One payment part and one outgoing attempt are supported.
+-
+-BTC → XBT uses available Neoxa asks; XBT → BTC uses bids. Quotes require enough
+-ordinary order-book depth and fresh, plausible ticker data. Synthetic AMM levels
+-are excluded. Stale/unavailable data or insufficient depth stops new market
+-quotes; there is no fallback to the old fixed rate. This price is a reference
+-for the swap, not an exchange fill guarantee or an automatically hedged trade.
+-
+-Default market limits are 10,000 BTC sats / 500,000 XBT sats per swap and
+-50,000 BTC sats / 2,500,000 XBT sats over the grant. Outgoing fees count toward
+-these limits. Choose smaller limits if appropriate. Approval reserves one slot
+-and the quoted amounts; failed or expired approved swaps do not replenish them.
+-Grant enrollment still expires after 24 hours. Pause/expiry blocks new swaps
+-while preserving the recovery rights of already enrolled swaps.
+-
+-**Swap Status** is read-only and shows expiry, slots, market limits and remaining
+-amount budgets. It does not guarantee a route. Route limits remain four hops,
+-10 sats of the outgoing asset, and 80 blocks forward / 288 blocks for new
+-reverse grants. Existing direct/fixed grants keep their old caps and fixed
+-1,000 BTC → 2,000 XBT or 3,000 XBT → 1,500 BTC amounts.
+-
+-Check the appropriate swap history and recipient receipt after paying. If a
+-reply is uncertain, preserve the record and let the worker recover the original
+-attempt; do not repeat the payment. Accepted payments keep their saved amounts,
+-route and incoming-channel binding across restarts and price-source outages.
+-On-chain recovery requires separate claim/sweep verification; it is not a
+-settled result. Historical pilot tools remain hidden unless an older record
+-requires inspection. **Advanced / Recovery → Worker Status** remains available.
+-
+-
+-
+-## Pair your nodes
+-
+-1. Start the package. Health waits for pairing.
+-2. Open **Pair Coordinator Nodes**.
+-3. For each node, enter its HTTPS base URL, expected node ID, dedicated read-only
+-   rune, and complete public root CA certificate in PEM format.
+-4. Confirm saving. Leave replacement disabled for the first pair.
+-5. Run the action. Both identities and networks must verify before saving.
+-6. Check **Connection Status** and the **Coordinator Connections** health check.
+-
+-Use the dedicated rune from each coordinator's **Create or Show Read-only
+-Controller Credential** action. Never use a general administrative rune.
+-For the BTC CLNrest connection string, change clnrest+https:// to https:// and
+-remove the query string (including any embedded rune). Enter the restricted
+-rune only in its separate masked field. Do not paste credentials into logs or
+-support messages. Obtain each CA from its authenticated StartOS session; do not
+-disable TLS verification.
+-
+-The service refreshes health roughly every 30 seconds. A stale result cannot
+-keep it green. Zero channels is allowed for connection monitoring; green does
+-not establish sufficient liquidity, a payment route or swap readiness.
+-
+-To change saved connection details, enter the full pair and enable the explicit
+-replacement toggle. A failed verification preserves the old pair. If a probe
+-holds the action lock, wait for it to finish and repeat the action. Repeating
+-pairing never sends a payment.
+-
+-## Backups and recovery
+-
+-Backups refuse unresolved execution. They preserve filtered terminal history,
+-while excluding pairing credentials, inspection credentials, grant pairing and
+-executable swap records. After restoring, re-pair the nodes and restore the
+-required setup explicitly. Old execution remains blocked; new pairing does not
+-reactivate old authority. A source/build checkpoint is not a wallet backup.
+-
+-If a backup was interrupted, inspect **Swap Status** and **Worker Status** before
+-continuing. Keep original node and controller records needed by an enrolled swap.
+-Controller restoration does not revoke credentials retained on an original node.
+-Store restricted credentials and public CA files securely, or retrieve them
+-through the coordinator's actions where supported.
+-
+-The package has no web UI, inbound API or additional Lightning node. Development
+-fixtures and historical release details are documented in README.md.
+-
+-## Recipient hints and preparation errors
+-
+-A recipient invoice needs a route the paying coordinator can discover. Private
+-hints being enabled does not guarantee a hint was included: CLN can omit a
+-channel whose peer appears to be a dead end. If preparation reports an unavailable
+-coordinator request while Swap Status says ready, check the recipient invoice's
+-actual hint count and channel readiness. A read-only route/history diagnostic
+-can distinguish a route refusal from an authority or transport problem. Keep
+-existing grants and records while diagnosing.
+-
+-On a customer CLN node, explicitly selecting eligible local channels in the
+-invoice's exposeprivatechannels array can provide hints omitted by the boolean
+-setting. Select from current connected, normal channels with sufficient receiving
+-liquidity and verify that the new invoice contains a hint; never invent a SCID.
+-This does not widen grant authority or route limits. The forward preparation UI
+-can still mask a specific route refusal as a generic coordinator-request error.
+-
+-## Migration development checkpoint
+-
+-0084 adds a separate regtest controller service for invoice → confirm → pay,
+-automatic recovery and saved history. It does not add or change installed StartOS
+-actions yet. Run only the supplied packaging-VM fixture; do not point it at an
+-installed node or copy existing payment state into it. After the funded service
+-matrix passes, the next integration work is the full XBT node package and UI.
+-
+-The candidate keeps old swaps attached to their original grants when a pairing
+-is renewed. Pause affects new swaps; an enrolled swap continues recovery. A
+-markup change affects new quotes only, with 0% as the default. Status and history
+-are cached read-only views. An approved swap cannot be cancelled as a draft.
+-
+-## 0092 local grant administration and restore boundary
+-
+-The migrated service uses the same price snapshot adapter with configurable
+-0–500 basis-point margin, default 0. Saved swaps are not repriced during recovery.
+-This patch adds shared parent restore-marker protection to service execution,
+-while keeping cached history readable. It remains a regtest-only migration
+-service; installed legacy actions are unchanged.
+-
+-The matching engine adds automatically selected, locally reviewed bounded grants
+-and exact confirmation recovery. The disposable fixture creates and renews those
+-grants through fresh CLI processes, then runs six funded forward/reverse service
+-cases with lost replies, pending restart, failure and exact balances. It fences
+-stopped journals afterward and verifies refusal before RPC with history retained.
+-Historical funded receipts retain their original sources and image provenance;
+-they are not represented as reruns of this changed runtime. The VM must pass the
+-new matrix before this checkpoint is accepted. No installer is produced.
+-
+-The operator has reported successful fresh 0090b XBT node/UI payments and
+-post-restart payments on two StartOS boxes. Coordinator mainnet activation,
+-deadline/on-chain protection and coordinator-aware backups remain subsequent
+-work. Mainnet guards are intentionally retained until that work is validated.
+-
+-## 0094 deadline protection candidate
+-
+-The separate regtest coordinator supports explicitly reviewed incoming grants
+-with `close_before_blocks: 72` and format `swap-bounded-authority-v2`. Existing
+-grants and credentials retain their previous authority. Before its single send,
+-the worker arms the exact committed incoming HTLC and rechecks the contract's
+-remaining-block margin. The node's customer facade watches armed enrollments
+-locally, including while the controller or outgoing coordinator is unavailable.
+-It records the exact close intent before dispatching `close` once. A lost reply
+-or crash between intent and dispatch never authorizes a second close or payment.
+-Admission expiry and pause do not stop enrolled recovery; restore markers do.
+-
+-A narrow engine patch allows an already committed final HTLC to reach its held
+-gate after a closing-channel restart. New arrivals and replayed forwarding HTLCs
+-remain refused there; a recovery hook that continues cannot invoke a core invoice.
+-The original important-plugin shutdown/crash fix and the XBT package’s 0088b
+-recovery fee-weight patch are retained in the new build. A saved preimage
+-uses the core's existing persisted fulfillment and onchaind claim path.
+-
+-The scoped `chain` operation checks fresh funding-spend, HTLC witness, expiry,
+-CSV sweep and wallet observations. It does not cache success. Confirmations and
+-wallet ownership are supplied by the paired CLN; the funded fixture separately
+-checks confirmed backend blocks and reconciles every satoshi. A close/release
+-reply is never settlement proof. On-chain cases remain `onchain_recovery`,
+-nonterminal and unavailable for grant renewal or another swap in that journal.
+-Automatic retirement of closed-channel history is a separate later change.
+-
+-The 0094 runner requires original-binary replay controls, six patched funded
+-cases in both directions (claim, timeout, closing restart), and the prior six
+-service cases on the new engines. Local unit checks are not funded acceptance.
+-The existing 0093 evidence keeps its original provenance. This is a source/test
+-candidate only: no installer, production activation, coordinator backup support,
+-legacy-channel migration, multipart payments or automatic payment retries.
+-
+-
+-### Migration recovery retirement (0096)
+-
+-The migration source adds explicit local review and confirmation after a
+-protected channel has fully resolved on chain. The coordinator verifies the
+-original funding and claim or timeout; the controller separately verifies the
+-original outgoing payment. History and used grant budgets remain saved. New
+-grants use eligible open channels and require their own confirmation. Existing
+-runes do not gain retirement authority. The packaging VM's 0096 regtest matrix
+-is required for acceptance; no installer or installed-node action is included.
+-
+-
+-## StartOS action integration candidate (0100)
+-
+-`startos/migration/` contains a separate set of real SDK forms and handlers for
+-the accepted packaged swap runtime. It is not registered by `startos/index.ts`
+-and does not change the installed menus, node startup, restore policy or UI.
+-The protocol and candidate commands still require disposable regtest.
+-
+-The 0100 runner compiles the handlers and exercises them around the unchanged
+-0098a runtime images. Its six funded cases cover both directions, failure,
+-ordinary restart and executable-image replacement on the same volumes, with
+-original channels, credentials, HTLCs and payment attempts retained. The
+-StartOS effects boundary is a subprocess fixture: this is not host installation
+-or upgrade acceptance. No installer is produced.
+-
+-See the controller repository's `docs/migrated-startos-actions.md` for the
+-candidate action flow, retained boundaries and remaining activation work.
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
+diff --git a/migration/package_service.py b/migration/package_service.py
+index 86a497a640536020212af8ace54977cac05583a9..d4f63df326dbee786f9560b398e5c7b455973ce1 100755
+--- a/migration/package_service.py
++++ b/migration/package_service.py
+@@ -6,7 +6,9 @@ sys.dont_write_bytecode = True
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ try:
+     import package_verify
+-    package_verify.verify(Path(__file__).parent, 'controller')
++    manifest = package_verify.verify(Path(__file__).parent, 'controller')
++    if '--mainnet' in sys.argv and manifest.get('environments') != ['regtest','mainnet']:
++        raise ValueError('runtime_environment_refused')
+     import service_cli
+     raise SystemExit(service_cli.main())
+ except Exception:
+diff --git a/migration/service.py b/migration/service.py
+index b5eef7c0f7f4c58aa03e264ee28a7d00d5f67901..f5a8963e7acee3aad8ab7afe15900af0a529b143 100644
+--- a/migration/service.py
++++ b/migration/service.py
+@@ -1,7 +1,7 @@
+ """Migration service: private atomic history and immutable per-swap HTTPS authority.
+ 
+-Disposable regtest only. This entry point is deliberately separate from installed
+-StartOS actions and backup paths until the migrated node package is validated.
++Explicitly initialized environment. Old regtest records retain their schema;
++mainnet authority uses a separate schema and cannot adopt a regtest pairing.
+ """
+ import copy
+ import fcntl
+@@ -24,19 +24,27 @@ MAX_JOBS = 32
+ MAX_PAIRINGS = 16
+ 
+ 
+-def empty():
+-    return dict(schema=1, format=FORMAT, selected={d:None for d in DIRECTIONS},
++def empty(environment='regtest'):
++    hg.need(environment in ba.ci.ENVIRONMENTS, 'service_environment_invalid')
++    result = dict(schema=1, format=FORMAT, selected={d:None for d in DIRECTIONS},
+                 pairings={}, jobs={}, paused=False, markup_bps=0, heartbeat=None)
++    if environment == 'mainnet': result.update(schema=2, environment=environment)
++    return result
++
++
++def environment(r):
++    return 'regtest' if r.get('schema') == 1 else r.get('environment')
+ 
+ 
+ def validate(r):
+-    hg.need(type(r) is dict and set(r)==set(empty()) and type(r['schema']) is int
+-            and r['schema']==1 and r['format']==FORMAT, 'service_record_invalid')
++    hg.need(type(r) is dict and set(r)==set(empty(environment(r))) and type(r['schema']) is int
++            and r['schema']==(1 if environment(r)=='regtest' else 2) and r['format']==FORMAT, 'service_record_invalid')
+     hg.need(type(r['paused']) is bool and hg.integer(r['markup_bps'],0,500), 'service_record_invalid')
+     hg.need(type(r['pairings']) is dict and len(r['pairings'])<=MAX_PAIRINGS
+             and type(r['jobs']) is dict and len(r['jobs'])<=MAX_JOBS, 'service_record_invalid')
+     for gid,b in r['pairings'].items():
+         wp.binding(b); hg.need(gid==ba.digest(b),'service_pairing_changed')
++        hg.need(all(n['grant']['chain']['environment']==environment(r) for n in b['nodes'].values()), 'service_environment_changed')
+     hg.need(type(r['selected']) is dict and set(r['selected'])==set(DIRECTIONS),'service_record_invalid')
+     for d,gid in r['selected'].items():
+         hg.need(gid is None or (gid in r['pairings'] and r['pairings'][gid]['direction']==d),'service_pairing_changed')
+@@ -57,14 +65,14 @@ def validate(r):
+     return r
+ 
+ 
+-def initialize(directory):
++def initialize(directory, environment='regtest'):
+     directory=Path(directory)
+     hg.need(not any(p.is_symlink() for p in (directory,*directory.parents)), 'service_path_refused')
+     hg.need(not restore_barrier.blocked(directory), "service_restored")
+     directory.mkdir(mode=0o700)  # Refuse existing state; never auto-initialize recovery.
+     fd=os.open(directory/'state.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+     with os.fdopen(fd,'w') as f:
+-        json.dump(empty(),f); f.flush(); os.fsync(f.fileno())
++        json.dump(empty(environment),f); f.flush(); os.fsync(f.fileno())
+     for p in (directory,directory.parent):
+         fd=os.open(p,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+         try: os.fsync(fd)
+@@ -143,6 +151,7 @@ class Service:
+     def pair(self,binding,*,confirmed=False):
+         self.guard(admission=True); hg.need(confirmed is True,'confirmation_required')
+         b=copy.deepcopy(wp.binding(binding)); gid=ba.digest(b)
++        hg.need(all(n['grant']['chain']['environment']==environment(self.record) for n in b['nodes'].values()), 'service_environment_changed')
+         hg.need(gid in self.record['pairings'] or len(self.record['pairings'])<MAX_PAIRINGS,'service_history_full')
+         # Always authenticate both endpoints before selecting even a saved pair.
+         m=Memory(self.journal,dict(schema=1,format=wp.FORMAT,binding=None))
+@@ -174,7 +183,7 @@ class Service:
+     def status(self):
+         h=self.record['heartbeat']; now=int(self.clock())
+         fresh=h is not None and 0<=now-h['at']<=120 and runner_alive(self.journal.directory)
+-        return dict(format=FORMAT,read_only=True,regtest_only=True,paused=self.record['paused'],
++        return dict(format=FORMAT,read_only=True,regtest_only=environment(self.record)=='regtest',paused=self.record['paused'],
+                     restored=restore_barrier.blocked(self.journal.directory),worker_fresh=fresh,
+                     markup_bps=self.record['markup_bps'],selected=copy.deepcopy(self.record['selected']),
+                     grants={direction: None if gid is None else {kind:dict(
+diff --git a/migration/service_cli.py b/migration/service_cli.py
+index 0e676813c2888e72ad4989302b18b718a38ec492..a63c61044580a0c7db3d5b190fce369bbc7d22b1 100644
+--- a/migration/service_cli.py
++++ b/migration/service_cli.py
+@@ -21,7 +21,7 @@ SAFE={'confirmation_required','service_pairing_required','service_previous_swap_
+       'contract_admission_expired','bounded_route_unavailable','market_unavailable','market_data_invalid'}
+ 
+ 
+-def execute(directory,request,**options):
++def execute(directory,request,*,expected_environment=None,**options):
+     hg.need(type(request) is dict and type(request.get('action')) is str,'service_request_invalid')
+     action=request['action']; fields={'status':set(),'history':set(),'pair':{'binding','confirmed'},
+         'prepare':{'direction','invoice'},'confirm':{'cid','confirmation','confirmed'},
+@@ -30,7 +30,9 @@ def execute(directory,request,**options):
+     hg.need(action in fields and set(request)==fields[action]|{'action'},'service_request_invalid')
+     j=hg.Journal(directory)
+     try:
+-        s=service.Service(j,**options); args={k:v for k,v in request.items() if k!='action'}
++        s=service.Service(j,**options)
++        hg.need(expected_environment is None or service.environment(s.record)==expected_environment,'service_environment_changed')
++        args={k:v for k,v in request.items() if k!='action'}
+         if action in ('status','history'): return s.status()
+         if action=='invoice':
+             s.guard(); return s.worker(args['cid']).payment_invoice(args['cid'])
+@@ -38,7 +40,7 @@ def execute(directory,request,**options):
+     finally: j.close()
+ 
+ 
+-def run(directory,*,factory=service.https.Client,clock=service.time.time,interval=1,stop=None):
++def run(directory,*,factory=service.https.Client,clock=service.time.time,interval=1,stop=None,expected_environment=None):
+     stop=stop or threading.Event(); deadline=service.time.monotonic()+120
+     while True:
+         try: fd=service.runner_fd(directory,create=True); break
+@@ -51,6 +53,7 @@ def run(directory,*,factory=service.https.Client,clock=service.time.time,interva
+             j=None
+             try:
+                 j=hg.Journal(directory); s=service.Service(j,factory=factory,clock=clock)
++                hg.need(expected_environment is None or service.environment(s.record)==expected_environment,'service_environment_changed')
+                 s.tick(run_id)
+             except BlockingIOError: pass
+             finally:
+@@ -61,18 +64,21 @@ def run(directory,*,factory=service.https.Client,clock=service.time.time,interva
+ 
+ def main():
+     p=argparse.ArgumentParser(description=__doc__)
+-    p.add_argument('--disposable-regtest',required=True,action='store_true')
++    mode=p.add_mutually_exclusive_group(required=True)
++    mode.add_argument('--disposable-regtest',action='store_true')
++    mode.add_argument('--mainnet',action='store_true')
+     p.add_argument('directory',type=Path); p.add_argument('mode',choices=('init','action','run')); args=p.parse_args()
+     os.umask(0o077)
++    environment='mainnet' if args.mainnet else 'regtest'
+     try:
+-        if args.mode=='init':service.initialize(args.directory); result=dict(initialized=True,regtest_only=True)
++        if args.mode=='init':service.initialize(args.directory,environment); result=dict(initialized=True,regtest_only=environment=='regtest')
+         elif args.mode=='run':
+             stop=threading.Event()
+             for sig in (signal.SIGTERM,signal.SIGINT):signal.signal(sig,lambda *a:stop.set())
+-            run(args.directory,stop=stop); return 0
++            run(args.directory,stop=stop,expected_environment=environment); return 0
+         else:
+             raw=sys.stdin.read(hg.MAX_BYTES+1); hg.need(len(raw)<=hg.MAX_BYTES,'service_request_invalid')
+-            result=execute(args.directory,json.loads(raw,object_pairs_hook=hg.unique_object))
++            result=execute(args.directory,json.loads(raw,object_pairs_hook=hg.unique_object),expected_environment=environment)
+         print(json.dumps(dict(result=result))); return 0
+     except Exception as e:
+         reason='service_busy' if isinstance(e,BlockingIOError) else str(e) if isinstance(e,ValueError) and str(e) in SAFE else 'service_request_refused'
+diff --git a/scripts/test-live-actions.cjs b/scripts/test-live-actions.cjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..6039204810e4f43ee97ba94ff567e38e0a7958d3
+--- /dev/null
++++ b/scripts/test-live-actions.cjs
+@@ -0,0 +1,96 @@
++/* Execute compiled real SDK forms/handlers. No Lightning or TLS substitution here. */
++const assert = require('node:assert/strict')
++const fs = require('node:fs')
++
++// Runtime paths are fixture-owned transport mapping, never form input. Only the
++// exported StartOS invoke functions construct the commands and private request.
++async function execute(moduleFile, id, input, dispatch, prefillOnly=false) {
++  const mod=require(moduleFile),calls=[],effects={eventId:'fixture-'+process.pid}
++  const actions=mod.createActions(async (_effects,request)=>{
++    calls.push(request);return dispatch(request)
++  })
++  const action=actions.get(id);assert.ok(action,'unknown registered action')
++  const form=await action.getInput({effects})
++  if(prefillOnly)return {form,calls}
++  const output=await action.run({effects,input})
++  return {output,form,calls}
++}
++
++async function tests(files) {
++  const cid='a'.repeat(64)
++  for(const [asset,file] of Object.entries(files)) {
++    const mod=require(file)
++    const privateRequest={action:'prepare',invoice:'PRIVATE_INVOICE'}
++    let sent=[]
++    await mod.executeRequest(privateRequest,async(argv,options)=>{
++      sent.push({argv,options});return {exitCode:0,stdout:JSON.stringify(asset==='controller'?{result:{}}:{})}
++    })
++    assert.deepEqual(sent[0].argv,asset==='controller'?[mod.entrypoint,'--mainnet',mod.directory,'action']:mod.adminCommand)
++    assert.deepEqual(JSON.parse(sent[0].options.input),privateRequest)
++    assert.ok(!JSON.stringify(sent[0].argv).includes('PRIVATE_INVOICE'))
++    for(const exec of [async()=>{throw Error('PRIVATE_ERROR')},async()=>({exitCode:1,stdout:'PRIVATE_ERROR'}),
++      async()=>({exitCode:1,stdout:JSON.stringify({reason:'PRIVATE_ERROR'})})]) {
++      await assert.rejects(mod.executeRequest({action:'status'},exec),e=>!e.message.includes('PRIVATE_ERROR'))
++    }
++    if(asset==='controller') {
++      let res=await execute(file,'migrated-new-forward',{invoice:'private-invoice'},async r=>{assert.equal(r.action,'prepare');return {confirmation:cid,direction:'forward',btc_msat:1,xbt_msat:2,rune:'SECRET',url:'SECRET'}})
++      assert.deepEqual(Object.keys(res.form.spec),['invoice']);assert.ok(!JSON.stringify(res.output).includes('SECRET'))
++      assert.equal(res.form.spec.invoice.masked,true)
++      const status=()=>({swaps:[{confirmation:cid,direction:'forward',state:'ready_for_confirmation'}]})
++      res=await execute(file,'migrated-confirm-forward',{},status,true)
++      assert.equal(res.form.value.cid,cid);assert.equal(res.form.value.confirmed,false)
++      await assert.rejects(execute(file,'migrated-confirm-forward',{cid,confirmed:false},async r=>{assert.equal(r.action,'status');return status()}))
++      res=await execute(file,'migrated-confirm-forward',{cid,confirmed:true},async r=>r.action==='status'?status():{confirmation:cid})
++      assert.deepEqual(res.calls.at(-1),{action:'confirm',cid,confirmation:cid,confirmed:true})
++      await assert.rejects(execute(file,'migrated-confirm-forward',{cid,confirmed:true},async r=>{
++        assert.equal(r.action,'status');return {swaps:[{confirmation:cid,direction:'reverse'}]}
++      }))
++      await assert.rejects(execute(file,'migrated-initialize',{confirmed:false},async()=>assert.fail('unconfirmed initialize dispatched')))
++      const bolt='lnbc20n1'+ 'q'.repeat(120)
++      res=await execute(file,'migrated-invoice',{cid},async r=>({invoice:bolt,rune:'SECRET'}))
++      const row=res.output.result.value.find(r=>r.name==='Payment invoice');assert.equal(row.value,bolt);assert.equal(row.qr,true);assert.equal(row.masked,true)
++      await assert.rejects(execute(file,'migrated-settings',{paused:false,markupBps:501},async()=>{throw Error('not reached')}))
++      res=await execute(file,'migrated-settings',{paused:true,markupBps:0},async r=>r)
++      assert.deepEqual(res.calls.at(-1),{action:'configure',paused:true,markup_bps:0})
++      for(const poison of ['SECRET','__proto__','constructor'])assert.ok(!JSON.stringify(mod.display({state:poison,confirmation:poison,btc_msat:poison,invoice:poison,rune:poison})).includes(poison))
++      assert.ok(mod.command.includes('--mainnet'));assert.equal(mod.command.at(-1),'run');assert.ok(!mod.command.includes('init'))
++    } else {
++      await assert.rejects(execute(file,'migrated-admin-init',{confirmed:false},async()=>assert.fail('unconfirmed initialize dispatched')))
++      const grant={chain:{profile:mod.profile,environment:'mainnet'}},rune='A'.repeat(50)
++      sent=[]
++      const credential=await mod.executeRequest({action:'credential',grant_id:cid,confirmed:true},async(argv,options)=>{
++        assert.equal(options,undefined);sent.push(argv)
++        return {exitCode:0,stdout:JSON.stringify(argv[6]==='swap-customer-credential'?{rune}:{regtest_only:false,grant})}
++      })
++      assert.deepEqual(credential,{credential:{grant,rune}})
++      assert.deepEqual(sent.map(a=>a[6]),['swap-customer-credential','swap-customer-call'])
++      assert.ok(sent.every(a=>a[2]==='--network=bitcoin'))
++      const visible=mod.display(credential).result.value[0]
++      assert.equal(visible.masked,true);assert.equal(visible.copyable,true)
++      await assert.rejects(mod.executeRequest({action:'credential',grant_id:cid,confirmed:false},async()=>assert.fail('credential dispatched')))
++      await assert.rejects(mod.executeRequest({action:'credential',grant_id:cid,confirmed:true},async argv=>({exitCode:0,
++        stdout:JSON.stringify(argv[6]==='swap-customer-credential'?{rune}:{regtest_only:false,grant:{chain:{profile:mod.profile,environment:'regtest'}}})})))
++      sent=[]
++      await mod.executeRequest({action:'setup',confirmed:true},async (argv,options)=> {
++        sent.push({argv,options});return {exitCode:0,stdout:JSON.stringify({initialized:true,restart_required:true})}
++      })
++      assert.deepEqual(sent[0].argv,['/usr/local/libexec/swap-node/package_node.py','--mainnet','--root','/root/.lightning','--profile',mod.profile,'prepare'])
++      assert.deepEqual(JSON.parse(sent[0].options.input),{confirmed:true})
++      for(const kind of ['incoming','outgoing']) {
++        const input={maxSwaps:4,maxAmount:50000000,totalAmount:150000000,lifetime:86400,
++          ...(kind==='incoming'?{minDelay:350,maxDelay:2016}:{maxFee:10000,maxDelay:288,maxHops:4})}
++        const res=await execute(file,'migrated-review-'+kind,input,async r=>({confirmation:cid,kind,phase:'review',limits:r.limits,channel_count:1,rune:'SECRET'}))
++        assert.ok(!Object.keys(res.form.spec).some(k=>/scid|channel/i.test(k)));assert.ok(!JSON.stringify(res.output).includes('SECRET'))
++        assert.equal(res.calls[0].limits[kind==='incoming'?'close_before_blocks':'max_fee_msat'],kind==='incoming'?72:10000)
++      }
++      for(const limits of [{maxFee:10001,maxDelay:288,maxHops:4},{maxFee:10000,maxDelay:289,maxHops:4},{maxFee:10000,maxDelay:288,maxHops:5}]) {
++        await assert.rejects(execute(file,'migrated-review-outgoing',{maxSwaps:4,maxAmount:10000000,totalAmount:30000000,lifetime:86400,...limits},async()=>assert.fail('outside runtime bounds dispatched')))
++      }
++      await assert.rejects(execute(file,'migrated-grant-confirm',{confirmation:cid,confirmed:false},async()=>{throw Error('not reached')}))
++      assert.ok(mod.adminCommand.includes('--mainnet'));assert.ok(mod.directory.endsWith('/bitcoin'))
++    }
++  }
++  console.log('PASS: real SDK forms, exact confirmation, default-off approval, masked credentials/invoices, bounded settings, no SCID input and fixed daemon command')
++}
++module.exports={execute,tests}
++if(require.main===module)tests(JSON.parse(fs.readFileSync(process.argv[2],'utf8'))).catch(e=>{console.error(e);process.exit(1)})
+diff --git a/startos/actions/index.ts b/startos/actions/index.ts
+index 198fdbc6576b9668e12625c0c795faba284d53d7..c80e1fbe10fc0718e949e18ffafa79e4805efca8 100644
+--- a/startos/actions/index.ts
++++ b/startos/actions/index.ts
+@@ -1,54 +1 @@
+-import { marketPricing } from './marketPricing'
+-import { swapStatus } from './swapStatus'
+-import { pairReverseGrants, newReverseSwap, confirmReverseSwap, reverseSwapStatus, cancelReverseDraft } from './reverseSwaps'
+-import { pairSwapGrants, newForwardSwap, confirmForwardSwap, repeatSwapStatus, cancelSwapDraft } from './repeatSwaps'
+-import { saveSwapInspection, findSwapChannels, prepareSwap } from './swapSetup'
+-import { prepareForwardPilot, approveForwardPilot, forwardPilotStatus } from './forwardPilot'
+-import { inspectForward, inspectReverse } from './preflight'
+-import { livePolicy } from './livePolicy'
+-import { pairXbtGate } from './xbtGateObservation'
+-import { pairBtcGate } from './gateObservation'
+-import { liveReadiness } from './readiness'
+-import { quoteStatus, reviewQuote, prepareQuote, approveQuote, prepareReverseQuote } from './quotes'
+-import { recoveryStatus, confirmRecovery, recoverOnce } from './recovery'
+-import { T } from '@start9labs/start-sdk'
+-import { sdk } from '../sdk'
+-import { mounts, rootDir } from '../utils'
+-const text = (name: string, masked = false) => sdk.Value.text({ name, masked, required: true, default: null, placeholder: null })
+-const ca = (name: string) => sdk.Value.textarea({ name, description: 'Paste the complete PEM root CA downloaded from this node’s authenticated StartOS session.', required: true, default: null, maxLength: 65536 })
+-const meta = (name: string) => async () => ({ name, description: 'Certificate-verified, read-only connections. No payment authority.', warning: null, allowedStatuses: 'only-running' as const, group: name === 'Connection Status' ? 'Status' : 'Swap Setup', visibility: 'enabled' as const })
+-async function invoke(effects: T.Effects, mode: 'pair' | 'status', request?: object): Promise<T.ActionResult & { version: '1' }> {
+-  return sdk.SubContainer.withTemp(effects, { imageId: 'controller' }, mounts, 'pairing-action', async sub => {
+-    const res = await sub.exec(['python3', '/app/controller.py', rootDir, mode], { input: request ? JSON.stringify(request) : '' })
+-    let report: any
+-    try { report = JSON.parse(String(res.stdout)) } catch { throw new Error('Action interrupted. Check Connection Status before repeating.') }
+-    if (res.exitCode !== 0) throw new Error('Pairing unavailable: ' + (report.error || 'private_details_withheld'))
+-    return { version: '1', title: 'Read-only Coordinator Connections', message: 'No funds moved. Connection readiness does not establish routing or liquidity.',
+-      result: { type: 'group', value: Object.entries(report).map(([name,value]) => ({ name, description: null, type: 'single' as const, value: typeof value === 'object' ? JSON.stringify(value) : String(value), masked: false, copyable: false, qr: false })) } }
+-  })
+-}
+-const pair = sdk.Action.withInput('pair-nodes', meta('Pair Coordinator Nodes'), sdk.InputSpec.of({
+-  btcUrl: text('BTC HTTPS base URL (without query or rune)'), btcId: text('Expected BTC node ID'), btcRune: text('BTC read-only rune', true), btcCa: ca('BTC root CA PEM'),
+-  xbtUrl: text('XBT HTTPS base URL (without query or rune)'), xbtId: text('Expected XBT node ID'), xbtRune: text('XBT read-only rune', true), xbtCa: ca('XBT root CA PEM'),
+-  confirmed: sdk.Value.toggle({ name: 'Save these verified read-only connections', default: false }),
+-  replace: sdk.Value.toggle({ name: 'Replace an existing pair if any connection details differ', description: 'Both new connections must pass verification before the saved pair changes.', default: false }),
+-}), async () => {}, async ({ effects, input: i }) => invoke(effects, 'pair', {
+-  confirmed: i.confirmed, replace: i.replace,
+-  nodes: { btc: { url: i.btcUrl.trim(), node_id: i.btcId.trim(), rune: i.btcRune.trim(), ca_pem: i.btcCa.trim() },
+-    xbt: { url: i.xbtUrl.trim(), node_id: i.xbtId.trim(), rune: i.xbtRune.trim(), ca_pem: i.xbtCa.trim() } },
+-}))
+-const status = sdk.Action.withInput('connection-status', meta('Connection Status'), sdk.InputSpec.of({}), async () => {}, async ({ effects }) => invoke(effects, 'status'))
+-const workerStatus = sdk.Action.withInput('worker-status', async () => ({
+-  name: 'Worker Status', description: 'Inspect the worker heartbeat and counts of records needing attention. Use Swap Status and the directional histories for current swaps.',
+-  warning: null, allowedStatuses: 'only-running' as const, group: 'Advanced / Recovery', visibility: 'enabled' as const,
+-}), sdk.InputSpec.of({}), async () => {}, async ({ effects }) =>
+-  sdk.SubContainer.withTemp(effects, { imageId: 'controller' }, mounts, 'worker-status', async sub => {
+-    const res = await sub.exec(['python3', '/app/lifecycle.py', rootDir + '/execution', 'status'])
+-    if (res.exitCode !== 0) throw new Error('Worker status unavailable; private details withheld.')
+-    let report: any
+-    try { report = JSON.parse(String(res.stdout)) } catch { throw new Error('Worker status unavailable.') }
+-    return { version: '1' as const, title: 'Execution Worker', message: 'The worker services approved swaps in both directions. Use the corresponding swap history for outcomes. Restored authority remains blocked.',
+-      result: { type: 'group' as const, value: Object.entries({worker_fresh: report.worker_fresh === true, restore_barrier_present: report.restored_block === true, backup_paused: report.backup_paused === true, saved_records: Array.isArray(report.jobs) ? report.jobs.length : 'Unknown', records_needing_attention: Array.isArray(report.jobs) ? report.jobs.filter((j: any) => ['unreadable','launch_uncertain','pending_recovery'].includes(j?.outcome)).length : 'Unknown'}).map(([name, value]) => ({ name, description: null,
+-        type: 'single' as const, value: typeof value === 'object' ? JSON.stringify(value) : String(value), masked: false, copyable: false, qr: false })) } }
+-  }))
+-export const actions = sdk.Actions.of().addAction(marketPricing).addAction(swapStatus).addAction(newReverseSwap).addAction(confirmReverseSwap).addAction(reverseSwapStatus).addAction(pairReverseGrants).addAction(cancelReverseDraft).addAction(newForwardSwap).addAction(confirmForwardSwap).addAction(repeatSwapStatus).addAction(pairSwapGrants).addAction(cancelSwapDraft).addAction(saveSwapInspection).addAction(findSwapChannels).addAction(prepareSwap).addAction(pair).addAction(status).addAction(workerStatus).addAction(recoveryStatus).addAction(confirmRecovery).addAction(recoverOnce).addAction(quoteStatus).addAction(reviewQuote).addAction(prepareQuote).addAction(approveQuote).addAction(prepareReverseQuote).addAction(liveReadiness).addAction(pairBtcGate).addAction(pairXbtGate).addAction(livePolicy).addAction(inspectForward).addAction(inspectReverse).addAction(prepareForwardPilot).addAction(approveForwardPilot).addAction(forwardPilotStatus)
++export { actions } from '../live/actions'
+diff --git a/startos/backups.ts b/startos/backups.ts
+index 4fa85416f0e4b7f28076b5650f34e8a59d16b28b..b39ccdc5c107f41d383ae4c4bc67990df7374804 100644
+--- a/startos/backups.ts
++++ b/startos/backups.ts
+@@ -1,26 +1,16 @@
+-import { unlink } from 'fs/promises'
+-import { T } from '@start9labs/start-sdk'
++import { lstat, writeFile } from 'fs/promises'
+ import { sdk } from './sdk'
+-import { mounts, rootDir } from './utils'
+-async function workerHook(effects: T.Effects, mode: string) {
+-  await sdk.SubContainer.withTemp(effects, { imageId: 'controller' }, mounts, 'worker-backup', async sub => {
+-    const res = await sub.exec(['python3', '/app/lifecycle.py', rootDir + '/execution', mode])
+-    if (res.exitCode !== 0) throw new Error('Worker backup/restore refused. Unresolved or unreadable execution records require inspection.')
+-  })
+-}
+-// Execution credentials and authorizations are never portable in a backup.
++// Credentials and execution journals are not portable authority.
+ export const { createBackup, restoreInit } = sdk.setupBackups(async () =>
+   sdk.Backups.ofVolumes('main')
+-    .setOptions({ exclude: ['reverse-session-pairing.json', 'forward-session-pairing.json', 'execution/reverse-swaps', 'execution/forward-swaps', 'swap-inspection.json', 'pairing.json', 'btc-gate-observation.json', 'xbt-gate-observation.json', 'status.json', 'pairing.lock', '.controller-*',
+-      'execution/forward-pilot', 'execution/forward-pilot-status.json', 'execution/jobs', 'execution/regtest-quote-nodes.json', 'execution/heartbeat.json', 'execution/lifecycle.lock', 'execution/backup-paused.json'] })
+-    .setPreBackup(async (effects) => workerHook(effects, 'backup-begin'))
+-    .setPostBackup(async (effects) => workerHook(effects, 'backup-end'))
+-    .setPostRestore(async (effects) => {
+-      await workerHook(effects, 'restored')
+-      for (const name of ['reverse-session-pairing.json', 'forward-session-pairing.json', 'swap-inspection.json', 'pairing.json', 'btc-gate-observation.json', 'xbt-gate-observation.json', 'status.json', 'execution/regtest-quote-nodes.json']) {
+-        await unlink(sdk.volumes.main.subpath(name)).catch((error: NodeJS.ErrnoException) => {
+-          if (error.code !== 'ENOENT') throw error
+-        })
++    .setOptions({ exclude: ['mainnet-swaps-v1', 'migrated-swaps-v1'] })
++    .setPostRestore(async () => {
++      const path = sdk.volumes.main.subpath('swap-restored.json')
++      try {
++        await writeFile(path, JSON.stringify({schema:1,format:'swap-restore-barrier-v1',blocked:true}), {mode:0o600,flag:'wx'})
++      } catch (error: any) {
++        if (error?.code !== 'EEXIST' || !(await lstat(path)).isFile()) throw error
++        // Any existing regular marker continues to fence restored authority.
+       }
+     }),
+ )
+diff --git a/startos/init/index.ts b/startos/init/index.ts
+index 2e671e5c48769747da0135061e413bf02dfc7f7d..802b61958e1431353525cc8ec835ef12a9e38aea 100644
+--- a/startos/init/index.ts
++++ b/startos/init/index.ts
+@@ -5,12 +5,19 @@ import { versionGraph } from '../versions'
+ import { actions } from '../actions'
+ import { restoreInit } from '../backups'
+ 
++const setup = sdk.setupOnInit(async (effects, kind) => {
++  if (kind === 'install') await sdk.action.createOwnTask(effects, actions.get('migrated-initialize') as Parameters<typeof sdk.action.createOwnTask>[1], 'critical', {
++    reason: 'Initialize fresh swap controller state, then start the service and pair bounded coordinator grants.',
++  })
++})
++
+ export const init = sdk.setupInit(
+   restoreInit,
+   versionGraph,
+   setInterfaces,
+   setDependencies,
+   actions,
++  setup,
+ )
+ 
+ export const uninit = sdk.setupUninit(versionGraph)
+diff --git a/startos/live/actions.ts b/startos/live/actions.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7da172d352a44709150d0dd97206d4e51fca10ca
+--- /dev/null
++++ b/startos/live/actions.ts
+@@ -0,0 +1,151 @@
++import { T } from '@start9labs/start-sdk'
++import { sdk } from '../sdk'
++import { mounts } from '../utils'
++
++// Mainnet actions use a separate immutable-environment journal.
++export const directory = '/data/mainnet-swaps-v1'
++export const entrypoint = '/usr/local/libexec/swap-controller/package_service.py'
++export type Call = (effects: T.Effects, request: Record<string, unknown>) => Promise<any>
++const errors: Record<string, string> = {
++  confirmation_required: 'Confirm the exact review before continuing.',
++  service_pairing_required: 'Pair the bounded grants for this direction first.',
++  service_previous_swap_active: 'Finish the existing swap or cancel its unapproved draft.',
++  service_review_superseded: 'The selected grants changed. Cancel the old draft and review again.',
++  service_worker_unavailable: 'The automatic worker is unavailable. Check Swap Status.',
++  service_paused: 'New swaps are paused. Existing approved swaps retain recovery.',
++  service_restored: 'Restored authority is blocked. Preserve its records.',
++  contract_admission_expired: 'This review expired. Cancel its unapproved draft and use a fresh invoice.',
++  bounded_route_unavailable: 'No route fits the saved fee, delay and hop limits. Check liquidity and private invoice hints.',
++  market_unavailable: 'Neoxa pricing is unavailable. Try a new review later.',
++  market_data_invalid: 'Neoxa data failed validation. No new quote was approved.',
++  service_busy: 'The worker is updating this record. Check history before retrying.',
++}
++export function refused(reason: unknown): Error {
++  return new Error(typeof reason === 'string' && Object.hasOwn(errors, reason)
++    ? errors[reason] : 'Swap request refused or reply unavailable. Check history; do not repeat a payment. Private details withheld.')
++}
++export async function executeRequest(request: Record<string, unknown>, exec: (argv: string[], options?: { input: string }) => Promise<any>) {
++    const initialize = request.action === 'initialize'
++    if (initialize && (request.confirmed !== true || Object.keys(request).sort().join() !== 'action,confirmed')) throw refused('confirmation_required')
++    let res: any
++    try { res = await exec([entrypoint, '--mainnet', directory, initialize ? 'init' : 'action'], initialize ? undefined : { input: JSON.stringify(request) }) } catch { throw refused(null) }
++    let reply: any
++    try { reply = JSON.parse(String(res.stdout)) } catch { throw refused(null) }
++    if (res.exitCode !== 0 || !reply || !Object.hasOwn(reply, 'result')) throw refused(reply?.reason)
++    return reply.result
++}
++export const invoke: Call = async (effects, request) => sdk.SubContainer.withTemp(
++  effects, { imageId: 'controller' }, mounts, 'migrated-swap-action', sub => executeRequest(request, (argv, options) => sub.exec(argv, options)))
++const text = (name: string, masked = false) => sdk.Value.text({ name, masked, required: true, default: null, placeholder: null })
++const confirmed = () => sdk.Value.toggle({ name: 'Confirm the exact reviewed terms', default: false })
++const meta = (name: string, group = 'Swaps') => async () => ({ name, group,
++  description: 'BTC/XBT swaps using saved bounded grants and a reviewed Neoxa price.',
++  warning: 'Incoming deadline protection can force-close the actual receiving channel if a swap cannot resolve in time.',
++  allowedStatuses: 'only-running' as const, visibility: 'enabled' as const })
++const hex = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v)
++const number = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0
++const states: Record<string, string> = {
++  ready_for_confirmation: 'Ready for confirmation', authorizing: 'Authorizing', publishing: 'Publishing payment invoice',
++  waiting_for_payment: 'Awaiting payment', outgoing_pending: 'Recipient payment pending', settled: 'Settled', failed: 'Failed',
++  cancelled: 'Cancelled before approval', expired: 'Expired', onchain_recovery: 'On-chain recovery needs inspection',
++}
++export function display(report: any, title = 'Swap Status'): T.ActionResult & { version: '1' } {
++  const rows: any[] = []
++  const add = (name: string, value: string, copyable = false, qr = false, masked = false) => rows.push({ name,
++    description: null, type: 'single', value, copyable, qr, masked })
++  if (!report || typeof report !== 'object') throw refused(null)
++  for (const key of ['worker_fresh', 'paused', 'restored', 'paired', 'existing_swaps_unchanged', 'initialized']) {
++    if (typeof report[key] === 'boolean') add(key.replaceAll('_', ' '), String(report[key]))
++  }
++  for (const direction of ['forward', 'reverse']) for (const kind of ['incoming', 'outgoing']) {
++    const grant = report.grants?.[direction]?.[kind]
++    if (!grant) continue
++    const prefix = (direction === 'forward' ? 'BTC → XBT' : 'XBT → BTC') + ' / ' + kind + ' grant / '
++    if (typeof grant.expired === 'boolean') add(prefix + 'expired', String(grant.expired))
++    for (const key of ['max_swaps', 'max_amount_msat', 'total_amount_msat', 'max_fee_msat', 'max_delay_blocks', 'max_hops', 'min_cltv_delta', 'max_cltv_delta']) {
++      if (number(grant.limits?.[key])) add(prefix + key, String(grant.limits[key]))
++    }
++  }
++  const list = Array.isArray(report.swaps) ? report.swaps : [report]
++  for (const row of list) {
++    if (hex(row?.confirmation)) add('Swap ID', row.confirmation, true)
++    if (row?.direction === 'forward' || row?.direction === 'reverse') add('Direction', row.direction === 'forward' ? 'BTC → XBT' : 'XBT → BTC')
++    if (typeof row?.state === 'string') add('State', Object.hasOwn(states, row.state) ? states[row.state] : 'Needs inspection')
++    for (const [key, label] of Object.entries({ btc_msat: 'BTC millisats', xbt_msat: 'XBT millisats', routing_fee_msat: 'Outgoing routing fee (millisats)',
++      markup_bps: 'Markup (basis points)', outgoing_hops: 'Outgoing hops', outgoing_delay_blocks: 'Outgoing delay (blocks)' })) {
++      if (number(row?.[key])) add(label, String(row[key]))
++    }
++    if (number(row?.expires_at) && row.expires_at <= 2 ** 35) add('Pay before (UTC)', new Date(row.expires_at * 1000).toISOString())
++    if (typeof row?.blocked === 'boolean') add('Execution blocked', String(row.blocked))
++    if (typeof row?.invoice === 'string' && /^ln[a-z0-9]{100,20000}$/.test(row.invoice)) add('Payment invoice', row.invoice, true, true, true)
++  }
++  return { version: '1', title, message: 'Review → confirm → pay once. Status and history use saved records. Preserve records if a reply is unavailable.',
++    result: { type: 'group', value: rows } }
++}
++function credential(raw: unknown): any {
++  try {
++    if (typeof raw !== 'string' || raw.length > 65536) throw Error()
++    const v = JSON.parse(raw)
++    if (!v || Object.keys(v).sort().join() !== 'grant,rune' || typeof v.rune !== 'string' || !v.grant) throw Error()
++    return v
++  } catch { throw new Error('Paste the complete bounded credential returned by the coordinator.') }
++}
++export function createActions(call: Call = invoke) {
++  let actions = sdk.Actions.of()
++  const add = (a: any) => { actions = actions.addAction(a) }
++  add(sdk.Action.withInput('migrated-initialize', async () => ({ ...await meta('Initialize Swap Controller', 'Swap Setup')(), allowedStatuses: 'only-stopped' as const }),
++    sdk.InputSpec.of({ confirmed: confirmed() }), async () => ({ confirmed: false }),
++    async ({ effects, input }) => {
++      if (input.confirmed !== true) throw refused('confirmation_required')
++      return display(await call(effects, { action: 'initialize', confirmed: true }))
++    }))
++  for (const direction of ['forward', 'reverse'] as const) {
++    const label = direction === 'forward' ? 'BTC to XBT' : 'XBT to BTC'
++    const prefill = async ({ effects }: { effects: T.Effects }) => {
++      const report = await call(effects, { action: 'status' })
++      const matches = (Array.isArray(report?.swaps) ? report.swaps : []).filter((r: any) => r.direction === direction && r.state === 'ready_for_confirmation' && hex(r.confirmation))
++      return { cid: matches.length === 1 ? matches[0].confirmation : null, confirmed: false }
++    }
++    add(sdk.Action.withInput('migrated-pair-' + direction, meta('Pair ' + label + ' Grants', 'Swap Setup'), sdk.InputSpec.of({
++      incomingUrl: text('Incoming coordinator HTTPS URL'), incomingCa: sdk.Value.textarea({ name: 'Incoming root CA PEM', required: true, default: null, maxLength: 65536 }),
++      incomingCredential: text('Incoming bounded credential', true), outgoingUrl: text('Outgoing coordinator HTTPS URL'),
++      outgoingCa: sdk.Value.textarea({ name: 'Outgoing root CA PEM', required: true, default: null, maxLength: 65536 }),
++      outgoingCredential: text('Outgoing bounded credential', true), confirmed: confirmed(),
++    }), async () => ({ confirmed: false }), async ({ effects, input: i }) => {
++      if (i.confirmed !== true) throw refused('confirmation_required')
++      const binding = { direction, nodes: {
++        incoming: { url: i.incomingUrl.trim(), ca_pem: i.incomingCa.trim(), ...credential(i.incomingCredential) },
++        outgoing: { url: i.outgoingUrl.trim(), ca_pem: i.outgoingCa.trim(), ...credential(i.outgoingCredential) },
++      } }
++      return display(await call(effects, { action: 'pair', binding, confirmed: i.confirmed }), 'Grants Paired')
++    }))
++    add(sdk.Action.withInput('migrated-new-' + direction, meta('New ' + label + ' Swap'), sdk.InputSpec.of({
++      invoice: text('Recipient invoice with private routing hints if needed', true),
++    }), async () => {}, async ({ effects, input }) => display(await call(effects, { action: 'prepare', direction, invoice: input.invoice.trim() }), 'Review ' + label + ' Swap')))
++    for (const mode of ['confirm', 'cancel'] as const) add(sdk.Action.withInput('migrated-' + mode + '-' + direction,
++      meta((mode === 'confirm' ? 'Confirm ' : 'Cancel Unapproved ') + label + ' Swap'), sdk.InputSpec.of({ cid: text('Reviewed swap ID'), confirmed: confirmed() }), prefill,
++      async ({ effects, input }) => {
++        if (input.confirmed !== true || !hex(input.cid)) throw refused('confirmation_required')
++        const report = await call(effects, { action: 'status' })
++        if (!Array.isArray(report?.swaps) || !report.swaps.some((r: any) => r.confirmation === input.cid && r.direction === direction)) throw refused('confirmation_required')
++        return display(await call(effects, { action: mode, cid: input.cid, confirmation: input.cid, ...(mode === 'confirm' ? { confirmed: true } : {}) }))
++      }))
++  }
++  for (const action of ['status', 'history'] as const) add(sdk.Action.withInput('migrated-' + action,
++    meta(action === 'status' ? 'Swap Status' : 'Swap History'), sdk.InputSpec.of({}), async () => {},
++    async ({ effects }) => display(await call(effects, { action }))))
++  add(sdk.Action.withInput('migrated-invoice', meta('Payment Invoice'), sdk.InputSpec.of({ cid: text('Confirmed swap ID') }), async () => {},
++    async ({ effects, input }) => {
++      if (!hex(input.cid)) throw refused(null)
++      return display(await call(effects, { action: 'invoice', cid: input.cid }), 'Pay This Invoice Once')
++    }))
++  add(sdk.Action.withInput('migrated-settings', meta('Swap Settings', 'Swap Setup'), sdk.InputSpec.of({
++    paused: sdk.Value.toggle({ name: 'Pause new swaps (approved recovery continues)', default: false }),
++    markupBps: sdk.Value.number({ name: 'Markup (basis points; 100 = 1%)', required: true, default: 0, integer: true, min: 0, max: 500 }),
++  }), async ({ effects }) => {
++    const current = await call(effects, { action: 'status' })
++    return { paused: current.paused === true, markupBps: number(current.markup_bps) ? current.markup_bps : 0 }
++  }, async ({ effects, input }) => display(await call(effects, { action: 'configure', paused: input.paused, markup_bps: input.markupBps }), 'Swap Settings')))
++  return actions
++}
++export const actions = createActions()
+diff --git a/startos/live/candidate.ts b/startos/live/candidate.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7fa1a4f634bf5f97cc4c1a5f307608943225fcb7
+--- /dev/null
++++ b/startos/live/candidate.ts
+@@ -0,0 +1,3 @@
++// Mainnet entry points registered by this dedicated candidate.
++export { actions, createActions, display, directory, entrypoint, executeRequest } from './actions'
++export { main, command } from './main'
+diff --git a/startos/live/main.ts b/startos/live/main.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..20669ea7be6e499577af223b6152bd1738d262f0
+--- /dev/null
++++ b/startos/live/main.ts
+@@ -0,0 +1,21 @@
++import { sdk } from '../sdk'
++import { mounts } from '../utils'
++import { directory, entrypoint, invoke } from './actions'
++
++// Initial state must already have been explicitly created. A missing or restored
++// journal must not be silently initialized by a restart or image replacement.
++export const command: [string, ...string[]] = [entrypoint, '--mainnet', directory, 'run']
++export const main = sdk.setupMain(async ({ effects }) => {
++  const worker = sdk.SubContainer.of(effects, { imageId: 'controller' }, mounts, 'migrated-worker')
++  return sdk.Daemons.of(effects).addDaemon('migrated-worker', {
++    subcontainer: worker, exec: { command }, requires: [],
++    ready: { display: 'Swap Worker', fn: async () => {
++      try {
++        const report = await invoke(effects, { action: 'status' })
++        if (report.restored === true) return { result: 'failure', message: 'Restored authority is blocked. Preserve its records.' }
++        if (report.worker_fresh !== true) return { result: 'loading', message: 'Waiting for the existing worker journal.' }
++        return { result: 'success', message: report.paused === true ? 'New swaps paused; approved recovery continues.' : 'Worker ready for explicitly confirmed swaps.' }
++      } catch { return { result: 'failure', message: 'Worker unavailable. Inspect saved status; do not recreate its state.' } }
++    } },
++  })
++})
+diff --git a/startos/main.ts b/startos/main.ts
+index 6fa73dab71f4d5b7516261e9227026f2c4575590..f42be2d5f8cfdafe24054c940f421784d8477068 100644
+--- a/startos/main.ts
++++ b/startos/main.ts
+@@ -1,39 +1 @@
+-import { sdk } from './sdk'
+-import { mounts, rootDir } from './utils'
+-export const main = sdk.setupMain(async ({ effects }) => {
+-  const sub = sdk.SubContainer.of(effects, { imageId: 'controller' }, mounts, 'controller')
+-  const worker = sdk.SubContainer.of(effects, { imageId: 'controller' }, mounts, 'worker')
+-  return sdk.Daemons.of(effects).addDaemon('monitor', {
+-    subcontainer: sub,
+-    exec: { command: ['python3', '/app/controller.py', rootDir, 'run'] },
+-    requires: [],
+-    ready: { display: 'Coordinator Connections', fn: async () => {
+-      const res = await sub.exec(['python3', '/app/controller.py', rootDir, 'status'])
+-      if (res.exitCode !== 0) return { result: 'failure', message: 'Pairing record unavailable; inspect Connection Status.' }
+-      try {
+-        const status = JSON.parse(String(res.stdout))
+-        if (!status.paired) return { result: 'loading', message: 'Run Pair Coordinator Nodes. Read-only mode.' }
+-        if (status.ready) return { result: 'success', message: 'Both node identities verified over HTTPS. Read-only; liquidity and routes not checked.' }
+-        return { result: 'loading', message: 'Waiting for healthy, freshly verified connections. Inspect Connection Status.' }
+-      } catch { return { result: 'failure', message: 'Invalid connection status.' } }
+-    } },
+-  }).addDaemon('worker', {
+-    subcontainer: worker,
+-    exec: { command: ['python3', '/app/lifecycle.py', rootDir + '/execution', 'run'] },
+-    requires: [],
+-    ready: { display: 'Execution Worker', fn: async () => {
+-      const res = await worker.exec(['python3', '/app/lifecycle.py', rootDir + '/execution', 'status'])
+-      if (res.exitCode !== 0) return { result: 'failure', message: 'Worker status unavailable.' }
+-      try {
+-        const status = JSON.parse(String(res.stdout))
+-        if (!status.worker_fresh) return { result: 'loading', message: 'Waiting for worker heartbeat.' }
+-        if (status.forward_pilot?.phase === 'attention' || status.forward_pilot?.needs_attention) return { result: 'failure', message: 'Legacy pilot needs inspection. Open Legacy Pilot Status and preserve its records.' }
+-        if (status.live_payment_enabled) return { result: 'success', message: 'Approved legacy pilot worker active. Inspect Legacy Pilot Status for its outcome.' }
+-        if (status.restored_block) return { result: 'success', message: 'Old execution remains blocked after restore. Inspect Swap Status and the directional histories.' }
+-        if (status.backup_paused) return { result: 'loading', message: 'Execution paused for backup; inspect Worker Status if this persists.' }
+-        if (status.jobs.some((j: any) => j.outcome === 'unreadable' || j.outcome === 'launch_uncertain')) return { result: 'failure', message: 'Execution record needs inspection. See Worker Status.' }
+-        return { result: 'success', message: 'Worker running for explicitly confirmed BTC to XBT and XBT to BTC swaps. Inspect Swap Status and the directional histories.' }
+-      } catch { return { result: 'failure', message: 'Invalid worker status.' } }
+-    } },
+-  })
+-})
++export { main } from './live/main'
+diff --git a/startos/manifest/i18n.ts b/startos/manifest/i18n.ts
+index c4f4f9f262963372c14e18a5006f8d6f5189616e..f106afa0e07825b8aaffbfdb086c44e6c3db1ded 100644
+--- a/startos/manifest/i18n.ts
++++ b/startos/manifest/i18n.ts
+@@ -1,2 +1,2 @@
+-export const short = { en_US: 'Read-only pairing and health for BTC and XBT coordinators' }
+-export const long = { en_US: 'Experimental controller preparation. Verifies two remote CLN identities over HTTPS using dedicated restricted runes. No wallet, swap execution, quote API or inbound network interface. Connection health is not a liquidity or routing check.' }
++export const short = { en_US: 'BTC/XBT swaps with reviewed grants and market pricing' }
++export const long = { en_US: 'Dedicated controller candidate. Pair bounded coordinator credentials, review a recipient invoice and Neoxa price, explicitly confirm, then pay once. An automatic service recovers saved attempts. Operator markup defaults to 0%. Fresh installation only; no legacy state import.' }
+diff --git a/startos/manifest/index.ts b/startos/manifest/index.ts
+index 8582f40a6b65f613326549c5f48f362e45e41c6f..c10964d70a937351274f6176d3bcacff37ac49b0 100644
+--- a/startos/manifest/index.ts
++++ b/startos/manifest/index.ts
+@@ -6,6 +6,6 @@ export const manifest = setupManifest({
+   upstreamRepo: 'https://github.com/BitcoinMechanic/lightning',
+   marketingUrl: 'https://github.com/BitcoinMechanic/lightning', donationUrl: null, description: { short, long },
+   volumes: ['main'],
+-  images: { controller: { source: { dockerBuild: { dockerfile: 'Dockerfile', workdir: '.' } }, arch: ['x86_64'] } },
++  images: { controller: { source: { dockerBuild: { dockerfile: 'Dockerfile.live', workdir: '.' } }, arch: ['x86_64'] } },
+   dependencies: {},
+ })
+diff --git a/startos/versions/current.ts b/startos/versions/current.ts
+index ae0d4b3d2c17552431957d90a4de5702d9c2847b..63476a47bcbf47460d55b4212a0ec9b1f68e5c94 100644
+--- a/startos/versions/current.ts
++++ b/startos/versions/current.ts
+@@ -1,6 +1,6 @@
+ import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
+ export const current = VersionInfo.of({
+-  version: '0.1.0:24',
+-  releaseNotes: { en_US: 'Add Neoxa market-priced swaps in both directions with configurable 0% default markup, exact saved quotes and explicitly enabled amount/budget grants. Preserve fixed-price grants and existing recovery records.' },
+-  migrations: { up: async () => {}, down: IMPOSSIBLE },
++  version: '#privkeyio:0.1.0:0',
++  releaseNotes: { en_US: 'Dedicated controller test candidate for the migrated BTC/XBT coordinators. Explicit initialization, bounded grants, invoice review, confirmed payments and automatic recovery. Fresh install only; no legacy authority import.' },
++  migrations: { up: IMPOSSIBLE, down: IMPOSSIBLE },
+ })
+diff --git a/startos/versions/index.ts b/startos/versions/index.ts
+index 60f46fd8fe65d5b99a705c69e99530a3316ffa2d..2212b73c8d30e5c1e323e95e167b192270f62db1 100644
+--- a/startos/versions/index.ts
++++ b/startos/versions/index.ts
+@@ -1,8 +1,3 @@
+ import { VersionGraph } from '@start9labs/start-sdk'
+ import { current } from './current'
+-import { v0_1_0_0 } from './v0.1.0_0'
+-
+-export const versionGraph = VersionGraph.of({
+-  current,
+-  other: [v0_1_0_0],
+-})
++export const versionGraph = VersionGraph.of({ current, other: [] })

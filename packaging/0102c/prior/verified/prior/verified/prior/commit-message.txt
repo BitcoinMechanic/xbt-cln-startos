@@ -1,0 +1,22 @@
+Checkpoint reviewed on-chain retirement and BTC recovery fees
+
+Require explicit local coordinator review after the original channel is fully
+closed and its claim or timeout proof has sufficient depth. Preserve the saved
+incoming binding and HTLC when core prunes closed history. Independently review
+the original terminal outgoing attempt before retiring the controller record.
+Recheck retained proof on subsequent admission and recovery. Keep consumed
+budgets and require new eligible funding for grant renewal.
+
+Correct BTC anchor-recovery input weight to include the witness script. The
+previous XBT-only overlay left BTC replacement funding below the relay floor.
+Reproduce the posted transaction's 216-sat estimate and corrected 225-sat
+estimate, and retain signed witness controls for seven CSV values. Explicitly
+spend recovered inputs with default fees in every retirement fixture case.
+
+0096a evidence: 169 unit tests without skips, six funded bidirectional
+retirements/new-funding renewals and six automatic-service regressions. Preserve
+original attempts, exact bindings, separate confirmations, lost reply recovery,
+post-renewal restarts, original engine evidence and the unchanged XBT binary.
+
+Three source commits and four annotated migration checkpoint tags. No installer,
+installed-service change, legacy wallet import or production activation.

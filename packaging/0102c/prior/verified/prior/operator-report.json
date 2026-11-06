@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "kind": "operator-reported-regtest-result",
+  "date": "2026-10-14",
+  "milestone": "0098a",
+  "reported": {
+    "funded_packaged_cases": 6,
+    "ordinary_restart": true,
+    "image_content_replacement": true,
+    "original_channels_HTLCs_attempts": true,
+    "twelve_balances": true,
+    "closed_channels": 0,
+    "exact_engines_retained": true,
+    "prior_evidence_retained": true,
+    "regtest_only": true,
+    "installer": false
+  },
+  "results_directory": "/tmp/privkeyio-0098a-results.r2pjegti",
+  "evidence_basis": "Operator supplied READY output. Export separately validates actual raw receipts, source/runtime hashes and checkpoint provenance."
+}

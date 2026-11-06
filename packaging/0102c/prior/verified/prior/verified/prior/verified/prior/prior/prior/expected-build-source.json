@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "fixture": "0088",
+  "package_tree": "e77f570ad430b53b435d96c4d6e4b8b61b4154af",
+  "source_lock": {
+    "schema": 1,
+    "engine": {
+      "repository": "https://github.com/BitcoinMechanic/lightning.git",
+      "commit": "ddd89e1d70d0ba415880a0ff02db7b053c73a298",
+      "tree": "21369587e10687c21634ec2b1d15a5de6db09496"
+    },
+    "ui": {
+      "repository": "https://github.com/ElementsProject/cln-application.git",
+      "commit": "ff2d698b4f64c86d950d6abe61bd6b8a0b52a68c",
+      "version": "26.09"
+    },
+    "package_id": "xbt-cln",
+    "wire_network": "bitcoin",
+    "profile": "xbt-privkeyio-v1",
+    "fresh_only": true,
+    "engine_patch": {
+      "path": "assets/engine-recovery-fees.patch",
+      "sha256": "86c80ef9bb4a9f1f52d31a647b54f04b2a6ca4d55031fd5154603eb0e6984219",
+      "test_path": "assets/test-recovery-weight.c",
+      "test_sha256": "e11ce68e002ddc33e0aa1b3ed7ffa4bc087f9db0568deb7a881733e5bf071c8c",
+      "version": "v26.06.9-blake2b.7-swap0088b"
+    }
+  },
+  "files": {
+    ".gitattributes": "ccfb2bb692c4e00083ded4ab2ef970d588c132dac013c746c2c839d1fa71b4f5",
+    "Dockerfile": "b91dc1bfdf869a428647734c6bdf9054c5fcaefdcf4e79fa0e02f9a1f0ccb9b9",
+    "README.md": "98c6f8d476e3ce3d09e9e873f6fcfb31956b98d78efc519091ae47dd44689e85",
+    "assets/engine-recovery-fees.patch": "86c80ef9bb4a9f1f52d31a647b54f04b2a6ca4d55031fd5154603eb0e6984219",
+    "assets/source-lock.json": "9054c52f2a559246999d47b430b12438197f54ba2ce2b29e7d443e21298a84ca",
+    "assets/test-recovery-weight.c": "e11ce68e002ddc33e0aa1b3ed7ffa4bc087f9db0568deb7a881733e5bf071c8c",
+    "instructions.md": "1dfb5f9bba6ed4afcfe2f47f1279bcbacc28f5468e6daa45d684345590c6f098",
+    "scripts/recovery-bridge.ts": "a436ef2b876265cd87e8c4b390aa70729b37c2c4eb9f93fc7339a1cfea662771",
+    "scripts/test-package.cjs": "dbe061e68d41304530b5ae114f27ec8fde658b7c7ca459c59d9b0eea2afe9958",
+    "scripts/test_backup_recovery.py": "67c1a0bf354e7d325bd234fc198d947183d279ba49106290ffd02fa9da4ec0a7",
+    "startos/backups.ts": "f29386fb28de62cea923426451fc810d035b283fc01a5a21adfe7552a7572fbd",
+    "startos/main.ts": "a33f4418be409dddac4dc1ef1f26b6be57c0f9168f618191fb548f01ebdf6477",
+    "startos/recovery.ts": "ea48183ff76f902267129558fd84342b4103dcfd8e9bea48b3c0852109f831bd"
+  },
+  "fixture_dockerfile_sha256": "83944de85d4c98c544f32a1c7bb4e40d0b1b4972dc403a556e995d508d3bb133",
+  "regtest_only": true,
+  "installer": false
+}
