@@ -1,3 +1,4 @@
+import { localControllerAction, syncLocalController } from './localController'
 import { T } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
 import { mainMounts, rootDir } from '../volume'
@@ -36,8 +37,13 @@ export async function executeRequest(request: Record<string, unknown>, exec: (ar
     if (r.exitCode !== 0) throw refuse()
     try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
 }
-export const invoke: Call = async (effects, request) => sdk.SubContainer.withTemp(
+export const rawInvoke: Call = async (effects, request) => sdk.SubContainer.withTemp(
   effects, { imageId: 'lightning' }, mainMounts, 'migrated-grant-action', sub => executeRequest(request, (argv, options) => sub.exec(argv, options)))
+export const invoke: Call = async (effects, request) => {
+  const result = await rawInvoke(effects, request)
+  if (['confirm', 'pause', 'credential'].includes(String(request.action))) await syncLocalController(effects, profile, rawInvoke)
+  return result
+}
 const text = (name: string) => sdk.Value.text({ name, masked: false, required: true, default: null, placeholder: null })
 const number = (name: string, value: number, min: number, max: number) => sdk.Value.number({ name, default: value, required: true, integer: true, min, max })
 const confirm = () => sdk.Value.toggle({ name: 'Confirm this exact grant and its channel protection authority', default: false })
@@ -70,6 +76,7 @@ export function display(report: any): T.ActionResult & { version: '1' } {
 export function createActions(call: Call = invoke, base = sdk.Actions.of()) {
   let actions = base
   const add = (a: any) => { actions = actions.addAction(a) }
+  add(localControllerAction(profile, rawInvoke))
   add(sdk.Action.withInput('migrated-admin-init', meta('Enable Swap Coordinator'), sdk.InputSpec.of({ confirmed: confirm() }), async () => ({ confirmed: false }),
     async ({ effects, input }) => {
       if (input.confirmed !== true) throw refuse()

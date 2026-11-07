@@ -244,3 +244,24 @@ This is a same-volume update and does not restore or replace wallet state.
 Retire unused outgoing swap authority without waiting for the recipient invoice to expire. Requires no send intent and fresh unused-payment/channel checks; permanently prevents later sending and preserves budgets, records, wallets and channels.
 
 For the expiry-workflow release, update the BTC and XBT coordinator packages before the controller. Existing unpaid expired swaps are then retired automatically after fresh unused-authority checks; no journal deletion or initialization is needed. Retired enrollments still consume their original grant slot and budget. A later swap may require a newly reviewed grant. Ten-minute pricing applies only to new controller quotes; never pay a previously expired invoice.
+
+
+## Automatic local Swap Controller connection
+
+With Swap Controller installed on this StartOS server, enable the coordinator and
+review/confirm incoming and outgoing grants as usual. Run **Connect Local Swap
+Controller** once and enable local connection. The controller discovers this node,
+its HTTPS endpoint and the server certificate automatically; credentials do not
+need to be copied. Confirming a replacement grant updates the shared connection.
+
+Only current, unpaused, unexpired, explicitly approved bounded grants are shared.
+The `public` volume contains `swap-controller.json` for local dependent services;
+it never contains a general administration rune. That volume and the opt-in marker
+are excluded from backups. Restore clears sharing and retains the authority fence.
+Disabling sharing stops automatic configuration; it does not revoke credentials
+already saved for approved swaps. Use Pause Grant when stopping new grant use.
+
+This does not open channels, fund liquidity, approve grants or raise spending limits.
+The controller preserves manual pairings and waits for active swaps to finish before
+selecting changed local grants. Older packages without this connection contract
+continue to require manual pairing.

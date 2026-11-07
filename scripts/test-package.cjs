@@ -69,6 +69,8 @@ async function main() {
     }
     const store={read:()=>({once:async()=>({restore:true,customExternalHosts:[],watchtowerClients:[],watchtowerServer:false}),const:async()=>null}),merge:async(_,v)=>flags.push(v)}
     const mocks={
+      './live/localController': {publicationDaemon:()=>({requires:['lightningd']})},
+      './live/actions': {profile:'xbt-privkeyio-v1',rawInvoke:async()=>({})},
       '@start9labs/start-sdk':{FileHelper:{string:()=>({read:()=>({const:async()=>null})})}},
       'bitcoin-core-startos/startos/manifest':{manifest:{}},
       './sdk':{sdk},'./xbtPolicy':policy,'./recovery':recovery,'./fileModels/store.json':{storeJson:store},
@@ -129,7 +131,7 @@ async function main() {
     const v3 = load('startos/versions/v3.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).v3
     const graph = load('startos/versions/index.ts', {'./current':{current},'./v2':{v2},'./v3':{v3}}).versionGraph
     const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
-    const to = ExtendedVersion.parse('#privkeyio:26.6.9:4')
+    const to = ExtendedVersion.parse('#privkeyio:26.6.9:5')
     const fromV2 = ExtendedVersion.parse('#privkeyio:26.6.9:2')
     assert.ok(graph.canMigrateFrom().satisfiedBy(fromV2))
     assert.ok(graph.canMigrateFrom().satisfiedBy(from))
@@ -153,13 +155,17 @@ async function main() {
     await fs.rmdir(path.join(root,policy.swapDirs[0]))
     assert.deepEqual(flags,[])
     console.log('PASS: SDK migration accepts only the prior candidate, preserves identity/flags and refuses swap state')
-    const b=load('startos/backups.ts',mocks)
+    let publicationCleared=0
+    const b=load('startos/backups.ts',{...mocks,'./live/localController':{clearPublication:async()=>{publicationCleared++}}})
     await b.createBackup()
     await backup.before()
     for (const name of ['bitcoin/swap-coordinator-v1','bitcoin/.swap-setup-*','bitcoin/lightningd.sqlite3','bitcoin/lightningd.sqlite3-wal','bitcoin/lightningd.sqlite3-shm','.commando-env']) assert.ok(backup.options.exclude.includes(name))
     await fs.writeFile(path.join(root,'bitcoin/emergency.recover'),'recovery-copy')
     await fs.writeFile(path.join(root,'.commando-env'),'discarded-credential')
+    await fs.writeFile(path.join(root,'local-controller-enabled.json'),'{}')
     await backup.after({})
+    assert.equal(publicationCleared,1)
+    assert.equal(await policy.exists(path.join(root,'local-controller-enabled.json')),false)
     assert.equal(await policy.exists(path.join(root,'.commando-env')),false)
     assert.deepEqual(flags,[{restore:true}]);assert.equal(tasks.length,1)
     assert.equal(JSON.parse(await fs.readFile(path.join(root,'node-restored.json'),'utf8')).recovery,true)

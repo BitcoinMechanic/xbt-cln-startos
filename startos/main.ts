@@ -1,3 +1,5 @@
+import { publicationDaemon } from './live/localController'
+import { profile as coordinatorProfile, rawInvoke as coordinatorCall } from './live/actions'
 import { recoveryCommands } from './recovery'
 import { verifyBackend, verifyNode, verifyVolume, requireInactiveSwaps, exists, activationHeight } from './xbtPolicy'
 import { FileHelper } from '@start9labs/start-sdk'
@@ -623,4 +625,5 @@ export const main = sdk.setupMain(async ({ effects }) => {
       },
       requires: store.restore ? ['lightningd', 'commando-config', 'consume-flags'] : ['lightningd', 'commando-config'],
     })
+    .addDaemon('local-controller-publication', publicationDaemon(effects, coordinatorProfile, coordinatorCall))
 })
