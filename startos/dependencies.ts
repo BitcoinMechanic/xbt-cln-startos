@@ -1,11 +1,11 @@
 import { sdk } from './sdk'
+import { backends, selectedBackend } from './backend'
 
 export const setDependencies = sdk.setupDependencies(async ({ effects }) => {
-  return {
-    bitcoind: {
-      healthChecks: ['bitcoind', 'sync-progress'],
-      kind: 'running',
-      versionRange: '*' // Backend identity is checked before lightningd starts.,
-    },
-  }
+  const packageId = await selectedBackend(effects)
+  return { [packageId]: {
+    healthChecks: [...backends[packageId].healthChecks],
+    kind: 'running' as const,
+    versionRange: '*', // Runtime identity checks still authenticate the chain.
+  } }
 })

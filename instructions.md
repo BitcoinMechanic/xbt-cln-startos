@@ -57,3 +57,17 @@ This does not open channels, fund liquidity, approve grants or raise spending li
 The controller preserves manual pairings and waits for active swaps to finish before
 selecting changed local grants. Older packages without this connection contract
 continue to require manual pairing.
+
+## Local BLAKE2b backend selection
+
+XBT Lightning prefers the installed `knots-blake2b` service. Only when it is absent
+does it select `bitcoind`. RPC discovery, read-only cookie mounts and dependency
+health checks all use the same selected service. A stopped or unhealthy preferred
+backend never triggers fallback. Installing/removing it updates the selection.
+Both backends must still pass the BLAKE2b activation/checkpoint checks; an ordinary
+BTC `bitcoind` is not an acceptable XBT backend. BTC Lightning is unaffected.
+
+This package still requires an unpruned backend. Core Lightning can use pruning
+when every needed historical block remains available, but recovery/rescans can
+stall on missing blocks. The `knots-blake2b` fetching proxy has not yet passed this
+package's recovery tests; its default pruned configuration remains rejected.

@@ -34,9 +34,13 @@ export const manifest = setupManifest({
     },
   },
   dependencies: {
+    'knots-blake2b': {
+      description: depBitcoindDescription, optional: true,
+      metadata: { title: 'Bitcoin Knots (BLAKE2b)', icon: 'https://raw.githubusercontent.com/paulscode/knots-blake2b-startos/3847fce974be7d944f37f97e47b3851444c9ffc5/icon.png' },
+    },
     bitcoind: {
       description: depBitcoindDescription,
-      optional: false,
+      optional: true,
       metadata: {
         title: 'Bitcoin Knots (BLAKE2b)',
         icon: 'https://raw.githubusercontent.com/Start9Labs/bitcoin-core-startos/feec0b1dae42961a257948fe39b40caf8672fce1/dep-icon.svg',

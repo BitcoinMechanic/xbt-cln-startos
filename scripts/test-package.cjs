@@ -16,6 +16,36 @@ function load(file, mocks = {}) {
   return mod.exports
 }
 async function main() {
+  // Presence, not health or bridge availability, selects one consistent backend.
+  for (const installed of [false, true]) for (const address of [null, '10.0.3.1:43123', '[fd00:3::1]:43123']) {
+    const requests = []
+    const backendSdk = {
+      getServiceManifest: (_effects, id, map) => {
+        assert.equal(id, 'knots-blake2b')
+        return {const: async () => map(installed ? {id} : null)}
+      },
+      host: {getBridgeAddress: (_effects, opts) => {
+        requests.push(opts); return {const: async () => address}
+      }},
+      setupDependencies: f => f,
+    }
+    const backend = load('startos/backend.ts', {
+      './sdk': {sdk: backendSdk},
+      'bitcoin-core-startos/startos/utils': {rpcHostId:'rpc', rpcPort:8332},
+    })
+    const expected = installed ? 'knots-blake2b' : 'bitcoind'
+    assert.equal(await backend.selectedBackend({}), expected)
+    const connection = await backend.backendRpcBridge({})
+    assert.deepEqual(requests, [{packageId:expected,hostId:'rpc',internalPort:installed?18443:8332,ssl:false}])
+    if (address) {
+      assert.equal(connection.packageId, expected); assert.equal(connection.port,43123)
+      assert.equal(connection.host,address.startsWith('[')?'fd00:3::1':'10.0.3.1')
+    } else assert.equal(connection,null) // No fallback when preferred binding is missing.
+    const dependencies = load('startos/dependencies.ts', {'./sdk':{sdk:backendSdk},'./backend':backend})
+    assert.deepEqual(await dependencies.setDependencies({effects:{}}), {
+      [expected]: {healthChecks:installed?['node','chain']:['bitcoind','sync-progress'],kind:'running',versionRange:'*'},
+    })
+  }
   const policy = load('startos/xbtPolicy.ts')
   const recovery = load('startos/recovery.ts', {'./xbtPolicy':policy})
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'xbt-package-'))
@@ -75,7 +105,7 @@ async function main() {
       'bitcoin-core-startos/startos/manifest':{manifest:{}},
       './sdk':{sdk},'./xbtPolicy':policy,'./recovery':recovery,'./fileModels/store.json':{storeJson:store},
       './fileModels/config':{clnConfig:{read:()=>({const:async()=>({raw:{plugin:[]}})})}},
-      './i18n':{i18n:x=>x},'./utils':{rootDir:'/root/.lightning',bitcoinDataDir:'/mnt/bitcoin',bitcoindRpcBridge:async()=>({host:'127.0.0.1',port:8332}),mainMounts:{mountDependency:()=>null}},
+      './i18n':{i18n:x=>x},'./utils':{rootDir:'/root/.lightning',bitcoinDataDir:'/mnt/bitcoin',bitcoindRpcBridge:async()=>({host:'127.0.0.1',port:8332,packageId:'bitcoind'}),mainMounts:{mountDependency:()=>null}},
       './actions/watchtower/towerUri':{},'./actions/watchtower/watchtower':{},'./actions/watchtower/watchtowerClientInfo':{},
       './actions/rescanBlockchain':{rescanBlockchain:{}},
     }
@@ -131,7 +161,7 @@ async function main() {
     const v3 = load('startos/versions/v3.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).v3
     const graph = load('startos/versions/index.ts', {'./current':{current},'./v2':{v2},'./v3':{v3}}).versionGraph
     const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
-    const to = ExtendedVersion.parse('#privkeyio:26.6.9:5')
+    const to = ExtendedVersion.parse('#privkeyio:26.6.9:6')
     const fromV2 = ExtendedVersion.parse('#privkeyio:26.6.9:2')
     assert.ok(graph.canMigrateFrom().satisfiedBy(fromV2))
     assert.ok(graph.canMigrateFrom().satisfiedBy(from))

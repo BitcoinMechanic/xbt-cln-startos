@@ -3,7 +3,6 @@ import { profile as coordinatorProfile, rawInvoke as coordinatorCall } from './l
 import { recoveryCommands } from './recovery'
 import { verifyBackend, verifyNode, verifyVolume, requireInactiveSwaps, exists, activationHeight } from './xbtPolicy'
 import { FileHelper } from '@start9labs/start-sdk'
-import { manifest as bitcoinManifest } from 'bitcoin-core-startos/startos/manifest'
 import { readFile, writeFile } from 'fs/promises'
 import {
   parseTowerUri,
@@ -85,8 +84,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const lightningSub = sdk.SubContainer.of(
     effects,
     { imageId: 'lightning' },
-    mainMounts.mountDependency<typeof bitcoinManifest>({
-      dependencyId: 'bitcoind',
+    mainMounts.mountDependency({
+      dependencyId: bitcoind.packageId,
       mountpoint: bitcoinDataDir,
       subpath: null,
       readonly: true,
