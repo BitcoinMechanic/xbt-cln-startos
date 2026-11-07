@@ -43,7 +43,7 @@ async function main() {
     } else assert.equal(connection,null) // No fallback when preferred binding is missing.
     const dependencies = load('startos/dependencies.ts', {'./sdk':{sdk:backendSdk},'./backend':backend})
     assert.deepEqual(await dependencies.setDependencies({effects:{}}), {
-      [expected]: {healthChecks:installed?['node','chain']:['bitcoind','sync-progress'],kind:'running',versionRange:'*'},
+      [expected]: {healthChecks:installed?['node','chain']:['bitcoind','sync-progress'],kind:'running',versionRange:installed?'>=29.4.3:1':'*'},
     })
   }
   const policy = load('startos/xbtPolicy.ts')
@@ -85,15 +85,17 @@ async function main() {
     const chain=[]; const flags=[]; const tasks=[]
     let rpcReplies = structuredClone(recorded)
     const rpcCalls = []
+    const connection = {host:'127.0.0.1',port:8332,packageId:'bitcoind'}
     const backup = {setOptions(o){this.options=o;return this},setPreBackup(f){this.before=f;return this},setPostRestore(f){this.after=f;return this}}
     const sdk = {
       volumes:{main:{subpath:p=>path.join(root,p)}},
       setupMain:f=>f, setupBackups:f=>({createBackup:f,restoreInit:null}), setHealth:async()=>null,
       Backups:{ofVolumes:()=>backup}, action:{createOwnTask:async(...a)=>tasks.push(a)},
-      SubContainer:{of:()=>({rootfs:'/test', exec:async args=>{
-        const method=args.find(x=>['getblockchaininfo','getdeploymentinfo','getblockhash'].includes(x))
+      SubContainer:{of:()=>({rootfs:'/test', exec:async (args,_options,timeout)=>{
+        assert.equal(timeout,70000) // The host deadline must allow the proxy RPC's 60 seconds.
+        const method=args.find(x=>['getblockchaininfo','getdeploymentinfo','getblockhash','getblock'].includes(x))
         rpcCalls.push({method,args})
-        return {exitCode:0,stdout:method==='getblockhash'?rpcReplies[method]:JSON.stringify(rpcReplies[method])}
+        return {exitCode:0,stdout:['getblockhash','getblock'].includes(method)?rpcReplies[method]:JSON.stringify(rpcReplies[method])}
       }})},
       Daemons:{of:()=>({addDaemon(id,spec){chain.push({id,spec});return this},addOneshot(id,spec){chain.push({id,spec});return this},addHealthCheck(id,spec){chain.push({id,spec});return this}})},
     }
@@ -105,7 +107,7 @@ async function main() {
       'bitcoin-core-startos/startos/manifest':{manifest:{}},
       './sdk':{sdk},'./xbtPolicy':policy,'./recovery':recovery,'./fileModels/store.json':{storeJson:store},
       './fileModels/config':{clnConfig:{read:()=>({const:async()=>({raw:{plugin:[]}})})}},
-      './i18n':{i18n:x=>x},'./utils':{rootDir:'/root/.lightning',bitcoinDataDir:'/mnt/bitcoin',bitcoindRpcBridge:async()=>({host:'127.0.0.1',port:8332,packageId:'bitcoind'}),mainMounts:{mountDependency:()=>null}},
+      './i18n':{i18n:x=>x},'./utils':{rootDir:'/root/.lightning',bitcoinDataDir:'/mnt/bitcoin',bitcoindRpcBridge:async()=>connection,mainMounts:{mountDependency:()=>null}},
       './actions/watchtower/towerUri':{},'./actions/watchtower/watchtower':{},'./actions/watchtower/watchtowerClientInfo':{},
       './actions/rescanBlockchain':{rescanBlockchain:{}},
     }
@@ -145,6 +147,38 @@ async function main() {
     rpcReplies=structuredClone(recorded)
     await backend.exec.fn()
     console.log('PASS: real Knots response through the actual startup hook; '+rejected.length+' invalid backend cases refused')
+    connection.packageId='knots-blake2b'
+    rpcReplies=structuredClone(recorded)
+    rpcReplies.getblockchaininfo.pruned=true
+    rpcReplies.getblockchaininfo.pruneheight=policy.activationHeight+1
+    rpcReplies.getblock='00'.repeat(200)
+    rpcCalls.length=0
+    await backend.exec.fn()
+    assert.deepEqual(rpcCalls.map(x=>x.method),['getblockchaininfo','getdeploymentinfo','getblockhash','getblockhash','getblock'])
+    assert.equal(rpcCalls[3].args.at(-1),String(policy.activationHeight))
+    assert.equal(rpcCalls[4].args.at(-1),'0')
+    for (const bad of ['', 'not hex', '00', {}, null]) {
+      rpcReplies.getblock=bad
+      await assert.rejects(()=>backend.exec.fn())
+      assert.deepEqual(flags,[])
+    }
+    for (const bad of [-1, null, '123', rpcReplies.getblockchaininfo.blocks+1]) {
+      rpcReplies.getblockchaininfo.pruneheight=bad
+      await assert.rejects(()=>backend.exec.fn(),/XBT requires/)
+    }
+    connection.packageId='bitcoind';rpcReplies=structuredClone(recorded)
+    let touched=false
+    await policy.verifyHistoricalBlock(good,async()=>{touched=true})
+    assert.equal(touched,false)
+    const calls=[]
+    await policy.verifyHistoricalBlock({pruned:true,pruneheight:100},async(method,...args)=>{
+      calls.push([method,...args]);return method==='getblockhash'?'aa'.repeat(32):'00'.repeat(200)
+    })
+    assert.equal(calls[0][1],'99')
+    await assert.rejects(()=>policy.verifyHistoricalBlock({pruned:true,pruneheight:100},async()=> 'invalid hash'))
+    await assert.rejects(()=>policy.verifyHistoricalBlock({pruned:true,pruneheight:100},async()=>{throw Error('peer unavailable')}))
+    console.log('PASS: pruned companion requires historical block availability; malformed/pruned fallback backends refuse before flag consumption')
+
     assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.requires,['xbt-backend-identity'])
     assert.ok(chain.find(x=>x.id==='cln-application').spec.requires.includes('consume-flags'))
     assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.exec.command.slice(0,7), ['/usr/local/libexec/swap-node/package_node.py','--mainnet','--profile','xbt-privkeyio-v1','--root','/root/.lightning','launch'])
@@ -161,7 +195,7 @@ async function main() {
     const v3 = load('startos/versions/v3.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).v3
     const graph = load('startos/versions/index.ts', {'./current':{current},'./v2':{v2},'./v3':{v3}}).versionGraph
     const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
-    const to = ExtendedVersion.parse('#privkeyio:26.6.9:6')
+    const to = ExtendedVersion.parse('#privkeyio:26.6.9:7')
     const fromV2 = ExtendedVersion.parse('#privkeyio:26.6.9:2')
     assert.ok(graph.canMigrateFrom().satisfiedBy(fromV2))
     assert.ok(graph.canMigrateFrom().satisfiedBy(from))

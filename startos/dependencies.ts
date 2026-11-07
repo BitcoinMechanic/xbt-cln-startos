@@ -6,6 +6,6 @@ export const setDependencies = sdk.setupDependencies(async ({ effects }) => {
   return { [packageId]: {
     healthChecks: [...backends[packageId].healthChecks],
     kind: 'running' as const,
-    versionRange: '*', // Runtime identity checks still authenticate the chain.
+    versionRange: packageId === 'knots-blake2b' ? '>=29.4.3:1' : '*', // Requires the BLAKE2b-capable fetching proxy.
   } }
 })

@@ -67,7 +67,15 @@ backend never triggers fallback. Installing/removing it updates the selection.
 Both backends must still pass the BLAKE2b activation/checkpoint checks; an ordinary
 BTC `bitcoind` is not an acceptable XBT backend. BTC Lightning is unaffected.
 
-This package still requires an unpruned backend. Core Lightning can use pruning
-when every needed historical block remains available, but recovery/rescans can
-stall on missing blocks. The `knots-blake2b` fetching proxy has not yet passed this
-package's recovery tests; its default pruned configuration remains rejected.
+Pruning is supported with **knots-blake2b 29.4.3:1 or newer**, using its normal
+RPC endpoint and bundled BLAKE2b-capable fetching proxy. Leave that service's
+pruning/proxy configuration enabled; no extra credentials or proxy service are
+needed. XBT Lightning checks the chain checkpoint and fetches a historical raw
+block before starting. If old blocks are unavailable, startup waits and retries.
+The `bitcoind` fallback still requires an unpruned backend.
+
+CLN fetches missing history through the proxy during catch-up and rescans.
+Recovery therefore depends on reachable archival BLAKE2b peers. If it stalls,
+restore the backend/proxy's peer connectivity and retry; preserve the Lightning
+wallet and channel state. Pruning support does not make old wallet imports or
+backup restores safe; existing restore barriers remain in force.

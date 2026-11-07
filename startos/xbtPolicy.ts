@@ -7,13 +7,29 @@ export const identity = { schema: 1, profile: 'xbt-privkeyio-v1', layout: 'bitco
 export const marker = 'xbt-package-identity.json'
 export const swapDirs = ['coordinator-admin-v1', 'bounded-authority-v1', 'remote-authority-v1', 'customer-remote-v1', 'customer-invoices-v1', 'swap-gate-v1']
 
-export function verifyBackend(chain: any, deploymentInfo: any, checkpoint: unknown) {
+export function verifyBackend(chain: any, deploymentInfo: any, checkpoint: unknown, backend = 'bitcoind') {
   // Knots reports its BLAKE2b hard fork beside `deployments`, not inside it.
   if (chain?.chain !== 'main' || chain.initialblockdownload !== false ||
-      chain.pruned !== false || !Number.isSafeInteger(chain.blocks) || chain.blocks < activationHeight ||
+      !(chain.pruned === false || (backend === 'knots-blake2b' && chain.pruned === true &&
+        Number.isSafeInteger(chain.pruneheight) && chain.pruneheight >= 0 && chain.pruneheight <= chain.blocks)) || !Number.isSafeInteger(chain.blocks) || chain.blocks < activationHeight ||
       deploymentInfo?.blake2b?.active !== true || deploymentInfo.blake2b.height !== activationHeight ||
       checkpoint !== activationHash) {
-    throw new Error('XBT requires synced, unpruned BLAKE2b Knots with the pinned activation checkpoint')
+    throw new Error('XBT requires synced BLAKE2b Knots with the pinned activation checkpoint; pruning requires knots-blake2b and its fetching proxy')
+  }
+}
+
+/** Check the selected authenticated RPC endpoint can supply historical blocks.
+ * CLN validates and processes the block itself; this is an availability probe.
+ * On a pruned chain, deliberately request a height below its retained window.
+ */
+export async function verifyHistoricalBlock(chain: any, rpc: (method: string, ...args: string[]) => Promise<any>) {
+  if (chain.pruned !== true) return
+  const height = Math.min(activationHeight, Math.max(1, chain.pruneheight - 1))
+  const hash = await rpc('getblockhash', String(height))
+  if (typeof hash !== 'string' || !/^[0-9a-f]{64}$/.test(hash)) throw new Error('Historical BLAKE2b block lookup unavailable')
+  const raw = await rpc('getblock', hash, '0')
+  if (typeof raw !== 'string' || raw.length < 162 || raw.length > 32000000 || raw.length % 2 || !/^[0-9a-f]+$/i.test(raw)) {
+    throw new Error('Historical BLAKE2b block unavailable through fetching proxy')
   }
 }
 

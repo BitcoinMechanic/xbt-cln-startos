@@ -1,7 +1,7 @@
 import { publicationDaemon } from './live/localController'
 import { profile as coordinatorProfile, rawInvoke as coordinatorCall } from './live/actions'
 import { recoveryCommands } from './recovery'
-import { verifyBackend, verifyNode, verifyVolume, requireInactiveSwaps, exists, activationHeight } from './xbtPolicy'
+import { verifyBackend, verifyHistoricalBlock, verifyNode, verifyVolume, requireInactiveSwaps, exists, activationHeight } from './xbtPolicy'
 import { FileHelper } from '@start9labs/start-sdk'
 import { readFile, writeFile } from 'fs/promises'
 import {
@@ -110,14 +110,17 @@ export const main = sdk.setupMain(async ({ effects }) => {
         const rpc = async (method: string, ...args: string[]) => {
           const res = await lightningSub.exec(['bitcoin-cli',
             `-rpcconnect=${bitcoind.host}`, `-rpcport=${bitcoind.port}`,
-            '-rpccookiefile=/mnt/bitcoin/.cookie', method, ...args])
+            '-rpccookiefile=/mnt/bitcoin/.cookie', '-rpcclienttimeout=60', method, ...args], undefined, 70000)
           if (res.exitCode !== 0) throw new Error('BLAKE2b backend inspection unavailable')
           const text = String(res.stdout).trim()
-          return method === 'getblockhash' ? text : JSON.parse(text)
+          return method === 'getblockhash' || method === 'getblock' ? text : JSON.parse(text)
         }
         const chain = await rpc('getblockchaininfo')
         const deployments = await rpc('getdeploymentinfo')
-        verifyBackend(chain, deployments, await rpc('getblockhash', String(activationHeight)))
+        verifyBackend(chain, deployments, await rpc('getblockhash', String(activationHeight)), bitcoind.packageId)
+        try { await verifyHistoricalBlock(chain, rpc) } catch {
+          throw new Error('Historical BLAKE2b blocks unavailable through fetching proxy. Check backend peers and retry; preserve Lightning state.')
+        }
         return null
       } }, requires: [],
     })
