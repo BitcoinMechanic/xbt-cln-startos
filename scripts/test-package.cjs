@@ -126,9 +126,10 @@ async function main() {
     const { ExtendedVersion } = Module.createRequire(require.resolve('@start9labs/start-sdk'))('@start9labs/start-core/exver')
     const current = load('startos/versions/current.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).current
     const v2 = load('startos/versions/v2.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).v2
-    const graph = load('startos/versions/index.ts', {'./current':{current},'./v2':{v2}}).versionGraph
+    const v3 = load('startos/versions/v3.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).v3
+    const graph = load('startos/versions/index.ts', {'./current':{current},'./v2':{v2},'./v3':{v3}}).versionGraph
     const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
-    const to = ExtendedVersion.parse('#privkeyio:26.6.9:3')
+    const to = ExtendedVersion.parse('#privkeyio:26.6.9:4')
     const fromV2 = ExtendedVersion.parse('#privkeyio:26.6.9:2')
     assert.ok(graph.canMigrateFrom().satisfiedBy(fromV2))
     assert.ok(graph.canMigrateFrom().satisfiedBy(from))
