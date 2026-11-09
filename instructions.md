@@ -104,5 +104,7 @@ restore the backend/proxy's peer connectivity and retry; preserve the Lightning
 wallet and channel state. Pruning support does not make old wallet imports or
 backup restores safe; existing restore barriers remain in force.
 
-Recipient invoice timelocks (including 80 blocks) are supported within the existing 288-block total route budget. The final hop must match the invoice, and the incoming swap deadline includes the outgoing route delay plus the existing recovery margin. Invoice timing, amount, timelock and route refusals have specific messages; unknown or uncertain failures remain private.
+Recipient invoice timelocks (including 80 blocks) are supported within the 576-block total route budget. The final hop must match the invoice, and the incoming swap deadline includes the outgoing route delay plus the existing recovery margin. Invoice timing, amount, timelock and route refusals have specific messages; unknown or uncertain failures remain private.
 An unknown recipient with no routing hints is reported separately: create a fresh invoice in the connected receiving wallet with private-channel route hints enabled. Increasing fees does not supply missing routes.
+
+New automatically managed outgoing grants allow up to 576 blocks of route delay. Existing idle managed grants refresh automatically; active recovery and manual grants are preserved. Incoming swap deadlines still cover the actual outgoing route delay plus 144 recovery blocks and 6 propagation blocks. Fee and hop limits are unchanged.

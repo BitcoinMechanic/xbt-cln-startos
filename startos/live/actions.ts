@@ -92,7 +92,7 @@ export function createActions(call: Call = invoke, base = sdk.Actions.of()) {
     const bounds = { maxSwaps: number('Maximum swaps', 4, 1, 10), maxAmount: number('Maximum amount per swap (millisats)', 1000000000, 1, 1000010000),
       totalAmount: number('Total grant budget (millisats)', 3000000000, 1, 10000100000), lifetime: number('Grant lifetime (seconds)', 86400, 300, 86400) }
     const timing: Record<string, ReturnType<typeof number>> = kind === 'incoming' ? { minDelay: number('Minimum incoming delay (blocks)', 350, 216, 2016), maxDelay: number('Maximum incoming delay (blocks)', 2016, 216, 2016) }
-      : { maxFee: number('Maximum routing fee (millisats)', 10000, 0, 10000), maxDelay: number('Maximum outgoing delay (blocks)', 288, 1, 288), maxHops: number('Maximum hops', 4, 1, 4) }
+      : { maxFee: number('Maximum routing fee (millisats)', 10000, 0, 10000), maxDelay: number('Maximum outgoing delay (blocks)', 576, 1, 576), maxHops: number('Maximum hops', 4, 1, 4) }
     add(sdk.Action.withInput('migrated-review-' + kind, meta('Review ' + kind + ' Grant'), sdk.InputSpec.of({ ...bounds, ...timing }), async () => {},
       async ({ effects, input }: any) => {
         if (input.totalAmount < input.maxAmount) throw new Error('The total budget must cover at least one swap at the per-swap maximum.')

@@ -113,7 +113,7 @@ class Trust:
         pins=sorted((p for n,p in usable if n>=amount),key=lambda p:p['channel_id'])[:8]
         limits=dict(max_swaps=4,max_amount_msat=amount,total_amount_msat=amount*3)
         limits.update(dict(min_cltv_delta=350,max_cltv_delta=2016,close_before_blocks=72) if kind=='incoming'
-                      else dict(max_fee_msat=fee,max_delay_blocks=288,max_hops=4))
+                      else dict(max_fee_msat=fee,max_delay_blocks=576,max_hops=4))
         now=int(self.admin.clock())
         return ba.grant(dict(schema=1,format=ba.grant_format(limits),chain=self.auth.chain,nonce=secrets.token_hex(32),kind=kind,
                              created_at=now,expires_at=now+86400,limits=limits,channels=pins),self.auth.chain)
@@ -148,6 +148,12 @@ class Trust:
                     candidate=self.plan(kind)
                     if candidate and candidate['limits']['max_amount_msat']>g['limits']['max_amount_msat']:
                         replacement=candidate
+                # Refresh only our idle outgoing grants. Earlier guards preserve
+                # active recovery and respect manual pauses and manual authority.
+                if (gid in self.r['owned'] and kind=='outgoing' and not item['paused']
+                        and g['limits']['max_delay_blocks']<576):
+                    candidate=self.plan(kind)
+                    if candidate:replacement=candidate
                 if replacement is None and not item['paused'] and g['expires_at']>int(self.admin.clock())+300 and len(entries)<g['limits']['max_swaps'] and remaining>=g['limits']['max_amount_msat']:
                     states[kind]='ready';continue
                 if gid not in self.r['owned'] and item['paused']:

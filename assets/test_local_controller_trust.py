@@ -61,6 +61,28 @@ class TrustTests(AdminTests):
             self.assertTrue(all(current[k]!=self.auth.record['current'][k] for k in ba.KINDS))
             self.assertEqual(len(self.auth.record['grants']),4)
             self.assertTrue(all(m in ('getinfo','listpeerchannels') for m,_ in self.node.calls))
+    def test_idle_owned_delay_budget_upgrades_once(self):
+        original=self.trust.plan
+        def old_plan(kind):
+            g=original(kind)
+            if g and kind=='outgoing':g['limits']['max_delay_blocks']=288
+            return g
+        with patch.object(self.trust,'plan',side_effect=old_plan):self.trust.maintain()
+        previous=copy.deepcopy(self.auth.record['current'])
+        self.trust.maintain()
+        current=copy.deepcopy(self.auth.record['current'])
+        self.assertEqual(current['incoming'],previous['incoming'])
+        self.assertNotEqual(current['outgoing'],previous['outgoing'])
+        self.assertEqual(self.auth.record['grants'][current['outgoing']]['terms']['limits']['max_delay_blocks'],576)
+        self.assertEqual(self.auth.record['grants'][previous['outgoing']]['terms']['limits']['max_delay_blocks'],288)
+        self.trust.maintain();self.assertEqual(current,self.auth.record['current'])
+
+    def test_old_manual_delay_budget_is_not_widened(self):
+        gid=self.review();self.confirm(gid)
+        self.trust.maintain()
+        self.assertEqual(self.auth.record['current']['outgoing'],gid)
+        self.assertEqual(self.auth.record['grants'][gid]['terms']['limits']['max_delay_blocks'],288)
+
     def test_empty_nodes_wait_then_get_authority(self):
         rows=self.node.rows;self.node.rows=[]
         self.assertEqual(set(self.trust.maintain()['roles'].values()),{'waiting_for_channels'})
