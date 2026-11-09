@@ -16,6 +16,39 @@ class TrustTests(AdminTests):
         path=self.root/lt.DIRECTORY
         if fresh:lt.initialize(path,self.node.chain)
         self.js.append(hg.Journal(path));self.trust=lt.Trust(self.admin,self.js[-1])
+    def xbt_liquidity(self):
+        self.close();self.root=self.root/'xbt';self.root.mkdir(mode=0o700)
+        self.open(ci.PRIVKEYIO_XBT,True)
+        self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
+    def test_chain_specific_ceiling_and_liquidity(self):
+        self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
+        self.trust.maintain()
+        self.assertTrue(all(v['terms']['limits']['max_amount_msat']==10000000 for v in self.auth.record['grants'].values()))
+        self.xbt_liquidity();self.node.rows[0]['receivable_msat']=500252000
+        self.trust.maintain()
+        def current(kind):return self.auth.record['grants'][self.auth.record['current'][kind]]['terms']['limits']
+        self.assertEqual(current('outgoing')['max_amount_msat'],1000000000)
+        self.assertEqual(current('outgoing')['total_amount_msat'],3000000000)
+        self.assertEqual(current('incoming')['max_amount_msat'],500252000)
+    def test_old_managed_xbt_grants_refresh_once_with_recovery_guard(self):
+        self.xbt_liquidity()
+        with patch.dict(lt.PER_SWAP_MSAT,{ci.PRIVKEYIO_XBT:10000000}):self.trust.maintain()
+        old=copy.deepcopy(self.auth.record['current'])
+        self.auth.record['entries']['pending-fixture']={}
+        self.assertEqual(self.trust.maintain()['state'],'waiting_for_recovery')
+        self.assertEqual(old,self.auth.record['current'])
+        self.auth.record['entries'].pop('pending-fixture')
+        self.trust.maintain();new=copy.deepcopy(self.auth.record['current'])
+        self.assertTrue(all(old[k]!=new[k] for k in ba.KINDS))
+        self.assertEqual(len(self.auth.record['grants']),4)
+        self.open();self.trust.maintain()
+        self.assertEqual(new,self.auth.record['current']);self.assertEqual(len(self.auth.record['grants']),4)
+    def test_policy_upgrade_does_not_override_manual_or_paused_xbt_grants(self):
+        self.xbt_liquidity();manual=self.review();self.confirm(manual)
+        self.trust.maintain();self.assertEqual(self.auth.record['current']['outgoing'],manual)
+        self.auth.pause(self.auth.record['current']['incoming'])
+        self.assertFalse(self.trust.maintain()['enabled'])
+        self.assertEqual(self.auth.record['current']['outgoing'],manual)
     def test_automatic_both_profiles_restart_and_renewal(self):
         for profile in (ci.BTC, ci.PRIVKEYIO_XBT):
             if profile!=ci.BTC:

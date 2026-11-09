@@ -64,7 +64,7 @@ export function localControllerAction(profile: string, call: Call) {
     name: 'Trust Local Swap Controller', group: 'Swap Coordinator', allowedStatuses: 'only-running' as const,
     visibility: 'enabled' as const,
     description: 'Authorize the local Swap Controller once. Incoming and outgoing scoped grants are created and renewed automatically when channels have liquidity. No per-grant approval or credential copying is required.',
-    warning: 'The trusted controller can initiate swaps within automatic limits (up to 10,000 sats each). Incoming protection can close the receiving channel near a swap deadline. Disabling trust stops new use of managed grants; existing swaps retain recovery authority.',
+    warning: 'The trusted controller can initiate swaps within automatic limits (up to 1,000,000 XBT sats each). Incoming protection can close the receiving channel near a swap deadline. Disabling trust stops new use of managed grants; existing swaps retain recovery authority.',
   }), sdk.InputSpec.of({ enabled: sdk.Value.toggle({ name: 'Trust this local swap controller', default: false }) }),
   async () => ({ enabled: await setting().then(s => s?.enabled === true && s?.trust === 2) }),
   async ({ effects, input }) => {

@@ -49,9 +49,12 @@ Legacy sharing-only opt-ins remain sharing-only until you explicitly enable trus
 The node creates incoming and outgoing scoped grants when suitable connected
 channels have liquidity. Each grant lasts up to 24 hours and renews automatically
 near expiry or when its remaining budget is too small for another maximum swap.
-The default ceiling is 10,000 sats per swap, four swaps and 30,000 sats per grant
+The XBT ceiling is 1,000,000 sats per swap, four swaps and 3,000,000 sats per grant
 (or less when liquidity is lower), with a 10-sat outgoing fee limit. These are
 per-grant limits, not lifetime spending limits: continuing trust authorizes renewal.
+Version 26.6.9:9 replaces automatically managed old 10,000-sat XBT grants when
+liquidity permits and no swap requires recovery. Manual and paused grants remain
+unchanged. The BTC companion retains its separate 10,000-sat per-swap ceiling.
 Incoming protection may close the receiving channel 72 blocks before its deadline.
 Nodes without suitable channels wait; this setting never funds or opens channels.
 

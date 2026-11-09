@@ -22,6 +22,7 @@ import restore_barrier
 
 DIRECTORY = 'local-controller-trust-v1'
 FORMAT = 'local-controller-trust-v1'
+PER_SWAP_MSAT = {ba.ci.BTC: 10000000, ba.ci.PRIVKEYIO_XBT: 1000000000}
 
 
 def initial(chain):
@@ -108,7 +109,7 @@ class Trust:
             except (ValueError,KeyError,TypeError):continue
             usable.append((available-fee,pin))
         if not usable:return None
-        amount=min(10000000,max(n for n,_ in usable))//1000*1000
+        amount=min(PER_SWAP_MSAT[self.auth.chain['profile']],max(n for n,_ in usable))//1000*1000
         pins=sorted((p for n,p in usable if n>=amount),key=lambda p:p['channel_id'])[:8]
         limits=dict(max_swaps=4,max_amount_msat=amount,total_amount_msat=amount*3)
         limits.update(dict(min_cltv_delta=350,max_cltv_delta=2016,close_before_blocks=72) if kind=='incoming'
@@ -133,19 +134,27 @@ class Trust:
             self.disable();return dict(state='paused',enabled=False)
         states={}
         for kind in ba.KINDS:
+            replacement=None
             gid=self.auth.record['current'][kind]
             if gid:
                 item=self.auth.record['grants'][gid];g=item['terms']
                 entries=[e for e in self.auth.record['entries'].values() if e['grant_id']==gid]
                 spent=sum(ba.payload(e['payload'],g) for e in entries)
                 remaining=g['limits']['total_amount_msat']-spent
-                if not item['paused'] and g['expires_at']>int(self.admin.clock())+300 and len(entries)<g['limits']['max_swaps'] and remaining>=g['limits']['max_amount_msat']:
+                # Upgrade only our old XBT grants, once liquidity permits. Never
+                # replace manual authority, unpause it, or bypass active recovery.
+                if (gid in self.r['owned'] and self.auth.chain['profile']==ba.ci.PRIVKEYIO_XBT
+                        and not item['paused'] and g['limits']['max_amount_msat']<=10000000):
+                    candidate=self.plan(kind)
+                    if candidate and candidate['limits']['max_amount_msat']>g['limits']['max_amount_msat']:
+                        replacement=candidate
+                if replacement is None and not item['paused'] and g['expires_at']>int(self.admin.clock())+300 and len(entries)<g['limits']['max_swaps'] and remaining>=g['limits']['max_amount_msat']:
                     states[kind]='ready';continue
                 if gid not in self.r['owned'] and item['paused']:
                     states[kind]='manual_grant_paused';continue
             if len(self.auth.record['grants'])>=ba.MAX_RECORDS or len(self.admin.record['reviews'])>=ba.MAX_RECORDS or len(self.auth.record['entries'])>=ba.MAX_RECORDS:
                 states[kind]='history_full';continue
-            g=self.plan(kind)
+            g=replacement or self.plan(kind)
             if g is None:states[kind]='waiting_for_channels';continue
             r=copy.deepcopy(self.r);r['pending']=g;self.save(r)
             self.finish_pending();states[kind]='ready'
