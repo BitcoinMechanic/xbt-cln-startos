@@ -311,3 +311,8 @@ Recovery therefore depends on reachable archival BLAKE2b peers. If it stalls,
 restore the backend/proxy's peer connectivity and retry; preserve the Lightning
 wallet and channel state. Pruning support does not make old wallet imports or
 backup restores safe; existing restore barriers remain in force.
+
+Recipient invoice timelocks (including 80 blocks) are supported within the existing 288-block total route budget. The final hop must match the invoice, and the incoming swap deadline includes the outgoing route delay plus the existing recovery margin. Invoice timing, amount, timelock and route refusals have specific messages; unknown or uncertain failures remain private.
+An unknown recipient with no routing hints is reported separately: create a fresh invoice in the connected receiving wallet with private-channel route hints enabled. Increasing fees does not supply missing routes.
+
+The reviewed runtime delta is in `patches/timelock-patches.json`. Stage it with `python3 patches/stage-timelock-runtime.py <runtime-directory>` before image packaging; the script requires exact source matches and refreshes the sealed manifest hashes. Existing swap journals are not migrated.

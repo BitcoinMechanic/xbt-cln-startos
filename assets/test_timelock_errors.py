@@ -1,0 +1,24 @@
+import threading
+import unittest
+from unittest.mock import Mock
+import customer_plugin as plugin
+
+class Tests(unittest.TestCase):
+    def service(self,error):
+        service=plugin.Service.__new__(plugin.Service)
+        service.serial=threading.RLock()
+        service._invoke=Mock(side_effect=error)
+        return service
+
+    def test_allowlisted_read_only_plan_failure(self):
+        service=self.service(ValueError('recipient_invoice_cltv_limit'))
+        self.assertEqual(service.invoke(plugin.remote.CALL,{'operation':'plan'}),
+                         {'admission_error':'recipient_invoice_cltv_limit'})
+        self.assertEqual(service._invoke.call_count,1)
+
+    def test_unknown_errors_and_mutation_outcomes_are_not_promoted(self):
+        for op,error in [('plan',ValueError('PRIVATE')),('send',ValueError('recipient_invoice_cltv_limit')),
+                         ('plan',TimeoutError('PRIVATE'))]:
+            service=self.service(error)
+            with self.assertRaises(type(error)):service.invoke(plugin.remote.CALL,{'operation':op})
+            self.assertEqual(service._invoke.call_count,1)

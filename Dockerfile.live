@@ -16,5 +16,8 @@ RUN ln -sf /opt/xbt/bin/lightning-cli /usr/local/bin/lightning-cli && ln -sf /op
 COPY --from=grpc /usr/local/libexec/c-lightning/plugins/cln-grpc /opt/xbt/libexec/c-lightning/plugins/cln-grpc
 RUN echo "0b4774e23b8eb81e79fabc0602a43cc53bac962fe229533098b258fd72a4ae06  /opt/xbt/libexec/c-lightning/plugins/cln-grpc" | sha256sum -c -
 
-# Local administrator trust manager; leave the verified swap runtime unchanged.
+# Local administrator trust manager; sealed compatibility patches are applied below.
 COPY assets/local_controller_trust.py /usr/local/libexec/local-controller-trust.py
+
+COPY patches/ /tmp/swap-timelock-patches/
+RUN python3 /tmp/swap-timelock-patches/stage-timelock-runtime.py /usr/local/libexec/swap-node && rm -rf /tmp/swap-timelock-patches
