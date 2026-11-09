@@ -108,3 +108,5 @@ Recipient invoice timelocks (including 80 blocks) are supported within the 576-b
 An unknown recipient with no routing hints is reported separately: create a fresh invoice in the connected receiving wallet with private-channel route hints enabled. Increasing fees does not supply missing routes.
 
 New automatically managed outgoing grants allow up to 576 blocks of route delay. Existing idle managed grants refresh automatically; active recovery and manual grants are preserved. Incoming swap deadlines still cover the actual outgoing route delay plus 144 recovery blocks and 6 propagation blocks. Fee and hop limits are unchanged.
+
+Incoming swap checks report why no approved channel can receive safely: connection, busy HTLCs, liquidity, dust safety minimum, policy limits or unavailable hints. Below-minimum refusals include requested and minimum millisatoshis. The existing untrimmed-HTLC safety requirement is unchanged; increase the swap amount rather than bypass it. These structured admission errors are restricted to read-only plan/inspect calls.
