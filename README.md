@@ -243,28 +243,49 @@ This is a same-volume update and does not restore or replace wallet state.
 
 Retire unused outgoing swap authority without waiting for the recipient invoice to expire. Requires no send intent and fresh unused-payment/channel checks; permanently prevents later sending and preserves budgets, records, wallets and channels.
 
-For the expiry-workflow release, update the BTC and XBT coordinator packages before the controller. Existing unpaid expired swaps are then retired automatically after fresh unused-authority checks; no journal deletion or initialization is needed. Retired enrollments still consume their original grant slot and budget. A later swap may require a newly reviewed grant. Ten-minute pricing applies only to new controller quotes; never pay a previously expired invoice.
+For the expiry-workflow release, update the BTC and XBT coordinator packages before the controller. Existing unpaid expired swaps are then retired automatically after fresh unused-authority checks; no journal deletion or initialization is needed. Retired enrollments still consume their original grant slot and budget. With local controller trust enabled, replacement grants are automatic within the retained-history ceiling; manual setups still require a new grant. Ten-minute pricing applies only to new controller quotes; never pay a previously expired invoice.
 
 
-## Automatic local Swap Controller connection
+## Automatic local Swap Controller trust
 
-With Swap Controller installed on this StartOS server, enable the coordinator and
-review/confirm incoming and outgoing grants as usual. Run **Connect Local Swap
-Controller** once and enable local connection. The controller discovers this node,
-its HTTPS endpoint and the server certificate automatically; credentials do not
-need to be copied. Confirming a replacement grant updates the shared connection.
+With Swap Controller installed on this StartOS server, run **Trust Local Swap
+Controller** once on each Lightning node. Enable **Trust this local swap controller**.
+This initializes the coordinator if needed and restarts the node. No individual
+grant confirmations, endpoint entry or credential copying are needed afterward.
+Legacy sharing-only opt-ins remain sharing-only until you explicitly enable trust.
 
-Only current, unpaused, unexpired, explicitly approved bounded grants are shared.
-The `public` volume contains `swap-controller.json` for local dependent services;
-it never contains a general administration rune. That volume and the opt-in marker
-are excluded from backups. Restore clears sharing and retains the authority fence.
-Disabling sharing stops automatic configuration; it does not revoke credentials
-already saved for approved swaps. Use Pause Grant when stopping new grant use.
+The node creates incoming and outgoing scoped grants when suitable connected
+channels have liquidity. Each grant lasts up to 24 hours and renews automatically
+near expiry or when its remaining budget is too small for another maximum swap.
+The default ceiling is 10,000 sats per swap, four swaps and 30,000 sats per grant
+(or less when liquidity is lower), with a 10-sat outgoing fee limit. These are
+per-grant limits, not lifetime spending limits: continuing trust authorizes renewal.
+Incoming protection may close the receiving channel 72 blocks before its deadline.
+Nodes without suitable channels wait; this setting never funds or opens channels.
 
-This does not open channels, fund liquidity, approve grants or raise spending limits.
-The controller preserves manual pairings and waits for active swaps to finish before
-selecting changed local grants. Older packages without this connection contract
-continue to require manual pairing.
+Disabling trust pauses every automatically managed grant for new swaps, while
+preserving outstanding recovery authority. Manually pausing a managed current
+grant also stops automatic renewal until you explicitly enable trust again.
+Unrelated manual grants are not revoked by this switch. Renewal waits while any
+swap requires recovery. Existing manual pairings in the controller are preserved.
+
+Only scoped credentials are published to the local dependent service through
+`public/swap-controller.json`; no general administration rune is shared. Trust,
+coordinator journals and published credentials are excluded from backups. Restore
+clears the opt-in and retains the existing authority fence.
+
+The existing finite coordinator journal still caps retained grants and enrollments
+at 64 each. Automatic renewal stops with a history-full status at that ceiling;
+it never deletes recovery history or silently resets budgets. Journal archival
+is not implemented in this release. The Local Controller Trust health message
+reports waiting, ready, paused, unavailable or history-full conditions.
+
+The image contains `assets/local_controller_trust.py` outside the sealed swap
+runtime. It verifies that runtime before opening its journals and holds the same
+exclusive authority lock as the coordinator. A durable pending-grant record makes
+retries recover the exact grant after an interrupted write. The helper exposes
+only enable, maintain and disable operations to local package administration.
+
 
 ## Local BLAKE2b backend selection
 

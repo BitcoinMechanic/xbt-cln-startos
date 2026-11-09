@@ -195,7 +195,7 @@ async function main() {
     const v3 = load('startos/versions/v3.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).v3
     const graph = load('startos/versions/index.ts', {'./current':{current},'./v2':{v2},'./v3':{v3}}).versionGraph
     const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
-    const to = ExtendedVersion.parse('#privkeyio:26.6.9:7')
+    const to = ExtendedVersion.parse('#privkeyio:26.6.9:8')
     const fromV2 = ExtendedVersion.parse('#privkeyio:26.6.9:2')
     assert.ok(graph.canMigrateFrom().satisfiedBy(fromV2))
     assert.ok(graph.canMigrateFrom().satisfiedBy(from))

@@ -13,6 +13,12 @@ export async function executeRequest(request: Record<string, unknown>, exec: (ar
     const run = async (argv: string[], options?: { input: string }) => {
       try { return await exec(argv, options) } catch { throw refuse() }
     }
+    if (request.action === 'local-trust') {
+      if (!['enable', 'maintain', 'disable'].includes(String(request.operation)) || Object.keys(request).sort().join() !== 'action,operation') throw refuse()
+      const r = await run(['python3', '-I', '/usr/local/libexec/local-controller-trust.py', '--network-directory', directory, '--profile', profile, String(request.operation)])
+      if (r.exitCode !== 0) throw refuse()
+      try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
+    }
     if (request.action === 'credential') {
       if (!hex(request.grant_id) || request.confirmed !== true || Object.keys(request).sort().join() !== 'action,confirmed,grant_id') throw refuse()
       const cli = ['/opt/xbt/bin/lightning-cli', '--lightning-dir=' + rootDir, '--network=bitcoin', '--json', '--notifications=none', '-k']
