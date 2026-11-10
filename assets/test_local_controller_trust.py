@@ -20,6 +20,67 @@ class TrustTests(AdminTests):
         self.close();self.root=self.root/'xbt';self.root.mkdir(mode=0o700)
         self.open(ci.PRIVKEYIO_XBT,True)
         self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
+    def extra_channel(self):
+        row=copy.deepcopy(self.node.rows[0])
+        row.update(channel_id='88'*32,funding_txid='99'*32,short_channel_id='120x1x0',
+                   spendable_msat=2000000000,receivable_msat=2000000000)
+        self.node.rows.append(row)
+        return row
+    def test_closed_historical_channel_does_not_block_renewal(self):
+        self.trust.maintain();old=copy.deepcopy(self.auth.record['current'])
+        gid=old['outgoing'];data=self.node.plan();self.node.plan_value=data
+        eid=self.auth.enroll(gid,data,confirmed=True);self.auth.retire(eid,confirmed=True)
+        receipt=copy.deepcopy(self.auth.record['entries'][eid])
+        self.node.rows[0]['state']='ONCHAIN';new=self.extra_channel();new['state']='CHANNELD_NORMAL'
+        self.trust.maintain()
+        for kind in ba.KINDS:
+            g=self.auth.record['grants'][self.auth.record['current'][kind]]['terms']
+            self.assertEqual([p['channel_id'] for p in g['channels']],[new['channel_id']])
+            self.assertNotEqual(old[kind],self.auth.record['current'][kind])
+        self.assertEqual(receipt,self.auth.record['entries'][eid])
+        current=copy.deepcopy(self.auth.record['current']);self.trust.maintain()
+        self.assertEqual(current,self.auth.record['current'])
+    def test_completed_payment_rechecks_live_history_and_accepts_verified_closed_pin(self):
+        self.trust.maintain();gid=self.auth.record['current']['outgoing']
+        data=self.node.plan();self.node.plan_value=data
+        eid=self.auth.enroll(gid,data,confirmed=True);self.auth.send(eid)
+        self.node.finish();self.auth.reconcile(eid)
+        self.assertTrue(self.auth.status(eid)['terminal'])
+        self.node.history_rows=[]
+        with self.assertRaisesRegex(ValueError,'original_htlc_missing'):self.auth.prior()
+        self.node.rows[0]['state']='ONCHAIN';self.auth.prior()
+        self.node.rows[0]['htlcs']=[{}]
+        with self.assertRaisesRegex(ValueError,'closed_history_unresolved'):self.auth.prior()
+        self.node.rows[0]['htlcs']=[]
+        closed=copy.deepcopy(self.node.rows.pop())
+        closed.update(leased=False,funding_withheld=False,closer='remote',last_commitment_txid='ab'*32)
+        call=self.auth.rpc
+        def rpc(method,**params):
+            return {'closedchannels':[closed]} if method=='listclosedchannels' else call(method,**params)
+        with patch.object(self.auth,'rpc',side_effect=rpc):
+            self.auth.prior()
+            closed['funding_txid']='cd'*32
+            with self.assertRaisesRegex(ValueError,'closed_funding_changed'):self.auth.prior()
+
+    def test_add_ready_channel_without_liquidity_or_disconnect_churn(self):
+        self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
+        self.trust.maintain();old=copy.deepcopy(self.auth.record['current']);self.extra_channel()
+        self.trust.maintain();current=copy.deepcopy(self.auth.record['current'])
+        self.assertNotEqual(old,current)
+        for gid in current.values():self.assertEqual(len(self.auth.record['grants'][gid]['terms']['channels']),2)
+        self.node.rows[1]['peer_connected']=False
+        self.trust.maintain();self.node.rows[1]['peer_connected']=True
+        self.node.rows[1]['spendable_msat']=0;self.node.rows[1]['receivable_msat']=0
+        self.trust.maintain();self.assertEqual(current,self.auth.record['current'])
+    def test_topology_change_preserves_unfinished_and_manual_grants(self):
+        manual=self.review();self.confirm(manual);self.trust.maintain()
+        self.extra_channel();self.auth.record['entries']['pending-fixture']={}
+        before=copy.deepcopy(self.auth.record['current'])
+        self.assertEqual(self.trust.maintain()['state'],'waiting_for_recovery')
+        self.assertEqual(before,self.auth.record['current'])
+        self.auth.record['entries'].pop('pending-fixture');self.trust.maintain()
+        self.assertEqual(manual,self.auth.record['current']['outgoing'])
+
     def test_chain_specific_ceiling_and_liquidity(self):
         self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
         self.trust.maintain()

@@ -33,12 +33,20 @@
     [
       "and data['created_at'] <= now and hg.integer(d.get('min_final_cltv_expiry'), 1, 40),",
       "and data['created_at'] <= now\n                and hg.integer(d.get('min_final_cltv_expiry'), 1, data['limits']['max_delay_blocks'])\n                and data['route'][-1]['delay'] == max(40, d['min_final_cltv_expiry']),"
+    ],
+    [
+      "    def prior(self):\n        for eid in list(self.record['entries']):\n            self.reconcile(eid)",
+      "    def closed_terminal(self, eid):\n        # Only an already terminal receipt can use closed-channel evidence.\n        # Live channels still require the original HTLC/history rechecks.\n        e,g=self.entry(eid)\n        if 'terminal' not in e or 'onchain_retirement' in e: return False\n        p=e['payload']\n        pins=([p['channel']] if g['kind']=='outgoing' else\n              [e['incoming']['binding']['channel']] if 'incoming' in e else p['approved_channels'])\n        reply=self.rpc('listpeerchannels')\n        hg.need(type(reply) is dict and type(reply.get('channels')) is list,'channels_unavailable')\n        for pin in pins:\n            rows=[r for r in reply['channels'] if r.get('channel_id')==pin['channel_id']]\n            if rows:\n                hg.need(len(rows)==1 and equal(hg.channel_pin(rows[0],self.chain['profile']),pin),'approved_channel_changed')\n                if rows[0].get('state')!='ONCHAIN': return False\n                hg.need(rows[0].get('lost_state',False) is False and rows[0].get('htlcs')==[], 'closed_history_unresolved')\n            else:\n                closed=self.rpc('listclosedchannels')\n                hg.need(type(closed) is dict and type(closed.get('closedchannels')) is list,'closed_history_unavailable')\n                matches=[r for r in closed['closedchannels'] if r.get('channel_id')==pin['channel_id']]\n                hg.need(len(matches)==1 and equal(hg.channel_pin(matches[0],self.chain['profile']),pin),'closed_funding_changed')\n                row=matches[0]\n                hg.need(row.get('leased') is False and row.get('funding_withheld') is False\n                        and row.get('closer') in ('local','remote')\n                        and ci.hex_field(row.get('last_commitment_txid'),64),'closed_history_unresolved')\n        return True\n\n    def prior(self):\n        for eid in list(self.record['entries']):\n            if self.closed_terminal(eid): continue\n            self.reconcile(eid)"
     ]
   ],
   "customer_plugin.py": [
     [
       "        with self.serial: return self._invoke(method, params, profile)",
       "        with self.serial:\n            try: return self._invoke(method, params, profile)\n            except ValueError as error:\n                # Only finite, read-only admission failures may cross the boundary.\n                safe = {'recipient_invoice_timing', 'recipient_invoice_limits',\n                        'recipient_route_unknown', 'recipient_invoice_cltv_limit', 'bounded_route_unavailable',\n                        'outgoing_channel_not_ready', 'route_outside_approved_channels',\n                        'route_fee_or_delay_limit', 'approved_channel_changed', 'incoming_channel_disconnected', 'incoming_channel_busy', 'incoming_liquidity_insufficient', 'incoming_amount_below_safe_minimum', 'incoming_htlc_policy_limit', 'incoming_hint_unavailable', 'incoming_channels_unavailable', 'channel_fee_metadata_invalid', 'channel_alias_metadata_invalid', 'outside_grant', 'node_not_synced'}\n                if method == remote.CALL and type(params) is dict and params.get('operation') in ('plan', 'inspect') and str(error) in safe:\n                    return dict(admission_error=str(error), **({'admission_details': error.details} if isinstance(error, invoice.AdmissionError) else {}))\n                raise"
+    ],
+    [
+      "safe = {'recipient_invoice_timing', 'recipient_invoice_limits',",
+      "safe = {'grant_closed', 'channel_requires_recovery', 'previous_enrollment_requires_recovery', 'recipient_invoice_timing', 'recipient_invoice_limits',"
     ]
   ],
   "customer_https.py": [

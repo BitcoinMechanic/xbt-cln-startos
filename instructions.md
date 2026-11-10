@@ -112,3 +112,5 @@ New automatically managed outgoing grants allow up to 576 blocks of route delay.
 Incoming swap checks report why no approved channel can receive safely: connection, busy HTLCs, liquidity, dust safety minimum, policy limits or unavailable hints. Below-minimum refusals include requested and minimum millisatoshis. The existing untrimmed-HTLC safety requirement is unchanged; increase the swap amount rather than bypass it. These structured admission errors are restricted to read-only plan/inspect calls.
 
 Refresh idle automatic grants to the configured cap when channel liquidity grows; preserve active contracts and manual grants.
+
+Idle automatic grants refresh when approved channels close or additional ready channels become available. Completed swap receipts are retained and do not require their old channels to stay open for new grants. Unfinished swaps, manual grants and pauses remain protected; temporary disconnects and liquidity changes do not churn channel scopes.

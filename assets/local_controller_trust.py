@@ -141,6 +141,22 @@ class Trust:
                 entries=[e for e in self.auth.record['entries'].values() if e['grant_id']==gid]
                 spent=sum(ba.payload(e['payload'],g) for e in entries)
                 remaining=g['limits']['total_amount_msat']-spent
+                # Change channel scopes only for idle, automatically owned authority.
+                # Add ready channels without removing temporarily illiquid/offline pins;
+                # permanently closed/missing channels may be replaced outright.
+                if gid in self.r['owned'] and not item['paused']:
+                    rows=self.auth.rpc('listpeerchannels').get('channels')
+                    hg.need(type(rows) is list,'channels_unavailable')
+                    live={r.get('channel_id') for r in rows
+                          if r.get('state') in ('CHANNELD_NORMAL','CHANNELD_AWAITING_LOCKIN')}
+                    old_ids={p['channel_id'] for p in g['channels']}
+                    retired=not old_ids.issubset(live)
+                    candidate=self.plan(kind)
+                    new_ids={p['channel_id'] for p in candidate['channels']} if candidate else set()
+                    if retired and candidate is None:
+                        states[kind]='waiting_for_channels';continue
+                    if candidate and (retired or old_ids < new_ids):
+                        replacement=candidate
                 # Upgrade only our old XBT grants, once liquidity permits. Never
                 # replace manual authority, unpause it, or bypass active recovery.
                 if (gid in self.r['owned'] and self.auth.chain['profile']==ba.ci.PRIVKEYIO_XBT

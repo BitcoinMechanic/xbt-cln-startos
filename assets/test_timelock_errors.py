@@ -11,9 +11,9 @@ class Tests(unittest.TestCase):
         return service
 
     def test_allowlisted_read_only_plan_failure(self):
-        service=self.service(ValueError('recipient_invoice_cltv_limit'))
+        service=self.service(ValueError('grant_closed'))
         self.assertEqual(service.invoke(plugin.remote.CALL,{'operation':'plan'}),
-                         {'admission_error':'recipient_invoice_cltv_limit'})
+                         {'admission_error':'grant_closed'})
         self.assertEqual(service._invoke.call_count,1)
 
     def test_unknown_errors_and_mutation_outcomes_are_not_promoted(self):
