@@ -148,6 +148,14 @@ class Trust:
                     candidate=self.plan(kind)
                     if candidate and candidate['limits']['max_amount_msat']>g['limits']['max_amount_msat']:
                         replacement=candidate
+                # A liquidity-limited grant can otherwise remain too small for
+                # its whole lifetime. Promote once to the configured policy cap
+                # when a channel supports it, avoiding churn on small changes.
+                if (gid in self.r['owned'] and not item['paused']
+                        and g['limits']['max_amount_msat'] < PER_SWAP_MSAT[self.auth.chain['profile']]):
+                    candidate=self.plan(kind)
+                    if candidate and candidate['limits']['max_amount_msat']==PER_SWAP_MSAT[self.auth.chain['profile']]:
+                        replacement=candidate
                 # Refresh only our idle outgoing grants. Earlier guards preserve
                 # active recovery and respect manual pauses and manual authority.
                 if (gid in self.r['owned'] and kind=='outgoing' and not item['paused']

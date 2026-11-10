@@ -30,6 +30,26 @@ class TrustTests(AdminTests):
         self.assertEqual(current('outgoing')['max_amount_msat'],1000000000)
         self.assertEqual(current('outgoing')['total_amount_msat'],3000000000)
         self.assertEqual(current('incoming')['max_amount_msat'],500252000)
+    def test_liquidity_limited_grant_promotes_once_at_policy_cap(self):
+        self.xbt_liquidity();self.node.rows[0]['receivable_msat']=500252000
+        self.trust.maintain();old=copy.deepcopy(self.auth.record['current'])
+        self.node.rows[0]['receivable_msat']=600000000
+        self.trust.maintain();self.assertEqual(old,self.auth.record['current'])
+        self.node.rows[0]['receivable_msat']=1738465000
+        self.auth.record['entries']['pending-fixture']={}
+        self.assertEqual(self.trust.maintain()['state'],'waiting_for_recovery')
+        self.assertEqual(old,self.auth.record['current'])
+        self.auth.record['entries'].pop('pending-fixture')
+        self.trust.maintain();new=copy.deepcopy(self.auth.record['current'])
+        self.assertNotEqual(old['incoming'],new['incoming'])
+        self.assertEqual(old['outgoing'],new['outgoing'])
+        self.assertEqual(self.auth.record['grants'][new['incoming']]['terms']['limits']['max_amount_msat'],1000000000)
+        self.assertEqual(self.auth.record['grants'][old['incoming']]['terms']['limits']['max_amount_msat'],500252000)
+        self.node.rows[0]['receivable_msat']=400000000
+        self.trust.maintain();self.node.rows[0]['receivable_msat']=2000000000
+        self.trust.maintain();self.assertEqual(new,self.auth.record['current'])
+        self.assertEqual(len(self.auth.record['grants']),3)
+
     def test_old_managed_xbt_grants_refresh_once_with_recovery_guard(self):
         self.xbt_liquidity()
         with patch.dict(lt.PER_SWAP_MSAT,{ci.PRIVKEYIO_XBT:10000000}):self.trust.maintain()
