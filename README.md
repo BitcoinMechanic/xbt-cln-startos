@@ -324,3 +324,9 @@ Incoming swap checks report why no approved channel can receive safely: connecti
 Refresh idle automatic grants to the configured cap when channel liquidity grows; preserve active contracts and manual grants.
 
 Idle automatic grants refresh when approved channels close or additional ready channels become available. Completed swap receipts are retained and do not require their old channels to stay open for new grants. Unfinished swaps, manual grants and pauses remain protected; temporary disconnects and liquidity changes do not churn channel scopes.
+
+### Channel splicing
+
+Channel details in the bundled UI expose `splicein` and `spliceout`, restricted to a single explicit channel ID and a positive whole-satoshi amount. The backend checks channel connectivity, funding-inflight state and negotiated splice feature bits before forwarding the command. Splice-out returns to the node wallet. CLN chooses the fee rate with its normal safety checks; splice-in fees are additional on-chain wallet spending, while splice-out fees come from the channel. The browser retains pending/uncertain results and the transaction ID; refresh status to inspect the actual funding transaction. A timeout is not evidence of failure. Diagnostic `log-level` values are preserved by the config model; use `io` only for a private capture and restore normal logging afterward.
+
+Pending splice indicators are derived from live channel inflight records and SQL transaction heights, not browser storage. Confirmation lookup failures remain visible. Peer confirmation targets are not exposed by CLN and are never guessed. Channel details show copyable peer IDs and advertised IPv4/IPv6/Tor/DNS URIs; incoming connection source ports are deliberately not presented as listening endpoints.

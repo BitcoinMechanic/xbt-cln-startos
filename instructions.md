@@ -114,3 +114,11 @@ Incoming swap checks report why no approved channel can receive safely: connecti
 Refresh idle automatic grants to the configured cap when channel liquidity grows; preserve active contracts and manual grants.
 
 Idle automatic grants refresh when approved channels close or additional ready channels become available. Completed swap receipts are retained and do not require their old channels to stay open for new grants. Unfinished swaps, manual grants and pauses remain protected; temporary disconnects and liquidity changes do not churn channel scopes.
+
+## Splice channel funds
+
+Open a channel in the CLN web interface and use **Splice channel** to add on-chain funds or withdraw local funds to this node’s on-chain wallet without closing the channel. Enter the amount in sats, select **Review splice**, and confirm. Both peers must support splicing and the channel must be connected and active. A network fee is charged in addition to the entered amount: from the on-chain wallet for adding funds, or from channel funds for withdrawing. Core Lightning selects the fee rate.
+
+The result includes the funding transaction ID. Use **Refresh splice status** to follow confirmation. If a reply times out or fails, inspect the channel and transaction before doing anything again; the transaction may already have been submitted. New capacity becomes usable according to both peers’ confirmation requirements.
+
+Pending splices appear directly under Payment Channels with their amount and confirmation count, updating while the page is open. Open channel details to see the proposed capacity, transaction and counterparty node ID. Copyable node URIs appear when the peer advertises a listening address; otherwise the page explains that its operator must provide one.

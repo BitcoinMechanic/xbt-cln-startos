@@ -1,8 +1,16 @@
 diff --git a/apps/backend/source/controllers/lightning.ts b/apps/backend/source/controllers/lightning.ts
-index 7aaf650..0f792ec 100755
+index 7aaf650..a67319a 100755
 --- a/apps/backend/source/controllers/lightning.ts
 +++ b/apps/backend/source/controllers/lightning.ts
-@@ -21,9 +21,7 @@ const ALLOWED_METHODS = new Set([
+@@ -15,15 +15,15 @@ const ALLOWED_METHODS = new Set([
+   'listsqlschemas',
+   'feerates',
+   'fundchannel',
++  'splicein',
++  'spliceout',
+   'close',
+   'withdraw',
+   'newaddr',
    'pay',
    'keysend',
    'invoice',
@@ -12,7 +20,7 @@ index 7aaf650..0f792ec 100755
    'createrune',
  ]);
  
-@@ -33,7 +31,7 @@ export function validateCallRequest(method: unknown, params: unknown): string |
+@@ -33,9 +33,18 @@ export function validateCallRequest(method: unknown, params: unknown): string |
    if (typeof method !== 'string' || !ALLOWED_METHODS.has(method)) {
      return 'Method not permitted: ' + String(method);
    }
@@ -20,7 +28,37 @@ index 7aaf650..0f792ec 100755
 +  if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
      return 'Invalid params for ' + method;
    }
++  if (method === 'splicein' || method === 'spliceout') {
++    const p = params as any;
++    if (!p || Array.isArray(p) || Object.keys(p).some(k => !['channel', 'amount'].includes(k)) ||
++        typeof p.channel !== 'string' || !/^[0-9a-f]{64}$/.test(p.channel) ||
++        typeof p.amount !== 'string' || !/^[1-9][0-9]{0,15}$/.test(p.amount) ||
++        !Number.isSafeInteger(Number(p.amount))) {
++      return 'Splicing requires one channel ID and a positive whole-satoshi amount; fee overrides and scripts are not accepted';
++    }
++  }
    if (method === 'createrune') {
+     const restrictions = (params as any)?.restrictions;
+     const valid =
+@@ -70,6 +79,18 @@ export class LightningController {
+         logger.warn('Refused lightning call: ' + validationError);
+         return handleError(new APIError(HttpStatusCode.FORBIDDEN, validationError), req, res, next);
+       }
++      if (req.body.method === 'splicein' || req.body.method === 'spliceout') {
++        const channels = await this.clnService.call('listpeerchannels', {});
++        const channel = channels.channels.find((c: any) => c.channel_id === req.body.params.channel);
++        if (!channel || channel.state !== 'CHANNELD_NORMAL' || !channel.peer_connected || channel.inflight?.length) {
++          throw new APIError(HttpStatusCode.INVALID_DATA, 'Splice requires a connected, active channel with no pending funding transaction. Inspect channel status before retrying.');
++        }
++        const peers = await this.clnService.call('listpeers', { id: channel.peer_id });
++        const features = peers.peers?.[0]?.features;
++        if (!features || !(BigInt('0x' + features) & (3n << 62n))) {
++          throw new APIError(HttpStatusCode.INVALID_DATA, 'The peer has not negotiated splice support (feature 62/63). Enable splicing on the peer and reconnect.');
++        }
++      }
+       logger.info('Calling method: ' + req.body.method);
+       this.clnService
+         .call(req.body.method, req.body.params)
 diff --git a/apps/backend/source/controllers/shared.ts b/apps/backend/source/controllers/shared.ts
 index acfbec5..24e246b 100644
 --- a/apps/backend/source/controllers/shared.ts
@@ -66,7 +104,7 @@ index acfbec5..24e246b 100644
  
    saveInvoiceRune = async (req: Request, res: Response, next: NextFunction) => {
 diff --git a/apps/backend/source/service/lightning.service.ts b/apps/backend/source/service/lightning.service.ts
-index 0db7321..cb8b6e8 100755
+index 0db7321..bd32c72 100755
 --- a/apps/backend/source/service/lightning.service.ts
 +++ b/apps/backend/source/service/lightning.service.ts
 @@ -13,6 +13,17 @@ import {
@@ -100,6 +138,15 @@ index 0db7321..cb8b6e8 100755
      switch (APP_CONSTANTS.APP_CONNECT) {
        case AppConnect.REST:
          return axios
+@@ -114,7 +131,7 @@ export class LightningService {
+             const nodeMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
+             if (nodeMessage) {
+               logger.error(nodeMessage);
+-              throw new LightningError(HttpStatusCode.LIGHTNING_SERVER, nodeMessage);
++              throw new LightningError(HttpStatusCode.LIGHTNING_SERVER, nodeMessage + ' (RPC code: ' + (err?.response?.data?.error?.code ?? err?.response?.data?.code ?? 'unavailable') + ')');
+             }
+             logger.error(err?.message || err?.code || 'Unknown lightning error');
+             throw new LightningError(
 diff --git a/apps/backend/source/shared/consts.ts b/apps/backend/source/shared/consts.ts
 index f131c10..29756a5 100755
 --- a/apps/backend/source/shared/consts.ts
@@ -208,10 +255,23 @@ index ab173c9..e08ce77 100755
                    className="text-dark"
                    label="Offer"
 diff --git a/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx b/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
-index cb3254e..260b379 100755
+index cb3254e..65d02e4 100755
 --- a/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
 +++ b/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
-@@ -29,7 +29,7 @@ const ChannelDetails = (props) => {
+@@ -1,4 +1,6 @@
+ import './ChannelDetails.scss';
++import SpliceChannel from './SpliceChannel';
++import SpliceStatus from './SpliceStatus';
+ import { useState } from 'react';
+ import PerfectScrollbar from 'react-perfect-scrollbar';
+ import { Spinner, Card, Row, Col, ProgressBar, OverlayTrigger, Tooltip } from 'react-bootstrap';
+@@ -24,12 +26,12 @@ const ChannelDetails = (props) => {
+   const nodeInfo = useSelector(selectNodeInfo);
+   const showToast = useSelector(selectShowToast);
+   const [showToastState, setShowToastState] = useState(false);
+-  const [channelClosed, setChannelClosed] = useState(props.selChannel.current_state !== 'ACTIVE' && props.selChannel.state !== 'CHANNELD_NORMAL');
++  const [channelClosed, setChannelClosed] = useState(false);
+   const [responseStatus, setResponseStatus] = useState(CallStatus.NONE);
    const [responseMessage, setResponseMessage] = useState('');
  
    const openLinkHandler = (event) => {
@@ -220,6 +280,205 @@ index cb3254e..260b379 100755
    };
  
    const ChannelCloseHandler = event => {
+@@ -139,6 +141,21 @@ const ChannelDetails = (props) => {
+                     </Col>
+                   </Row>
+                 </Col>
++                <SpliceStatus channel={props.selChannel} detailed />
++                <Row className='mt-12px'>
++                  <Col xs={12} className='fs-7 text-light'>Counterparty node ID</Col>
++                  <Col xs={12} className='fw-bold' style={{ overflowWrap: 'anywhere' }}>{props.selChannel.peer_id}</Col>
++                  <Col xs={12}><button type="button" className="btn-rounded bg-primary mt-2" onClick={() => copyTextToClipboard(props.selChannel.peer_id).then(() => dispatch(setShowToast({show: true, message: 'Node ID copied', bg: 'success'}))).catch(error => { setResponseStatus(CallStatus.ERROR); setResponseMessage('Could not copy node ID: ' + String(error)); })}>Copy node ID</button></Col>
++                </Row>
++                <Row className='mt-12px'>
++                  <Col xs={12} className='fs-7 text-light'>Node URI</Col>
++                  <Col xs={12}>
++                    {props.selChannel.node_uris?.length ? props.selChannel.node_uris.map(uri => <div key={uri} className="mb-2">
++                      <div className="fw-bold" style={{ overflowWrap: 'anywhere' }}>{uri}</div>
++                      <button type="button" className="btn-rounded bg-primary mt-2" onClick={() => copyTextToClipboard(uri).then(() => dispatch(setShowToast({show: true, message: 'Node URI copied', bg: 'success'}))).catch(error => { setResponseStatus(CallStatus.ERROR); setResponseMessage('Could not copy node URI: ' + String(error)); })}>Copy node URI</button>
++                    </div>) : <span className="text-light">This peer has not advertised a connection address. Ask its operator for a node URI.</span>}
++                  </Col>
++                </Row>
+                 <Row className='mt-1'>
+                   <Col xs={12} className='fs-7 text-light'>Short Channel Id</Col>
+                   <Col xs={12} className='pe-1 overflow-x-ellipsis fw-bold'>
+@@ -193,6 +210,7 @@ const ChannelDetails = (props) => {
+                   <Col xs={1} onClick={openLinkHandler} className='btn-sm-svg btn-svg-open'><OpenLinkSVG id={props.selChannel.funding_txid} /></Col>
+                 </Row>
+               </Row>
++              <SpliceChannel channel={props.selChannel} />
+               <ToastMessage
+                 showOnComponent={true}
+                 show={showToastState}
+@@ -210,7 +228,7 @@ const ChannelDetails = (props) => {
+               <></>
+             )}
+           </Card.Body>
+-          {channelClosed ? (
++          {channelClosed || !['ACTIVE', 'INACTIVE'].includes(props.selChannel.current_state) ? (
+             <></>
+           ) : (
+             <Card.Footer className="d-flex justify-content-center">
+diff --git a/apps/frontend/src/components/cln/ChannelDetails/SpliceChannel.tsx b/apps/frontend/src/components/cln/ChannelDetails/SpliceChannel.tsx
+new file mode 100644
+index 0000000..2f1e371
+--- /dev/null
++++ b/apps/frontend/src/components/cln/ChannelDetails/SpliceChannel.tsx
+@@ -0,0 +1,82 @@
++import { useRef, useState } from 'react';
++import { Alert, Form } from 'react-bootstrap';
++import { HttpService } from '../../../services/http.service';
++
++// Keep an unresolved submission visible even after closing the channel drawer.
++export default function SpliceChannel({ channel }) {
++  const key = 'splice:' + channel.channel_id;
++  const [direction, setDirection] = useState('splicein');
++  const [amount, setAmount] = useState('');
++  const [review, setReview] = useState(false);
++  const [record, setRecord] = useState(() => JSON.parse(localStorage.getItem(key) || 'null'));
++  const [settled, setSettled] = useState(false);
++  const [aborted, setAborted] = useState(false);
++  const [status, setStatus] = useState('');
++  const submitting = useRef(false);
++  const confirmed = settled || (!!record?.txid && channel.state === 'CHANNELD_NORMAL' && channel.funding_txid === record.txid);
++  const save = (value) => { localStorage.setItem(key, JSON.stringify(value)); setRecord(value); };
++  const valid = /^[1-9][0-9]{0,15}$/.test(amount) && Number.isSafeInteger(Number(amount));
++  const available = channel.state === 'CHANNELD_NORMAL' && channel.peer_connected !== false;
++  const submit = async () => {
++    if (!valid || !available || record || submitting.current) return;
++    submitting.current = true;
++    setReview(false);
++    const pending = { direction, amount, funding: channel.funding_txid, time: new Date().toISOString() };
++    save(pending);
++    setStatus('Negotiating splice with the peer. Do not submit another splice.');
++    try {
++      const result: any = await HttpService.clnCall(direction, { channel: channel.channel_id, amount });
++      save({ ...pending, txid: result.txid, result: result.txid ? 'Broadcast; waiting for confirmations.' : 'Node returned without a transaction ID; check channel status before retrying.' });
++      setStatus('');
++    } catch (error) {
++      save({ ...pending, error: String(error) });
++      setStatus('');
++    } finally { submitting.current = false; }
++  };
++  const refresh = async () => {
++    try {
++      const result: any = await HttpService.clnCall('listpeerchannels', { id: channel.peer_id });
++      const current = result.channels.find(c => c.channel_id === channel.channel_id);
++      if (!current) { setStatus('Channel not found. Do not repeat the splice.'); return; }
++      setAborted(!!record?.error && current.state === 'CHANNELD_NORMAL' && !current.inflight?.length && current.funding_txid === record.funding);
++      setSettled(current.state === 'CHANNELD_NORMAL' && !current.inflight?.length && !!record?.txid && current.funding_txid === record.txid);
++      setStatus('State: ' + current.state + '; capacity: ' + (Number(current.total_msat) / 1000).toLocaleString() +
++        ' sats; funding transaction: ' + current.funding_txid + '; pending splices: ' + (current.inflight?.length || 0));
++    } catch (error) { setStatus('Status check failed: ' + String(error)); }
++  };
++  if (!record && channel.state === 'CHANNELD_AWAITING_SPLICE') return null;
++  return <section className="mt-4 mb-3" aria-label="Splice channel">
++    <h5>Splice channel</h5>
++    <p className="fs-7">Add on-chain funds or withdraw local funds without closing the channel. Both nodes must support splicing.</p>
++    {record ? <Alert variant={record.error ? 'warning' : 'info'}>
++      <div>{record.direction === 'splicein' ? 'Splice in' : 'Splice out'}: {Number(record.amount).toLocaleString()} sats</div>
++      <div>{record.time}</div>
++      <div style={{ overflowWrap: 'anywhere' }}>{confirmed ? 'Splice confirmed.' : (record.error || record.result || 'Submission in progress or outcome unknown.')}</div>
++      {record.txid && <div style={{ overflowWrap: 'anywhere' }}>Transaction: {record.txid}</div>}
++      <p>Check the channel and transaction before any further splice. A lost reply does not mean it failed.</p>
++      <button type="button" className="btn-rounded bg-primary" onClick={refresh}>Refresh splice status</button>
++      {aborted && <div className="mt-2"><p>The node reports the original funding transaction and no pending splice. Check wallet transactions before dismissing this failed attempt.</p><button type="button" className="btn-rounded" onClick={() => {
++        const history = JSON.parse(localStorage.getItem(key + ':history') || '[]');
++        localStorage.setItem(key + ':history', JSON.stringify([...history, record].slice(-20)));
++        localStorage.removeItem(key); setRecord(null); setAborted(false);
++      }}>Dismiss failed attempt</button></div>}
++      {confirmed && <button type="button" className="btn-rounded mt-2" onClick={() => { localStorage.removeItem(key); setRecord(null); setSettled(false); }}>Splice confirmed — dismiss result</button>}
++    </Alert> : <>
++      <Form.Label htmlFor="splice-direction">Direction</Form.Label>
++      <Form.Select id="splice-direction" value={direction} onChange={e => { setDirection(e.target.value); setReview(false); }}>
++        <option value="splicein">Add funds from on-chain wallet</option>
++        <option value="spliceout">Withdraw funds to on-chain wallet</option>
++      </Form.Select>
++      <Form.Label className="mt-2" htmlFor="splice-amount">Amount in sats</Form.Label>
++      <Form.Control id="splice-amount" inputMode="numeric" value={amount} onChange={e => { setAmount(e.target.value); setReview(false); }} />
++      <p className="fs-7 mt-2">{direction === 'splicein' ? 'The network fee is paid separately from the on-chain wallet.' : 'The network fee is also deducted from channel funds.'} Core Lightning selects the fee rate with its normal fee safety checks.</p>
++      {!available && <p>Connect the peer and wait for the channel to become active before splicing.</p>}
++      {review ? <Alert variant="warning">
++        <p>Confirm {direction === 'splicein' ? 'adding' : 'withdrawing'} {Number(amount).toLocaleString()} sats {direction === 'splicein' ? 'to' : 'from'} this channel, plus the network fee?</p>
++        <button type="button" className="btn-rounded bg-primary me-2" onClick={submit}>Confirm splice</button>
++        <button type="button" className="btn-rounded" onClick={() => setReview(false)}>Cancel</button>
++      </Alert> : <button type="button" className="btn-rounded bg-primary" disabled={!valid || !available} onClick={() => setReview(true)}>Review splice</button>}
++    </>}
++    {status && <p role="status" style={{ overflowWrap: 'anywhere' }}>{status}</p>}
++  </section>;
++}
+diff --git a/apps/frontend/src/components/cln/ChannelDetails/SpliceStatus.tsx b/apps/frontend/src/components/cln/ChannelDetails/SpliceStatus.tsx
+new file mode 100644
+index 0000000..b850180
+--- /dev/null
++++ b/apps/frontend/src/components/cln/ChannelDetails/SpliceStatus.tsx
+@@ -0,0 +1,18 @@
++export default function SpliceStatus({ channel, detailed = false }) {
++  if (channel.state !== 'CHANNELD_AWAITING_SPLICE') return null;
++  const pending = channel.pending_splices || [];
++  return <div className="mt-2 mb-2 fs-7" role="status" aria-label="Pending splice">
++    {pending.length ? pending.map(splice => <div key={splice.txid} className="mb-2">
++      <div className="fw-bold text-warning">Splice pending: {splice.delta > 0 ? '+' : ''}{splice.delta.toLocaleString()} sats</div>
++      <div className="text-dark">{splice.confirmations === null ? 'Confirmation count unavailable' :
++        splice.confirmations === 0 ? '0 confirmations · waiting to be mined' :
++        splice.confirmations.toLocaleString() + (splice.confirmations === 1 ? ' confirmation' : ' confirmations') + ' · waiting for both peers to lock the splice'}</div>
++      {detailed && <>
++        <div className="text-dark">Channel capacity after splice: {splice.capacity.toLocaleString()} sats</div>
++        <div className="text-light" style={{ overflowWrap: 'anywhere' }}>Splice transaction: {splice.txid}</div>
++      </>}
++    </div>) : <div className="fw-bold text-warning">Splice pending · waiting for both peers to lock the splice</div>}
++    {detailed && <div className="text-light">Balances above show the current funding. The new capacity is pending. The peer’s required confirmation count is not reported by Core Lightning.</div>}
++    {channel.splice_status_error && <div className="text-danger">Confirmation lookup failed: {channel.splice_status_error}</div>}
++  </div>;
++}
+diff --git a/apps/frontend/src/components/cln/Channels/Channels.tsx b/apps/frontend/src/components/cln/Channels/Channels.tsx
+index e60274b..6da1e9d 100755
+--- a/apps/frontend/src/components/cln/Channels/Channels.tsx
++++ b/apps/frontend/src/components/cln/Channels/Channels.tsx
+@@ -1,4 +1,5 @@
+ import './Channels.scss';
++import SpliceStatus from '../ChannelDetails/SpliceStatus';
+ import { motion } from 'framer-motion';
+ import PerfectScrollbar from 'react-perfect-scrollbar';
+ import { Spinner, Card, Row, Col, ListGroup, Alert, ProgressBar, OverlayTrigger, Tooltip } from 'react-bootstrap';
+@@ -53,6 +54,7 @@ const Channels = (props) => {
+                               </span>
+                             </OverlayTrigger>
+                           </div>
++                          <SpliceStatus channel={channel} />
+                           <ProgressBar>
+                             <ProgressBar variant='primary' now={(channel.to_us_sat > 1000000 || channel.to_them_sat > 1000000) ? (channel.to_us_sat / 1000) : channel.to_us_sat} key={1} />
+                             <ProgressBar variant='light' now={(channel.to_us_sat > 1000000 || channel.to_them_sat > 1000000) ? (channel.to_them_sat / 1000) : channel.to_them_sat} key={2} />
+diff --git a/apps/frontend/src/components/cln/ChannelsCard/ChannelsCard.tsx b/apps/frontend/src/components/cln/ChannelsCard/ChannelsCard.tsx
+index d53af4d..b878f6d 100755
+--- a/apps/frontend/src/components/cln/ChannelsCard/ChannelsCard.tsx
++++ b/apps/frontend/src/components/cln/ChannelsCard/ChannelsCard.tsx
+@@ -1,5 +1,7 @@
+ import './ChannelsCard.scss';
+ import { useState } from 'react';
++import { useSelector } from 'react-redux';
++import { selectListChannels } from '../../../store/rootSelectors';
+ import { motion, AnimatePresence } from 'framer-motion';
+ import { Card } from 'react-bootstrap';
+ 
+@@ -12,6 +14,8 @@ import { PeerChannel } from '../../../types/root.type';
+ const ChannelsCard = () => {
+   const [selChannelCard, setSelChannelCard] = useState('channels');
+   const [selChannel, setSelChannel] = useState<PeerChannel | null>(null);
++  const channels = useSelector(selectListChannels);
++  const liveChannel = channels.mergedChannels?.find(c => c.channel_id === selChannel?.channel_id) || selChannel;
+   const [newlyOpenedChannelId, setNewlyOpenedChannelId] = useState<string>('');
+ 
+   const onCloseHandler = channelId => {
+@@ -38,7 +42,7 @@ const ChannelsCard = () => {
+           ) : selChannelCard === 'details' ? (
+             <ChannelDetails 
+               onClose={() => setSelChannelCard('channels')}
+-              selChannel={selChannel}
++              selChannel={liveChannel}
+               onChannelStateChange={(newState) => setSelChannel(prev => 
+                 prev ? { ...prev, current_state: newState } as PeerChannel : null
+               )}
 diff --git a/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx b/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx
 index ad311b4..f1aed16 100755
 --- a/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx
@@ -288,6 +547,117 @@ index 4e3acae..c34718a 100755
          <Dropdown.Item as='div' className='d-flex align-items-center justify-content-between'>Currency <ToggleSwitch onChange={changeCurrencyUnitHandler} values={CURRENCY_UNITS} selIndex={uiConfigUnit === Units.BTC ? 1 : 0} /></Dropdown.Item>
        </Dropdown.Menu>
      </Dropdown>
+diff --git a/apps/frontend/src/services/http.service.ts b/apps/frontend/src/services/http.service.ts
+index 8712c1c..c4b2f54 100644
+--- a/apps/frontend/src/services/http.service.ts
++++ b/apps/frontend/src/services/http.service.ts
+@@ -1,4 +1,5 @@
+ import axios from 'axios';
++import { nodeUris, pendingSplices } from '../utilities/channel-status';
+ import moment from 'moment';
+ import { ApplicationConfiguration, AuthResponse, Peer } from '../types/root.type';
+ import { API_BASE_URL, API_VERSION, APP_WAIT_TIME, PaymentType, TimeGranularity, getTimestampWithGranularity, SATS_MSAT, SCROLL_PAGE_SIZE } from '../utilities/constants';
+@@ -202,9 +203,26 @@ export class RootService {
+     const nodesMap = new Map<string, Peer>(
+       nodes.nodes?.map(node => [node.nodeid, node]) || []
+     );
++    let txRows: any[][] | null = null;
++    let tip: number | null = null;
++    let spliceStatusError: string | null = null;
++    if (peerChannels.channels?.some(channel => channel.state === 'CHANNELD_AWAITING_SPLICE')) {
++      try {
++        const [transactions, info]: [any, any] = await Promise.all([
++          HttpService.clnCall('sql', { query: 'SELECT hash, blockheight FROM transactions' }),
++          HttpService.clnCall('getinfo')
++        ]);
++        if (!Array.isArray(transactions.rows) || !Number.isInteger(info.blockheight)) throw new Error('Invalid confirmation response from node');
++        txRows = transactions.rows;
++        tip = info.blockheight;
++      } catch (error) { spliceStatusError = String(error); }
++    }
+     const merged = peerChannels.channels?.map(channel => ({
+       ...channel,
+-      node_alias: nodesMap.get(channel.peer_id)?.alias ?? ''
++      node_alias: nodesMap.get(channel.peer_id)?.alias ?? '',
++      node_uris: nodeUris(channel.peer_id, nodesMap.get(channel.peer_id)?.addresses),
++      pending_splices: pendingSplices(channel, txRows, tip),
++      splice_status_error: spliceStatusError
+     })) || [];
+     return { channels: merged };
+     // // No pagination, need full data for active, pending and inactive channels calculations
+diff --git a/apps/frontend/src/types/root.type.ts b/apps/frontend/src/types/root.type.ts
+index 968cc30..c88e682 100755
+--- a/apps/frontend/src/types/root.type.ts
++++ b/apps/frontend/src/types/root.type.ts
+@@ -176,6 +176,9 @@ export type ChannelType = {
+ };
+ 
+ export type PeerChannel = {
++  node_uris?: string[];
++  pending_splices?: { txid: string; delta: number; capacity: number; confirmations: number | null }[];
++  splice_status_error?: string | null;
+   node_alias: string;
+   peer_id: string;
+   channel_id: string;
+diff --git a/apps/frontend/src/utilities/channel-status.test.ts b/apps/frontend/src/utilities/channel-status.test.ts
+new file mode 100644
+index 0000000..bc94201
+--- /dev/null
++++ b/apps/frontend/src/utilities/channel-status.test.ts
+@@ -0,0 +1,23 @@
++import { nodeUris, pendingSplices } from './channel-status';
++
++const id = '02' + 'a'.repeat(64);
++test('only advertised listening endpoints become node URIs, including IPv6 and Tor', () => {
++  expect(nodeUris(id, [
++    {type:'ipv4',address:'192.168.8.102',port:9735},
++    {type:'ipv6',address:'2001:db8::1',port:9735},
++    {type:'torv3',address:'a'.repeat(56)+'.onion',port:9735},
++    {type:'ipv4',address:'127.0.0.1',port:0},
++    {type:'websocket',address:'unknown',port:9735},
++  ])).toEqual([id+'@192.168.8.102:9735',id+'@[2001:db8::1]:9735',id+'@'+'a'.repeat(56)+'.onion:9735']);
++  expect(nodeUris(id)).toEqual([]);
++  expect(nodeUris('invalid', [{type:'ipv4',address:'127.0.0.1',port:9735}])).toEqual([]);
++});
++const channel = {state:'CHANNELD_AWAITING_SPLICE',total_msat:9999834000,inflight:[{funding_txid:'tx',total_funding_msat:10999834000}]};
++test('pending amount and confirmations come from node state without browser history', () => {
++  expect(pendingSplices(channel,[['tx',0]],100)[0]).toEqual({txid:'tx',delta:1000000,capacity:10999834,confirmations:0});
++  expect(pendingSplices(channel,[['tx',98]],100)[0].confirmations).toBe(3);
++  expect(pendingSplices(channel,null,null)[0].confirmations).toBeNull();
++  expect(pendingSplices(channel,[],100)[0].confirmations).toBeNull();
++  expect(pendingSplices({...channel,state:'CHANNELD_NORMAL'},[['tx',98]],100)).toEqual([]);
++  expect(pendingSplices({...channel,total_msat:11999834000},[['tx',98]],100)[0].delta).toBe(-1000000);
++});
+diff --git a/apps/frontend/src/utilities/channel-status.ts b/apps/frontend/src/utilities/channel-status.ts
+new file mode 100644
+index 0000000..e59748d
+--- /dev/null
++++ b/apps/frontend/src/utilities/channel-status.ts
+@@ -0,0 +1,24 @@
++import { Address } from '../types/root.type';
++
++export function nodeUris(id: string, addresses: Address[] = []): string[] {
++  if (!/^(02|03)[0-9a-f]{64}$/i.test(id)) return [];
++  return [...new Set(addresses.filter(a =>
++    ['ipv4', 'ipv6', 'torv3', 'dns'].includes(a.type || '') &&
++    typeof a.address === 'string' && /^[a-z0-9.:[\]-]+$/i.test(a.address) &&
++    Number.isInteger(a.port) && a.port! > 0 && a.port! <= 65535
++  ).map(a => {
++    const host = a.address!.includes(':') && !a.address!.startsWith('[') ? '[' + a.address + ']' : a.address;
++    return id + '@' + host + ':' + a.port;
++  }))];
++}
++
++export function pendingSplices(channel: any, rows: any[][] | null, tip: number | null) {
++  if (channel.state !== 'CHANNELD_AWAITING_SPLICE') return [];
++  return (channel.inflight || []).map((f: any) => {
++    const row = rows?.find(row => row[0] === f.funding_txid);
++    const height = row ? Number(row[1]) : null;
++    const confirmations = height !== null && tip !== null ? (height > 0 ? Math.max(0, tip - height + 1) : 0) : null;
++    const capacity = Number(f.total_funding_msat) / 1000;
++    return { txid: f.funding_txid, delta: capacity - Number(channel.total_msat) / 1000, capacity, confirmations };
++  });
++}
 diff --git a/apps/frontend/src/utilities/constants.ts b/apps/frontend/src/utilities/constants.ts
 index 3517756..f0ca1d4 100755
 --- a/apps/frontend/src/utilities/constants.ts

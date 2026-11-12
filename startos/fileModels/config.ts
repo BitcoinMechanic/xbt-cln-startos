@@ -88,6 +88,7 @@ export const shape = z.object({
   proxy: iniString,
 
   // User-configurable
+  'log-level': iniEnum(['io', 'trace', 'debug', 'info', 'unusual', 'broken']),
   'always-use-proxy': iniStringBoolean,
   alias: iniString,
   rgb: iniString,
