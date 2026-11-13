@@ -23,3 +23,38 @@ assert.deepEqual(peerUiAddresses(['192.168.8.102:64774','[2001:db8::1]:9735','a'
 ]);
 assert.deepEqual(peerUiAddresses(['0.0.0.0:9735','[::]:9735','127.0.0.1:9735','host:0','host:65536','user:secret@host:9735','host:9735/path','host:9735?secret']), []);
 console.log('PASS: reachable peer endpoints, external ports, IPv6, Tor and invalid binding rejection');
+
+const channelId = 'a'.repeat(64);
+assert.equal(validateCallRequest('setchannellabel',{channel_id:channelId,label:'Savings'}),null);
+assert.equal(validateCallRequest('setchannellabel',{channel_id:channelId,label:''}),null);
+for (const params of [{channel_id:'../secret',label:'test'},{channel_id:channelId,label:'x'.repeat(81)},{channel_id:channelId,label:'bad\nlabel'},{channel_id:channelId,label:'test',key:['other']}]) {
+  assert.notEqual(validateCallRequest('setchannellabel',params),null);
+}
+for (const method of ['datastore','deldatastore','listdatastore']) assert.notEqual(validateCallRequest(method,{}),null);
+console.log('PASS: channel label validation and private datastore boundary');
+const { LightningController } = await import(pathToFileURL(root+'/apps/backend/dist/controllers/lightning.js'));
+const savedLabels = new Map();
+const calls = [];
+const mock = {call: async (method, params) => {
+  calls.push([method, params]);
+  if (method === 'listpeerchannels') return {channels:[{channel_id:channelId},{channel_id:'b'.repeat(64)}]};
+  if (method === 'datastore') { savedLabels.set(params.key[2], params.string); return {}; }
+  if (method === 'listdatastore') return {datastore:[...savedLabels].map(([id,string])=>({key:['cln-application','channel-labels',id],string}))};
+  throw Error('Unexpected RPC');
+}};
+async function call(controller, method, params) {
+  return new Promise((resolve,reject) => controller.callMethod({body:{method,params}}, {
+    status(code) { this.code=code; return this; }, json(body) { resolve({code:this.code,body}); },
+  }, reject));
+}
+let controller = new LightningController(mock);
+assert.equal((await call(controller,'setchannellabel',{channel_id:channelId,label:' Savings '})).code,200);
+assert.equal(savedLabels.get(channelId),'Savings');
+controller = new LightningController(mock); // no process-local label state
+let response = await call(controller,'listpeerchannels',{});
+assert.equal(response.body.channels[0].channel_label,'Savings');
+assert.equal(response.body.channels[1].channel_label,'');
+assert.equal((await call(controller,'setchannellabel',{channel_id:channelId,label:''})).code,200);
+assert.equal((await call(controller,'listpeerchannels',{})).body.channels[0].channel_label,'');
+assert(calls.filter(([method])=>method==='datastore').every(([,p])=>p.key[0]==='cln-application' && p.key[1]==='channel-labels'));
+console.log('PASS: labels persist through controller recreation, remain channel-specific and can be cleared');

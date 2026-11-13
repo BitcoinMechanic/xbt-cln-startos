@@ -124,3 +124,5 @@ The result includes the funding transaction ID. Use **Refresh splice status** to
 Pending splices appear directly under Payment Channels with their amount and confirmation count, updating while the page is open. Open channel details to see the proposed capacity, transaction and counterparty node ID. Copyable node URIs appear when the peer advertises a listening address; otherwise the page explains that its operator must provide one.
 
 Node Info uses advertised peer addresses and StartOS Peer interface bindings (including LAN endpoints and their assigned external ports). Select an endpoint to copy or scan its URI. LAN addresses require the same network or a VPN. A Tor address appears only when one is assigned to the Peer interface. Wildcard listen addresses are never connection endpoints.
+
+In the CLN web UI, open a Payment Channel to add or edit its private label (up to 80 characters). Save label updates the channel list; clearing it restores the peer alias. Labels are stored in the node wallet datastore, persist across browsers and service restarts, and are included with the node wallet in backups. They are not announced to peers.

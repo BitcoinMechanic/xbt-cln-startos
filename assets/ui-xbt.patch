@@ -1,5 +1,5 @@
 diff --git a/apps/backend/source/controllers/lightning.ts b/apps/backend/source/controllers/lightning.ts
-index 7aaf650..bc06e11 100755
+index 7aaf650..2f7b268 100755
 --- a/apps/backend/source/controllers/lightning.ts
 +++ b/apps/backend/source/controllers/lightning.ts
 @@ -1,3 +1,5 @@
@@ -8,7 +8,13 @@ index 7aaf650..bc06e11 100755
  import { Request, Response, NextFunction } from 'express';
  import handleError from '../shared/error-handler.js';
  import { LightningService } from '../service/lightning.service.js';
-@@ -15,15 +17,15 @@ const ALLOWED_METHODS = new Set([
+@@ -10,20 +12,21 @@ const ALLOWED_METHODS = new Set([
+   'listfunds',
+   'listpeers',
+   'listpeerchannels',
++  'setchannellabel',
+   'listnodes',
+   'sql',
    'listsqlschemas',
    'feerates',
    'fundchannel',
@@ -26,7 +32,7 @@ index 7aaf650..bc06e11 100755
    'createrune',
  ]);
  
-@@ -33,9 +35,18 @@ export function validateCallRequest(method: unknown, params: unknown): string |
+@@ -33,9 +36,26 @@ export function validateCallRequest(method: unknown, params: unknown): string |
    if (typeof method !== 'string' || !ALLOWED_METHODS.has(method)) {
      return 'Method not permitted: ' + String(method);
    }
@@ -34,6 +40,14 @@ index 7aaf650..bc06e11 100755
 +  if (params !== undefined && (typeof params !== 'object' || params === null || Array.isArray(params))) {
      return 'Invalid params for ' + method;
    }
++  if (method === 'setchannellabel') {
++    const p = params as any;
++    if (!p || Object.keys(p).some(k => !['channel_id', 'label'].includes(k)) ||
++        typeof p.channel_id !== 'string' || !/^[0-9a-f]{64}$/.test(p.channel_id) ||
++        typeof p.label !== 'string' || p.label.length > 80 || /[\u0000-\u001f\u007f]/.test(p.label)) {
++      return 'Channel labels require a valid channel ID and at most 80 characters, without control characters';
++    }
++  }
 +  if (method === 'splicein' || method === 'spliceout') {
 +    const p = params as any;
 +    if (!p || Array.isArray(p) || Object.keys(p).some(k => !['channel', 'amount'].includes(k)) ||
@@ -46,7 +60,7 @@ index 7aaf650..bc06e11 100755
    if (method === 'createrune') {
      const restrictions = (params as any)?.restrictions;
      const valid =
-@@ -56,6 +67,25 @@ export function validateCallRequest(method: unknown, params: unknown): string |
+@@ -56,6 +76,25 @@ export function validateCallRequest(method: unknown, params: unknown): string |
    return null;
  }
  
@@ -72,10 +86,21 @@ index 7aaf650..bc06e11 100755
  export class LightningController {
    private clnService: LightningService;
  
-@@ -70,11 +100,30 @@ export class LightningController {
+@@ -70,11 +109,48 @@ export class LightningController {
          logger.warn('Refused lightning call: ' + validationError);
          return handleError(new APIError(HttpStatusCode.FORBIDDEN, validationError), req, res, next);
        }
++      if (req.body.method === 'setchannellabel') {
++        const { channel_id, label } = req.body.params;
++        const channels = await this.clnService.call('listpeerchannels', {});
++        if (!channels.channels?.some((c: any) => c.channel_id === channel_id)) {
++          throw new APIError(HttpStatusCode.INVALID_DATA, 'This channel is no longer available. Refresh the channel list.');
++        }
++        await this.clnService.call('datastore', {
++          key: ['cln-application', 'channel-labels', channel_id], string: label.trim(), mode: 'create-or-replace',
++        });
++        return res.status(200).json({ channel_id, label: label.trim() });
++      }
 +      if (req.body.method === 'splicein' || req.body.method === 'spliceout') {
 +        const channels = await this.clnService.call('listpeerchannels', {});
 +        const channel = channels.channels.find((c: any) => c.channel_id === req.body.params.channel);
@@ -94,6 +119,13 @@ index 7aaf650..bc06e11 100755
 -        .then((commandRes: any) => {
 +        .then(async (commandRes: any) => {
            logger.info('Controller received response for ' + req.body.method);
++          if (req.body.method === 'listpeerchannels') {
++            const stored = await this.clnService.call('listdatastore', { key: ['cln-application', 'channel-labels'] });
++            const labels = new Map((stored.datastore || []).filter((v: any) =>
++              v.key?.length === 3 && v.key[0] === 'cln-application' && v.key[1] === 'channel-labels' && typeof v.string === 'string'
++            ).map((v: any) => [v.key[2], v.string]));
++            commandRes.channels = commandRes.channels.map((c: any) => ({ ...c, channel_label: labels.get(c.channel_id) || '' }));
++          }
 +          if (req.body.method === 'getinfo') {
 +            commandRes.peer_addresses = [];
 +            if (process.env.PEER_ADDRESSES_FILE) {
@@ -300,17 +332,18 @@ index ab173c9..e08ce77 100755
                    className="text-dark"
                    label="Offer"
 diff --git a/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx b/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
-index cb3254e..65d02e4 100755
+index cb3254e..98c9075 100755
 --- a/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
 +++ b/apps/frontend/src/components/cln/ChannelDetails/ChannelDetails.tsx
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,7 @@
  import './ChannelDetails.scss';
++import ChannelLabel from './ChannelLabel';
 +import SpliceChannel from './SpliceChannel';
 +import SpliceStatus from './SpliceStatus';
  import { useState } from 'react';
  import PerfectScrollbar from 'react-perfect-scrollbar';
  import { Spinner, Card, Row, Col, ProgressBar, OverlayTrigger, Tooltip } from 'react-bootstrap';
-@@ -24,12 +26,12 @@ const ChannelDetails = (props) => {
+@@ -24,12 +27,12 @@ const ChannelDetails = (props) => {
    const nodeInfo = useSelector(selectNodeInfo);
    const showToast = useSelector(selectShowToast);
    const [showToastState, setShowToastState] = useState(false);
@@ -325,10 +358,20 @@ index cb3254e..65d02e4 100755
    };
  
    const ChannelCloseHandler = event => {
-@@ -139,6 +141,21 @@ const ChannelDetails = (props) => {
+@@ -123,7 +126,7 @@ const ChannelDetails = (props) => {
+                   >
+                     <span className='d-flex align-items-center justify-content-start fw-bold'>
+                       <div className={'d-inline-block mx-1 dot ' + (props.selChannel.current_state?.toLowerCase() === 'active' ? 'bg-success' : props.selChannel.current_state?.toLowerCase() === 'pending' ? 'bg-warning' : 'bg-danger')}></div>
+-                      {props.selChannel.node_alias}
++                      {props.selChannel.channel_label || props.selChannel.node_alias || props.selChannel.peer_id}
+                     </span>
+                   </OverlayTrigger>
+                   <ProgressBar>
+@@ -139,6 +142,22 @@ const ChannelDetails = (props) => {
                      </Col>
                    </Row>
                  </Col>
++                <ChannelLabel key={props.selChannel.channel_id} channel={props.selChannel} />
 +                <SpliceStatus channel={props.selChannel} detailed />
 +                <Row className='mt-12px'>
 +                  <Col xs={12} className='fs-7 text-light'>Counterparty node ID</Col>
@@ -347,7 +390,7 @@ index cb3254e..65d02e4 100755
                  <Row className='mt-1'>
                    <Col xs={12} className='fs-7 text-light'>Short Channel Id</Col>
                    <Col xs={12} className='pe-1 overflow-x-ellipsis fw-bold'>
-@@ -193,6 +210,7 @@ const ChannelDetails = (props) => {
+@@ -193,6 +212,7 @@ const ChannelDetails = (props) => {
                    <Col xs={1} onClick={openLinkHandler} className='btn-sm-svg btn-svg-open'><OpenLinkSVG id={props.selChannel.funding_txid} /></Col>
                  </Row>
                </Row>
@@ -355,7 +398,7 @@ index cb3254e..65d02e4 100755
                <ToastMessage
                  showOnComponent={true}
                  show={showToastState}
-@@ -210,7 +228,7 @@ const ChannelDetails = (props) => {
+@@ -210,7 +230,7 @@ const ChannelDetails = (props) => {
                <></>
              )}
            </Card.Body>
@@ -364,6 +407,49 @@ index cb3254e..65d02e4 100755
              <></>
            ) : (
              <Card.Footer className="d-flex justify-content-center">
+diff --git a/apps/frontend/src/components/cln/ChannelDetails/ChannelLabel.tsx b/apps/frontend/src/components/cln/ChannelDetails/ChannelLabel.tsx
+new file mode 100644
+index 0000000..b069857
+--- /dev/null
++++ b/apps/frontend/src/components/cln/ChannelDetails/ChannelLabel.tsx
+@@ -0,0 +1,37 @@
++import { useEffect, useState } from 'react';
++import { Form, Alert } from 'react-bootstrap';
++import { useDispatch } from 'react-redux';
++import { HttpService } from '../../../services/http.service';
++import { setChannelLabel } from '../../../store/rootSlice';
++
++export default function ChannelLabel({ channel }) {
++  const dispatch = useDispatch();
++  const [label, setLabel] = useState(channel.channel_label || '');
++  const [editing, setEditing] = useState(false);
++  const [saving, setSaving] = useState(false);
++  const [message, setMessage] = useState('');
++  const [error, setError] = useState('');
++  useEffect(() => { if (!editing) setLabel(channel.channel_label || ''); }, [channel.channel_label, editing]);
++  const save = async () => {
++    if (saving) return;
++    setSaving(true); setMessage(''); setError('');
++    try {
++      const result: any = await HttpService.clnCall('setchannellabel', { channel_id: channel.channel_id, label });
++      dispatch(setChannelLabel(result));
++      setEditing(false); setMessage(result.label ? 'Channel label saved.' : 'Channel label removed.');
++    } catch (e) { setError('Could not save channel label: ' + String(e)); }
++    finally { setSaving(false); }
++  };
++  return <section className="mt-3 mb-3" data-testid="channel-label-editor">
++    <Form.Label htmlFor="channel-label">Channel label</Form.Label>
++    <Form.Control id="channel-label" maxLength={80} value={label} disabled={saving}
++      placeholder="Optional" onChange={e => { setLabel(e.target.value); setEditing(true); setMessage(''); }} />
++    <div className="fs-7 text-light mt-1">Private to your node. Leave blank to use the peer alias.</div>
++    <div className="d-flex gap-2 mt-2">
++      <button type="button" className="btn-rounded bg-primary" onClick={save} disabled={saving || !editing}>{saving ? 'Saving…' : 'Save label'}</button>
++      {editing && <button type="button" className="btn-rounded" disabled={saving} onClick={() => { setEditing(false); setError(''); }}>Cancel</button>}
++    </div>
++    {message && <p role="status" className="mt-2">{message}</p>}
++    {error && <Alert variant="danger" className="mt-2">{error}</Alert>}
++  </section>;
++}
 diff --git a/apps/frontend/src/components/cln/ChannelDetails/SpliceChannel.tsx b/apps/frontend/src/components/cln/ChannelDetails/SpliceChannel.tsx
 new file mode 100644
 index 0000000..2f1e371
@@ -477,7 +563,7 @@ index 0000000..b850180
 +  </div>;
 +}
 diff --git a/apps/frontend/src/components/cln/Channels/Channels.tsx b/apps/frontend/src/components/cln/Channels/Channels.tsx
-index e60274b..6da1e9d 100755
+index e60274b..14f20a7 100755
 --- a/apps/frontend/src/components/cln/Channels/Channels.tsx
 +++ b/apps/frontend/src/components/cln/Channels/Channels.tsx
 @@ -1,4 +1,5 @@
@@ -486,7 +572,21 @@ index e60274b..6da1e9d 100755
  import { motion } from 'framer-motion';
  import PerfectScrollbar from 'react-perfect-scrollbar';
  import { Spinner, Card, Row, Col, ListGroup, Alert, ProgressBar, OverlayTrigger, Tooltip } from 'react-bootstrap';
-@@ -53,6 +54,7 @@ const Channels = (props) => {
+@@ -34,7 +35,7 @@ const Channels = (props) => {
+                   {listChannels.mergedChannels.map((channel, idx) => (
+                     <motion.li
+                       data-testid='list-item-channel'
+-                      key={channel.short_channel_id || channel.node_alias || idx}
++                      key={channel.channel_id || channel.short_channel_id || idx}
+                       className={'list-group-item list-item-channel ' + (props.newlyOpenedChannelId === channel.channel_id ? 'newly-opened' : '')}
+                       variants={props.newlyOpenedChannelId === channel.channel_id ? STAGERRED_SPRING_VARIANTS_3 : {}} initial='hidden' animate='visible' exit='hidden' custom={0}
+                       onClick={() => (props.onChannelClick(channel))}
+@@ -49,10 +50,11 @@ const Channels = (props) => {
+                               >
+                               <span data-testid='channel-node-alias'>
+                                 <div className={'d-inline-block mx-1 dot ' + (channel.current_state?.toLowerCase() === 'active' ? 'bg-success' : channel.current_state?.toLowerCase() === 'pending' ? 'bg-warning' : 'bg-danger')}></div>
+-                                {channel.node_alias}
++                                {channel.channel_label || channel.node_alias || channel.peer_id}
                                </span>
                              </OverlayTrigger>
                            </div>
@@ -704,8 +804,34 @@ index 8712c1c..c4b2f54 100644
      })) || [];
      return { channels: merged };
      // // No pagination, need full data for active, pending and inactive channels calculations
+diff --git a/apps/frontend/src/store/rootSlice.tsx b/apps/frontend/src/store/rootSlice.tsx
+index 1d971e1..cdc4bf4 100644
+--- a/apps/frontend/src/store/rootSlice.tsx
++++ b/apps/frontend/src/store/rootSlice.tsx
+@@ -121,6 +121,13 @@ const rootSlice = createSlice({
+       const aggr = aggregatePeerChannels(listChannels);
+       state.listChannels = { ...aggr, isLoading: false };
+     },
++    setChannelLabel(state, action: PayloadAction<{channel_id: string; label: string}>) {
++      for (const key of ['mergedChannels', 'activeChannels', 'pendingChannels', 'inactiveChannels'] as const) {
++        for (const channel of state.listChannels[key]) {
++          if (channel.channel_id === action.payload.channel_id) channel.channel_label = action.payload.label;
++        }
++      }
++    },
+     clearRootStore(state) {
+       return { ...defaultRootState, appConfig: state.appConfig };
+     },
+@@ -138,6 +145,7 @@ export const {
+   setNodeInfo,
+   setListFunds,
+   setListChannels,
++  setChannelLabel,
+   clearRootStore,
+ } = rootSlice.actions;
+ 
 diff --git a/apps/frontend/src/types/root.type.ts b/apps/frontend/src/types/root.type.ts
-index 968cc30..e043f30 100755
+index 968cc30..e2153ca 100755
 --- a/apps/frontend/src/types/root.type.ts
 +++ b/apps/frontend/src/types/root.type.ts
 @@ -38,6 +38,7 @@ export type NodeInfo = {
@@ -716,7 +842,7 @@ index 968cc30..e043f30 100755
    version?: string;
    blockheight?: number;
    network?: string;
-@@ -176,6 +177,9 @@ export type ChannelType = {
+@@ -176,7 +177,11 @@ export type ChannelType = {
  };
  
  export type PeerChannel = {
@@ -724,8 +850,10 @@ index 968cc30..e043f30 100755
 +  pending_splices?: { txid: string; delta: number; capacity: number; confirmations: number | null }[];
 +  splice_status_error?: string | null;
    node_alias: string;
++  channel_label?: string;
    peer_id: string;
    channel_id: string;
+   short_channel_id?: string;
 diff --git a/apps/frontend/src/utilities/channel-status.test.ts b/apps/frontend/src/utilities/channel-status.test.ts
 new file mode 100644
 index 0000000..9960406
