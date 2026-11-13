@@ -5,6 +5,7 @@ import { versionGraph } from '../versions'
 import { actions } from '../actions'
 import { restoreInit } from '../backups'
 import { seedFiles } from './seedFiles'
+import { peerUiAddresses } from './peerUiAddresses'
 import { watchHosts } from './watchHosts'
 
 export const init = sdk.setupInit(
@@ -15,6 +16,7 @@ export const init = sdk.setupInit(
   setDependencies,
   actions,
   watchHosts,
+  peerUiAddresses,
 )
 
 export const uninit = sdk.setupUninit(versionGraph)

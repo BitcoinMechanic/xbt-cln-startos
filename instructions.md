@@ -122,3 +122,5 @@ Open a channel in the CLN web interface and use **Splice channel** to add on-cha
 The result includes the funding transaction ID. Use **Refresh splice status** to follow confirmation. If a reply times out or fails, inspect the channel and transaction before doing anything again; the transaction may already have been submitted. New capacity becomes usable according to both peers’ confirmation requirements.
 
 Pending splices appear directly under Payment Channels with their amount and confirmation count, updating while the page is open. Open channel details to see the proposed capacity, transaction and counterparty node ID. Copyable node URIs appear when the peer advertises a listening address; otherwise the page explains that its operator must provide one.
+
+Node Info uses advertised peer addresses and StartOS Peer interface bindings (including LAN endpoints and their assigned external ports). Select an endpoint to copy or scan its URI. LAN addresses require the same network or a VPN. A Tor address appears only when one is assigned to the Peer interface. Wildcard listen addresses are never connection endpoints.

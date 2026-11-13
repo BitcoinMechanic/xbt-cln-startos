@@ -600,6 +600,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           APP_PROTOCOL: 'https',
           APP_HOST: '0.0.0.0',
           APP_PORT: String(uiPort),
+          PEER_ADDRESSES_FILE: `${rootDir}/peer-ui-addresses.json`,
           APP_CONFIG_FILE: `${rootDir}/data/app/config.json`,
           APP_LOG_FILE: `${rootDir}/data/app/application-cln.log`,
           LIGHTNING_VARS_FILE: `${rootDir}/.commando-env`,

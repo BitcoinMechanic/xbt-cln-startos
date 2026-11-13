@@ -1,8 +1,14 @@
 diff --git a/apps/backend/source/controllers/lightning.ts b/apps/backend/source/controllers/lightning.ts
-index 7aaf650..a67319a 100755
+index 7aaf650..bc06e11 100755
 --- a/apps/backend/source/controllers/lightning.ts
 +++ b/apps/backend/source/controllers/lightning.ts
-@@ -15,15 +15,15 @@ const ALLOWED_METHODS = new Set([
+@@ -1,3 +1,5 @@
++import { readFile } from 'fs/promises';
++import { isIP } from 'net';
+ import { Request, Response, NextFunction } from 'express';
+ import handleError from '../shared/error-handler.js';
+ import { LightningService } from '../service/lightning.service.js';
+@@ -15,15 +17,15 @@ const ALLOWED_METHODS = new Set([
    'listsqlschemas',
    'feerates',
    'fundchannel',
@@ -20,7 +26,7 @@ index 7aaf650..a67319a 100755
    'createrune',
  ]);
  
-@@ -33,9 +33,18 @@ export function validateCallRequest(method: unknown, params: unknown): string |
+@@ -33,9 +35,18 @@ export function validateCallRequest(method: unknown, params: unknown): string |
    if (typeof method !== 'string' || !ALLOWED_METHODS.has(method)) {
      return 'Method not permitted: ' + String(method);
    }
@@ -40,7 +46,33 @@ index 7aaf650..a67319a 100755
    if (method === 'createrune') {
      const restrictions = (params as any)?.restrictions;
      const valid =
-@@ -70,6 +79,18 @@ export class LightningController {
+@@ -56,6 +67,25 @@ export function validateCallRequest(method: unknown, params: unknown): string |
+   return null;
+ }
+ 
++// StartOS exports public and LAN endpoints with their actual external ports.
++// This is authenticated UI metadata, separate from lightningd's gossip addresses.
++export function peerUiAddresses(value: unknown): any[] {
++  if (!Array.isArray(value)) return [];
++  return value.flatMap(endpoint => {
++    if (typeof endpoint !== 'string' || endpoint.length > 512) return [];
++    try {
++      const url = new URL(endpoint.includes('://') ? endpoint : 'tcp://' + endpoint.replace(/^\/\//, ''));
++      const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
++      const port = Number(url.port);
++      if (url.username || url.password || (url.pathname && url.pathname !== '/') || url.search || url.hash ||
++          !Number.isInteger(port) || port < 1 || port > 65535 ||
++          ['0.0.0.0', '::', 'localhost', '::1'].includes(host) || host.startsWith('127.') ||
++          !/^[a-z0-9.:-]+$/.test(host)) return [];
++      return [{ type: isIP(host) === 6 ? 'ipv6' : isIP(host) === 4 ? 'ipv4' : host.endsWith('.onion') ? 'torv3' : 'dns', address: host, port }];
++    } catch { return []; }
++  });
++}
++
+ export class LightningController {
+   private clnService: LightningService;
+ 
+@@ -70,11 +100,30 @@ export class LightningController {
          logger.warn('Refused lightning call: ' + validationError);
          return handleError(new APIError(HttpStatusCode.FORBIDDEN, validationError), req, res, next);
        }
@@ -59,6 +91,19 @@ index 7aaf650..a67319a 100755
        logger.info('Calling method: ' + req.body.method);
        this.clnService
          .call(req.body.method, req.body.params)
+-        .then((commandRes: any) => {
++        .then(async (commandRes: any) => {
+           logger.info('Controller received response for ' + req.body.method);
++          if (req.body.method === 'getinfo') {
++            commandRes.peer_addresses = [];
++            if (process.env.PEER_ADDRESSES_FILE) {
++              try { commandRes.peer_addresses = peerUiAddresses(JSON.parse(await readFile(process.env.PEER_ADDRESSES_FILE, 'utf8'))); }
++              catch { logger.warn('StartOS peer addresses unavailable; showing advertised endpoints only'); }
++            }
++          }
+           if (
+             APP_CONSTANTS.APP_CONNECT == AppConnect.COMMANDO &&
+             req.body.method &&
 diff --git a/apps/backend/source/controllers/shared.ts b/apps/backend/source/controllers/shared.ts
 index acfbec5..24e246b 100644
 --- a/apps/backend/source/controllers/shared.ts
@@ -479,6 +524,80 @@ index d53af4d..b878f6d 100755
                onChannelStateChange={(newState) => setSelChannel(prev => 
                  prev ? { ...prev, current_state: newState } as PeerChannel : null
                )}
+diff --git a/apps/frontend/src/components/modals/NodeInfo/NodeInfo.tsx b/apps/frontend/src/components/modals/NodeInfo/NodeInfo.tsx
+index b169e27..e32b8be 100755
+--- a/apps/frontend/src/components/modals/NodeInfo/NodeInfo.tsx
++++ b/apps/frontend/src/components/modals/NodeInfo/NodeInfo.tsx
+@@ -1,5 +1,6 @@
+ import './NodeInfo.scss';
+ import { useEffect, useState } from 'react';
++import { nodeUris } from '../../../utilities/channel-status';
+ import { motion, AnimatePresence } from 'framer-motion';
+ import { QRCodeCanvas } from 'qrcode.react';
+ import { Modal, Row, InputGroup, Form } from 'react-bootstrap';
+@@ -20,20 +21,15 @@ const NodeInfo = () => {
+   const [nodeURI, setNodeURI] = useState('');
+ 
+   useEffect(() => {
+-    let uri = (nodeInfo.id || '');
+-    if (nodeInfo.address && nodeInfo.address?.length && nodeInfo.address.length > 0) {
+-      uri = uri + '@' + nodeInfo.address[0].address + ':' + nodeInfo.address[0].port;
+-    } else if (nodeInfo.binding && nodeInfo.binding?.length && nodeInfo.binding.length > 0) {
+-      uri = uri + '@' + nodeInfo.binding[0].address + ':' + nodeInfo.binding[0].port;
+-    } else {
+-      uri = uri + '@ : ';
+-    }
+-    setNodeURI(uri);
++    const uris = nodeUris(nodeInfo.id || '', [...(nodeInfo.address || []), ...(nodeInfo.peer_addresses || [])]);
++    setNodeURI(previous => uris.includes(previous) ? previous : (uris[0] || ''));
+   }, [nodeInfo]);
+ 
++  const uris = nodeUris(nodeInfo.id || '', [...(nodeInfo.address || []), ...(nodeInfo.peer_addresses || [])]);
++
+   const copyHandler = () => {
+-    copyTextToClipboard(nodeURI).then(() => {
+-      dispatch(setShowToast({show: true, message: 'Node ID Copied Successfully!', bg: 'success'}));
++    copyTextToClipboard(nodeURI || nodeInfo.id || '').then(() => {
++      dispatch(setShowToast({show: true, message: nodeURI ? 'Node URI copied' : 'Node ID copied', bg: 'success'}));
+     }).catch((err) => {
+       logger.error(err);
+     });
+@@ -49,7 +45,7 @@ const NodeInfo = () => {
+           <span className='span-close-svg' onClick={closeHandler}><CloseSVG /></span>
+         </Modal.Header>
+         <Modal.Body className='py-0'>
+-          <Row className='qr-container m-auto d-flex'>
++          {nodeURI && <Row className='qr-container m-auto d-flex'>
+             <AnimatePresence>
+               <motion.img
+                 key='cln-logo'
+@@ -62,18 +58,21 @@ const NodeInfo = () => {
+               />
+             </AnimatePresence>
+             <QRCodeCanvas value={nodeURI || ''} size={220} includeMargin={true} bgColor={isDarkMode ? '#0C0C0F' : '#FFFFFF'} fgColor={isDarkMode ? '#FFFFFF' : '#000000'} />
+-          </Row>
++          </Row>}
+           <Row className='d-flex align-items-start justify-content-center pt-2'>
+-            <h4 className='text-blue fw-bold d-flex justify-content-center'>Node ID</h4>
++            <h4 className='text-blue fw-bold d-flex justify-content-center'>{nodeURI ? 'Node URI' : 'Node ID'}</h4>
+             <p className='py-3 w-75 text-break text-dark d-flex justify-content-center'>
+-              Other Lightning nodes can open payment channels to your node following this Node ID.            
++              {nodeURI ? 'Use this URI to connect to your node. LAN addresses require access to the same network or VPN.' : 'No reachable peer address is configured. Add an address to the Peer interface in StartOS. A node ID alone is not a connection endpoint.'}            
+             </p>
++            {uris.length > 1 && <Form.Select aria-label="Peer address" value={nodeURI} onChange={event => setNodeURI(event.target.value)}>
++              {uris.map(uri => <option key={uri} value={uri}>{uri}</option>)}
++            </Form.Select>}
+             <div className='mb-4 text-break text-dark d-flex justify-content-center'>
+             <InputGroup className='mb-3'>
+               <Form.Control 
+                 onClick={copyHandler}
+-                placeholder={nodeURI}
+-                aria-label={nodeURI}
++                value={nodeURI || nodeInfo.id || ''}
++                aria-label='Node connection address'
+                 aria-describedby="copy-addon"
+                 className="form-control-left"
+                 readOnly
 diff --git a/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx b/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx
 index ad311b4..f1aed16 100755
 --- a/apps/frontend/src/components/shared/FiatBox/FiatBox.tsx
@@ -586,10 +705,18 @@ index 8712c1c..c4b2f54 100644
      return { channels: merged };
      // // No pagination, need full data for active, pending and inactive channels calculations
 diff --git a/apps/frontend/src/types/root.type.ts b/apps/frontend/src/types/root.type.ts
-index 968cc30..c88e682 100755
+index 968cc30..e043f30 100755
 --- a/apps/frontend/src/types/root.type.ts
 +++ b/apps/frontend/src/types/root.type.ts
-@@ -176,6 +176,9 @@ export type ChannelType = {
+@@ -38,6 +38,7 @@ export type NodeInfo = {
+   num_inactive_channels?: number;
+   address?: Address[];
+   binding?: Address[];
++  peer_addresses?: Address[];
+   version?: string;
+   blockheight?: number;
+   network?: string;
+@@ -176,6 +177,9 @@ export type ChannelType = {
  };
  
  export type PeerChannel = {
@@ -601,10 +728,10 @@ index 968cc30..c88e682 100755
    channel_id: string;
 diff --git a/apps/frontend/src/utilities/channel-status.test.ts b/apps/frontend/src/utilities/channel-status.test.ts
 new file mode 100644
-index 0000000..bc94201
+index 0000000..9960406
 --- /dev/null
 +++ b/apps/frontend/src/utilities/channel-status.test.ts
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,31 @@
 +import { nodeUris, pendingSplices } from './channel-status';
 +
 +const id = '02' + 'a'.repeat(64);
@@ -614,6 +741,9 @@ index 0000000..bc94201
 +    {type:'ipv6',address:'2001:db8::1',port:9735},
 +    {type:'torv3',address:'a'.repeat(56)+'.onion',port:9735},
 +    {type:'ipv4',address:'127.0.0.1',port:0},
++    {type:'ipv4',address:'0.0.0.0',port:9735},
++    {type:'ipv6',address:'::',port:9735},
++    {type:'ipv4',address:'127.0.0.1',port:9735},
 +    {type:'websocket',address:'unknown',port:9735},
 +  ])).toEqual([id+'@192.168.8.102:9735',id+'@[2001:db8::1]:9735',id+'@'+'a'.repeat(56)+'.onion:9735']);
 +  expect(nodeUris(id)).toEqual([]);
@@ -628,19 +758,26 @@ index 0000000..bc94201
 +  expect(pendingSplices({...channel,state:'CHANNELD_NORMAL'},[['tx',98]],100)).toEqual([]);
 +  expect(pendingSplices({...channel,total_msat:11999834000},[['tx',98]],100)[0].delta).toBe(-1000000);
 +});
++
++test('node connection URIs preserve StartOS external port and never use a wildcard', () => {
++  expect(nodeUris(id, [{type:'ipv4',address:'192.168.8.102',port:64774}])).toEqual([id+'@192.168.8.102:64774']);
++  expect(nodeUris(id, [{type:'ipv4',address:'0.0.0.0',port:9735}])).toEqual([]);
++});
 diff --git a/apps/frontend/src/utilities/channel-status.ts b/apps/frontend/src/utilities/channel-status.ts
 new file mode 100644
-index 0000000..e59748d
+index 0000000..184b281
 --- /dev/null
 +++ b/apps/frontend/src/utilities/channel-status.ts
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,26 @@
 +import { Address } from '../types/root.type';
 +
 +export function nodeUris(id: string, addresses: Address[] = []): string[] {
 +  if (!/^(02|03)[0-9a-f]{64}$/i.test(id)) return [];
 +  return [...new Set(addresses.filter(a =>
 +    ['ipv4', 'ipv6', 'torv3', 'dns'].includes(a.type || '') &&
-+    typeof a.address === 'string' && /^[a-z0-9.:[\]-]+$/i.test(a.address) &&
++    typeof a.address === 'string' &&
++    !['0.0.0.0', '::', '[::]', '::1', '[::1]', 'localhost'].includes(a.address.toLowerCase()) &&
++    !a.address.startsWith('127.') && /^[a-z0-9.:[\]-]+$/i.test(a.address) &&
 +    Number.isInteger(a.port) && a.port! > 0 && a.port! <= 65535
 +  ).map(a => {
 +    const host = a.address!.includes(':') && !a.address!.startsWith('[') ? '[' + a.address + ']' : a.address;

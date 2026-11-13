@@ -8,7 +8,7 @@ RUN git init && git remote add origin https://github.com/ElementsProject/cln-app
     git checkout --detach FETCH_HEAD && \
     test "$(git rev-parse HEAD)" = ff2d698b4f64c86d950d6abe61bd6b8a0b52a68c
 COPY assets/ui-xbt.patch /tmp/ui-xbt.patch
-RUN echo 'd2a6a7006e39b65db97c329002a3ae69bc01acec581e0f1fc0a4c7b4b3f5e295  /tmp/ui-xbt.patch' | sha256sum -c - && \
+RUN echo '7cfd8baa9152197b592fda2b15f25de89e0cd251738191416154e0872f9d492d  /tmp/ui-xbt.patch' | sha256sum -c - && \
     git apply --check /tmp/ui-xbt.patch && git apply /tmp/ui-xbt.patch
 RUN npm ci && ./node_modules/.bin/tsc -p apps/backend/tsconfig.json && \
     npm test -w cln-application-frontend -- --runInBand channel-status.test.ts && \
