@@ -6,7 +6,7 @@
   "source": "Exact sealed runtime from the tested package build context; no node state or credentials",
   "upstream_engine_review": {
     "repository": "https://github.com/privkeyio/lightning",
-    "commit": "69104ff71",
+    "commit": "69104ff71e2f615c2480161a6c8a2bddd20f04c9",
     "release": "v26.06.10-blake2b.1",
     "already_present": {
       "important_hook_death": "bdbef46a07f6c71da00f276456361431cb6496c6",
