@@ -22,7 +22,7 @@ import restore_barrier
 
 DIRECTORY = 'local-controller-trust-v1'
 FORMAT = 'local-controller-trust-v1'
-PER_SWAP_MSAT = {ba.ci.BTC: 10000000, ba.ci.PRIVKEYIO_XBT: 1000000000}
+PER_SWAP_MSAT = {ba.ci.BTC: 100000000, ba.ci.PRIVKEYIO_XBT: 10000000000}
 
 
 def initial(chain):
@@ -110,7 +110,11 @@ class Trust:
             usable.append((available-fee,pin))
         if not usable:return None
         amount=min(PER_SWAP_MSAT[self.auth.chain['profile']],max(n for n,_ in usable))//1000*1000
-        pins=sorted((p for n,p in usable if n>=amount),key=lambda p:p['channel_id'])[:8]
+        # The per-swap ceiling is a maximum, not a minimum channel size.
+        # Keep smaller channels eligible for smaller payments. Route admission
+        # still checks actual spendable/receivable liquidity on the selected pin.
+        selected=sorted(usable,key=lambda item:(-item[0],item[1]['channel_id']))[:8]
+        pins=sorted((p for _,p in selected),key=lambda p:p['channel_id'])
         limits=dict(max_swaps=4,max_amount_msat=amount,total_amount_msat=amount*3)
         limits.update(dict(min_cltv_delta=350,max_cltv_delta=2016,close_before_blocks=72) if kind=='incoming'
                       else dict(max_fee_msat=fee,max_delay_blocks=576,max_hops=4))
@@ -155,12 +159,17 @@ class Trust:
                     new_ids={p['channel_id'] for p in candidate['channels']} if candidate else set()
                     if retired and candidate is None:
                         states[kind]='waiting_for_channels';continue
-                    if candidate and (retired or old_ids < new_ids):
+                    old_pins={p['channel_id']:p for p in g['channels']}
+                    # Splicing keeps channel_id but replaces the funding outpoint
+                    # and SCID. Refresh only after the new channel is eligible.
+                    changed=bool(candidate) and any(p['channel_id'] in old_pins and p!=old_pins[p['channel_id']]
+                                                   for p in candidate['channels'])
+                    if candidate and (retired or old_ids < new_ids or changed):
                         replacement=candidate
                 # Upgrade only our old XBT grants, once liquidity permits. Never
                 # replace manual authority, unpause it, or bypass active recovery.
                 if (gid in self.r['owned'] and self.auth.chain['profile']==ba.ci.PRIVKEYIO_XBT
-                        and not item['paused'] and g['limits']['max_amount_msat']<=10000000):
+                        and not item['paused'] and (g['limits']['max_amount_msat']<=10000000 or g['limits']['max_amount_msat']==1000000000)):
                     candidate=self.plan(kind)
                     if candidate and candidate['limits']['max_amount_msat']>g['limits']['max_amount_msat']:
                         replacement=candidate

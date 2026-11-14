@@ -86,7 +86,7 @@ The `lightning-sub` runs the engine. The `cln-application-sub` runs the UI backe
 
 Available node operations include wallet addresses, deposits/withdrawals, channel management, BOLT11 invoices/payments, ordinary keysend, forwarding settings, peer/node information, SQL-backed history, seed display, rescans, UI password reset and rune management. Local tests do not establish every feature's live behavior.
 
-The UI identifies the node and coin units as XBT, uses the XBT explorer, and displays fiat as unavailable instead of valuing XBT at BTC's fiat price. Before a UI BOLT11 payment is submitted, authenticated decode must show the mandatory XBT bit. A plain BTC invoice is rejected even though generic decode accepts the shared HRP. BOLT12 offer controls are disabled in this candidate pending their chain-boundary validation. UI ordinary payments are separate from the swap worker's single-part, single-attempt policy.
+The UI identifies the node and coin units as XBT, uses the XBT explorer, and values XBT using Neoxa’s BTCB2/USDC ticker, with USD treated as the USDC quote and Frankfurter USD FX rates for other supported currencies. Before a UI BOLT11 payment is submitted, authenticated decode must show the mandatory XBT bit. A plain BTC invoice is rejected even though generic decode accepts the shared HRP. BOLT12 offer controls are disabled in this candidate pending their chain-boundary validation. UI ordinary payments are separate from the swap worker's single-part, single-attempt policy.
 
 CLBOSS remains excluded because its external swaps assume BTC. TEOS/watchtower and Sling are not included or offered by this candidate; their fork compatibility is unverified. Currencyrate and BTC-oriented LSPS/BIP353 plugins are disabled. Core plugins and both submodule pins remain tracked; no submodule gitlink is changed.
 
@@ -257,7 +257,7 @@ Legacy sharing-only opt-ins remain sharing-only until you explicitly enable trus
 The node creates incoming and outgoing scoped grants when suitable connected
 channels have liquidity. Each grant lasts up to 24 hours and renews automatically
 near expiry or when its remaining budget is too small for another maximum swap.
-The XBT ceiling is 1,000,000 sats per swap, four swaps and 3,000,000 sats per grant
+The XBT ceiling is 10,000,000 sats per swap, four swaps and 30,000,000 sats per grant
 (or less when liquidity is lower), with a 10-sat outgoing fee limit. These are
 per-grant limits, not lifetime spending limits: continuing trust authorizes renewal.
 Version 26.6.9:9 replaces automatically managed old 10,000-sat XBT grants when
@@ -334,3 +334,17 @@ Pending splice indicators are derived from live channel inflight records and SQL
 The peerUiAddresses init hook atomically exports nonlocal, non-bridge Peer interface endpoints to peer-ui-addresses.json. The authenticated UI reads this file on getinfo; it does not announce LAN addresses or restart lightningd on UI metadata changes. Node Info rejects wildcard/loopback endpoints, preserves external ports, supports address selection, and shows an explicit unavailable state without a connection QR when no endpoint exists.
 
 In the CLN web UI, open a Payment Channel to add or edit its private label (up to 80 characters). Save label updates the channel list; clearing it restores the peer alias. Labels are stored in the node wallet datastore, persist across browsers and service restarts, and are included with the node wallet in backups. They are not announced to peers.
+
+After a confirmed splice, Trust Local Swap Controller automatically refreshes changed funding pins once the channel is eligible and every previous swap enrollment is terminal. Completed swap records retain their original funding references. Renewal checks the node’s confirmed transaction history to prove the new funding output descends from the old one; active or uncertain recovery still blocks replacement.
+
+Payment Channels and channel details wrap long labels and peer IDs within the card and displays each liquidity bar as the local and remote shares of the channel balance, regardless of channel size.
+
+Automatic controller grants include smaller ready channels for payments within their liquidity, even when those channels cannot carry the full per-swap policy maximum. Each planned payment still checks its selected channel liquidity.
+
+Lightning invoices may be all lowercase or all uppercase. Mixed-case invoices are rejected; network, signature, amount and expiry checks still apply.
+
+Settlement also accepts the lowercase form Core Lightning stores for an uppercase invoice. Saved plans remain unchanged; payment hash, recipient, amounts and original attempt identity must still match.
+
+Route planning distinguishes unknown route-hint entry nodes from hint fee, delay and hop limits. It reports hint counts and saved limits; an unresolved route search is not proof that a fee limit was exceeded. Private paths may require multiple hinted hops to reach a public node. No payment is sent during planning.
+
+Fiat estimates use Neoxa BTCB2/USDC and, for non-USD display, Frankfurter USD exchange rates. The node fetches fixed public rate endpoints and caches them for five minutes; the browser converts balances locally. No amounts, addresses, invoices or node identities are sent to either price service. USDC is treated as USD, so the display is an estimate. Invalid or stale quotes show “Fiat unavailable”, never Bitcoin/BTC prices. A failed FX request does not suppress the available USD price.

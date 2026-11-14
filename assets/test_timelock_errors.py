@@ -16,6 +16,14 @@ class Tests(unittest.TestCase):
                          {'admission_error':'grant_closed'})
         self.assertEqual(service._invoke.call_count,1)
 
+    def test_route_hint_details_only_cross_read_only_boundary(self):
+        from route_plan import RouteAdmissionError
+        error=RouteAdmissionError('route_hint_entry_unknown',route_hint_count=1,max_fee_msat=10000,max_delay_blocks=576,max_hops=4)
+        value=self.service(error).invoke(plugin.remote.CALL,{'operation':'plan'})
+        self.assertEqual(value['admission_error'],'route_hint_entry_unknown')
+        self.assertEqual(value['admission_details'],error.details)
+        with self.assertRaises(RouteAdmissionError):self.service(error).invoke(plugin.remote.CALL,{'operation':'send'})
+
     def test_unknown_errors_and_mutation_outcomes_are_not_promoted(self):
         for op,error in [('plan',ValueError('PRIVATE')),('send',ValueError('recipient_invoice_cltv_limit')),
                          ('plan',TimeoutError('PRIVATE'))]:

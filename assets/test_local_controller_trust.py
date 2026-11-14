@@ -19,13 +19,26 @@ class TrustTests(AdminTests):
     def xbt_liquidity(self):
         self.close();self.root=self.root/'xbt';self.root.mkdir(mode=0o700)
         self.open(ci.PRIVKEYIO_XBT,True)
-        self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
+        self.node.rows[0].update(spendable_msat=20000000000,receivable_msat=20000000000)
     def extra_channel(self):
         row=copy.deepcopy(self.node.rows[0])
         row.update(channel_id='88'*32,funding_txid='99'*32,short_channel_id='120x1x0',
-                   spendable_msat=2000000000,receivable_msat=2000000000)
+                   spendable_msat=20000000000,receivable_msat=20000000000)
         self.node.rows.append(row)
         return row
+    def test_smaller_ready_channel_remains_eligible_below_grant_ceiling(self):
+        self.node.rows[0].update(spendable_msat=300000000,receivable_msat=300000000)
+        self.trust.maintain();old=copy.deepcopy(self.auth.record['current'])
+        small=self.extra_channel();small.update(spendable_msat=65296000,receivable_msat=30000000)
+        self.trust.maintain()
+        for kind in ba.KINDS:
+            g=self.auth.record['grants'][self.auth.record['current'][kind]]['terms']
+            self.assertIn(small['channel_id'],[p['channel_id'] for p in g['channels']])
+            self.assertEqual(g['limits']['max_amount_msat'],100000000)
+            self.assertNotEqual(old[kind],self.auth.record['current'][kind])
+        stable=copy.deepcopy(self.auth.record['current']);self.trust.maintain()
+        self.assertEqual(stable,self.auth.record['current'])
+
     def test_closed_historical_channel_does_not_block_renewal(self):
         self.trust.maintain();old=copy.deepcopy(self.auth.record['current'])
         gid=old['outgoing'];data=self.node.plan();self.node.plan_value=data
@@ -63,7 +76,7 @@ class TrustTests(AdminTests):
             with self.assertRaisesRegex(ValueError,'closed_funding_changed'):self.auth.prior()
 
     def test_add_ready_channel_without_liquidity_or_disconnect_churn(self):
-        self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
+        self.node.rows[0].update(spendable_msat=20000000000,receivable_msat=20000000000)
         self.trust.maintain();old=copy.deepcopy(self.auth.record['current']);self.extra_channel()
         self.trust.maintain();current=copy.deepcopy(self.auth.record['current'])
         self.assertNotEqual(old,current)
@@ -81,22 +94,73 @@ class TrustTests(AdminTests):
         self.auth.record['entries'].pop('pending-fixture');self.trust.maintain()
         self.assertEqual(manual,self.auth.record['current']['outgoing'])
 
+    def test_terminal_receipt_requires_confirmed_splice_lineage_before_renewal(self):
+        self.trust.maintain();gid=self.auth.record['current']['outgoing']
+        data=self.node.plan();self.node.plan_value=data
+        eid=self.auth.enroll(gid,data,confirmed=True);self.auth.send(eid)
+        self.node.finish();self.auth.reconcile(eid)
+        receipt=copy.deepcopy(self.auth.record['entries'][eid]);old=copy.deepcopy(data['channel'])
+        row=self.node.rows[0];row.update(funding_txid='ee'*32,short_channel_id='121x2x0',funding_outnum=0)
+        tx=dict(hash=row['funding_txid'],blockheight=121,txindex=2,outputs=[dict(index=0)],
+                inputs=[dict(txid=old['funding_txid'],index=old['funding_outnum'])])
+        call=self.auth.rpc
+        def rpc(method,**params):
+            return {'transactions':[tx]} if method=='listtransactions' else call(method,**params)
+        with patch.object(self.auth,'rpc',side_effect=rpc):
+            self.auth.prior()
+            tx['blockheight']=0
+            with self.assertRaisesRegex(ValueError,'splice_unconfirmed'):self.auth.prior()
+            tx['blockheight']=121;tx['inputs'][0]['txid']='ff'*32
+            with self.assertRaisesRegex(ValueError,'splice_funding_unproven'):self.auth.prior()
+            tx['inputs'][0]['txid']=old['funding_txid']
+            row['peer_id']='02'+'ff'*32
+            with self.assertRaisesRegex(ValueError,'splice_identity_changed'):self.auth.prior()
+            row['peer_id']=old['peer_id']
+            self.trust.maintain()
+            self.assertNotEqual(gid,self.auth.record['current']['outgoing'])
+        self.assertEqual(receipt,self.auth.record['entries'][eid])
+
+    def test_splice_refreshes_funding_pins_once_and_keeps_old_grants(self):
+        self.xbt_liquidity();self.trust.maintain()
+        old=copy.deepcopy(self.auth.record['current'])
+        originals={gid:copy.deepcopy(self.auth.record['grants'][gid]) for gid in old.values()}
+        row=self.node.rows[0];row.update(funding_txid='ee'*32,short_channel_id='121x2x0')
+        self.trust.maintain();current=copy.deepcopy(self.auth.record['current'])
+        for kind in ba.KINDS:
+            self.assertNotEqual(old[kind],current[kind])
+            pin=self.auth.record['grants'][current[kind]]['terms']['channels'][0]
+            self.assertEqual(pin['funding_txid'],row['funding_txid'])
+            self.assertEqual(pin['short_channel_id'],row['short_channel_id'])
+            self.assertEqual(originals[old[kind]],self.auth.record['grants'][old[kind]])
+        self.trust.maintain();self.assertEqual(current,self.auth.record['current'])
+
+    def test_splice_refresh_waits_for_recovery_and_eligible_channel(self):
+        self.xbt_liquidity();self.trust.maintain();old=copy.deepcopy(self.auth.record['current'])
+        self.node.rows[0].update(funding_txid='ee'*32,short_channel_id='121x2x0',peer_connected=False)
+        self.trust.maintain();self.assertEqual(old,self.auth.record['current'])
+        self.node.rows[0]['peer_connected']=True
+        self.auth.record['entries']['pending-fixture']={}
+        self.assertEqual(self.trust.maintain()['state'],'waiting_for_recovery')
+        self.assertEqual(old,self.auth.record['current'])
+        self.auth.record['entries'].pop('pending-fixture');self.trust.maintain()
+        self.assertNotEqual(old,self.auth.record['current'])
+
     def test_chain_specific_ceiling_and_liquidity(self):
-        self.node.rows[0].update(spendable_msat=2000000000,receivable_msat=2000000000)
+        self.node.rows[0].update(spendable_msat=20000000000,receivable_msat=20000000000)
         self.trust.maintain()
-        self.assertTrue(all(v['terms']['limits']['max_amount_msat']==10000000 for v in self.auth.record['grants'].values()))
+        self.assertTrue(all(v['terms']['limits']['max_amount_msat']==100000000 for v in self.auth.record['grants'].values()))
         self.xbt_liquidity();self.node.rows[0]['receivable_msat']=500252000
         self.trust.maintain()
         def current(kind):return self.auth.record['grants'][self.auth.record['current'][kind]]['terms']['limits']
-        self.assertEqual(current('outgoing')['max_amount_msat'],1000000000)
-        self.assertEqual(current('outgoing')['total_amount_msat'],3000000000)
+        self.assertEqual(current('outgoing')['max_amount_msat'],10000000000)
+        self.assertEqual(current('outgoing')['total_amount_msat'],30000000000)
         self.assertEqual(current('incoming')['max_amount_msat'],500252000)
     def test_liquidity_limited_grant_promotes_once_at_policy_cap(self):
         self.xbt_liquidity();self.node.rows[0]['receivable_msat']=500252000
         self.trust.maintain();old=copy.deepcopy(self.auth.record['current'])
         self.node.rows[0]['receivable_msat']=600000000
         self.trust.maintain();self.assertEqual(old,self.auth.record['current'])
-        self.node.rows[0]['receivable_msat']=1738465000
+        self.node.rows[0]['receivable_msat']=17384650000
         self.auth.record['entries']['pending-fixture']={}
         self.assertEqual(self.trust.maintain()['state'],'waiting_for_recovery')
         self.assertEqual(old,self.auth.record['current'])
@@ -104,10 +168,10 @@ class TrustTests(AdminTests):
         self.trust.maintain();new=copy.deepcopy(self.auth.record['current'])
         self.assertNotEqual(old['incoming'],new['incoming'])
         self.assertEqual(old['outgoing'],new['outgoing'])
-        self.assertEqual(self.auth.record['grants'][new['incoming']]['terms']['limits']['max_amount_msat'],1000000000)
+        self.assertEqual(self.auth.record['grants'][new['incoming']]['terms']['limits']['max_amount_msat'],10000000000)
         self.assertEqual(self.auth.record['grants'][old['incoming']]['terms']['limits']['max_amount_msat'],500252000)
         self.node.rows[0]['receivable_msat']=400000000
-        self.trust.maintain();self.node.rows[0]['receivable_msat']=2000000000
+        self.trust.maintain();self.node.rows[0]['receivable_msat']=20000000000
         self.trust.maintain();self.assertEqual(new,self.auth.record['current'])
         self.assertEqual(len(self.auth.record['grants']),3)
 
