@@ -1,18 +1,29 @@
+import { publicationDaemon } from './live/localController'
+import {
+  profile as coordinatorProfile,
+  rawInvoke as coordinatorCall,
+} from './live/actions'
+import { recoveryCommands } from './recovery'
+import {
+  verifyBackend,
+  verifyHistoricalBlock,
+  verifyNode,
+  verifyVolume,
+  requireInactiveSwaps,
+  exists,
+  activationHeight,
+} from './xbtPolicy'
 import { FileHelper } from '@start9labs/start-sdk'
-import { manifest as bitcoinManifest } from 'bitcoin-core-startos/startos/manifest'
-import { createHash } from 'node:crypto'
-import { mkdir, readFile, rm, writeFile } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import {
   parseTowerUri,
   towerKey,
   towerNetAddr,
 } from './actions/watchtower/towerUri'
-import { errorMessage, literal } from './actions/payments'
 import { watchtowerClientPlugin } from './actions/watchtower/watchtower'
 import { ListTowers } from './actions/watchtower/watchtowerClientInfo'
 import { clnConfig } from './fileModels/config'
 import { storeJson } from './fileModels/store.json'
-import { vpnConfFile } from './fileModels/vpn.conf'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
@@ -25,14 +36,6 @@ import {
   uiPort,
   wsPort,
 } from './utils'
-import {
-  handshakeStaleMs,
-  parseWireguardConfig,
-  renderWgQuick,
-  vpnDownScript,
-  vpnIface,
-  vpnUpScript,
-} from './vpn'
 
 export const main = sdk.setupMain(async ({ effects }) => {
   /**
@@ -40,13 +43,17 @@ export const main = sdk.setupMain(async ({ effects }) => {
    *
    * In this section, we fetch any resources or run any desired preliminary commands.
    */
-  console.info(i18n('Starting Core Lightning!'))
+  await verifyVolume(sdk.volumes.main.subpath(''))
+  await requireInactiveSwaps(sdk.volumes.main.subpath(''))
+  const restored = await exists(sdk.volumes.main.subpath('node-restored.json'))
+  console.info('Starting XBT Core Lightning')
 
   // watch cln config for changes
   const conf = await clnConfig.read().const(effects)
 
   // bitcoind's RPC over the bridge, for the sync-progress bitcoin-cli below.
   const bitcoind = await bitcoindRpcBridge(effects)
+  if (!bitcoind) throw new Error('BLAKE2b Knots RPC is unavailable')
 
   // get store.json but don't watch for changes
   const store = await storeJson.read().once()
@@ -54,25 +61,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
     throw new Error('no store.json')
   }
 
+  if (store.watchtowerServer || store.watchtowerClients.length)
+    throw new Error(
+      'Watchtower compatibility is not enabled for this XBT candidate',
+    )
+
   const watchtowerClientLoaded = !!conf?.raw?.plugin?.includes(
     watchtowerClientPlugin,
   )
 
   const lightningdArgs: string[] = ['--database-upgrade=true']
-
-  const vpn =
-    store.clearnetVpn && parseWireguardConfig(store.clearnetVpn.config)
-  if (vpn && 'error' in vpn) {
-    throw new Error(`invalid clearnet VPN configuration: ${vpn.error}`)
-  }
-  if (vpn) {
-    await mkdir(sdk.volumes.main.subpath('./vpn'), { recursive: true })
-    await vpnConfFile.write(effects, renderWgQuick(vpn.config))
-  } else {
-    await rm(sdk.volumes.main.subpath(`./vpn/${vpnIface}.conf`), {
-      force: true,
-    })
-  }
 
   if (store.rescan) {
     lightningdArgs.push(`--rescan=${store.rescan}`)
@@ -100,8 +98,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
   const lightningSub = sdk.SubContainer.of(
     effects,
     { imageId: 'lightning' },
-    mainMounts.mountDependency<typeof bitcoinManifest>({
-      dependencyId: 'bitcoind',
+    mainMounts.mountDependency({
+      dependencyId: bitcoind.packageId,
       mountpoint: bitcoinDataDir,
       subpath: null,
       readonly: true,
@@ -119,18 +117,48 @@ export const main = sdk.setupMain(async ({ effects }) => {
     )
     .const(effects)
 
-  let vpnHealthConfig = store.clearnetVpn?.config ?? null
-  let vpnNoHandshakeSince = Date.now()
-  const vpnConfigHash = createHash('sha256')
-    .update(vpnHealthConfig ?? '')
-    .digest('hex')
-
   const baseDaemons = sdk.Daemons.of(effects)
-    .addOneshot('vpn', {
+    .addOneshot('xbt-backend-identity', {
       subcontainer: lightningSub,
       exec: {
-        command: ['sh', '-c', vpn ? vpnUpScript : vpnDownScript],
-        env: { STARTOS_VPN_CONFIG_HASH: vpnConfigHash },
+        fn: async () => {
+          const rpc = async (method: string, ...args: string[]) => {
+            const res = await lightningSub.exec(
+              [
+                'bitcoin-cli',
+                `-rpcconnect=${bitcoind.host}`,
+                `-rpcport=${bitcoind.port}`,
+                '-rpccookiefile=/mnt/bitcoin/.cookie',
+                '-rpcclienttimeout=60',
+                method,
+                ...args,
+              ],
+              { timeout: 70000 },
+            )
+            if (res.exitCode !== 0)
+              throw new Error('BLAKE2b backend inspection unavailable')
+            const text = String(res.stdout).trim()
+            return method === 'getblockhash' || method === 'getblock'
+              ? text
+              : JSON.parse(text)
+          }
+          const chain = await rpc('getblockchaininfo')
+          const deployments = await rpc('getdeploymentinfo')
+          verifyBackend(
+            chain,
+            deployments,
+            await rpc('getblockhash', String(activationHeight)),
+            bitcoind.packageId,
+          )
+          try {
+            await verifyHistoricalBlock(chain, rpc)
+          } catch {
+            throw new Error(
+              'Historical BLAKE2b blocks unavailable through fetching proxy. Check backend peers and retry; preserve Lightning state.',
+            )
+          }
+          return null
+        },
       },
       requires: [],
     })
@@ -138,9 +166,17 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: lightningSub,
       exec: {
         command: [
-          'lightningd',
-          `--lightning-dir=${rootDir}`,
+          '/usr/local/libexec/swap-node/package_node.py',
+          '--mainnet',
+          '--profile',
+          'xbt-privkeyio-v1',
+          '--root',
+          rootDir,
+          'launch',
           `--conf=${rootDir}/config`,
+          // The retained engine's compiled builtin list predates this plugin.
+          '--important-plugin=/opt/xbt/libexec/c-lightning/plugins/cln-grpc',
+          '--important-plugin=/opt/xbt/libexec/c-lightning/plugins/clnrest',
           ...lightningdArgs,
         ],
         // watchtower-client keeps its identity key and registered towers in
@@ -158,6 +194,14 @@ export const main = sdk.setupMain(async ({ effects }) => {
             'getinfo',
           ])
           if (res.exitCode === 0) {
+            try {
+              verifyNode(JSON.parse(String(res.stdout)))
+            } catch {
+              return {
+                result: 'failure',
+                message: 'The node does not report the required XBT features',
+              }
+            }
             return {
               message: i18n('The RPC interface is ready'),
               result: 'success',
@@ -169,7 +213,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }
         },
       },
-      requires: ['vpn'],
+      requires: ['xbt-backend-identity'],
     })
     .addOneshot('commando-config', {
       subcontainer: lightningSub,
@@ -213,50 +257,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
           await writeFile(
             commandoEnv,
             `LIGHTNING_PUBKEY="${pubkey}"\nLIGHTNING_RUNE="${rune}"\n`,
+            { mode: 0o600 },
           )
 
           return null
         },
       },
       requires: ['lightningd'],
-    })
-    .addDaemon('cln-application', {
-      subcontainer: sdk.SubContainer.of(
-        effects,
-        {
-          imageId: 'ui',
-        },
-        mainMounts,
-        'cln-application-sub',
-      ),
-      exec: {
-        command: ['node', '/app/apps/backend/dist/server.js'],
-        env: {
-          BITCOIN_NETWORK: 'bitcoin',
-          LIGHTNING_DATA_DIR: rootDir,
-          APP_PROTOCOL: 'https',
-          APP_HOST: '0.0.0.0',
-          APP_PORT: String(uiPort),
-          APP_CONFIG_FILE: `${rootDir}/data/app/config.json`,
-          APP_LOG_FILE: `${rootDir}/data/app/application-cln.log`,
-          LIGHTNING_VARS_FILE: `${rootDir}/.commando-env`,
-          LIGHTNING_WS_PORT: String(wsPort),
-          LIGHTNING_REST_PORT: String(clnrestPort),
-          // clnrest runs plaintext (clnrest-protocol=http); the app defaults
-          // this to https and would otherwise look for TLS certs.
-          LIGHTNING_REST_PROTOCOL: 'http',
-          LIGHTNING_GRPC_PORT: String(grpcPort),
-        },
-      },
-      ready: {
-        display: i18n('Web Interface'),
-        fn: () =>
-          sdk.healthCheck.checkPortListening(effects, uiPort, {
-            successMessage: i18n('The Web Interface is ready'),
-            errorMessage: i18n('The Web Interface is not ready'),
-          }),
-      },
-      requires: ['lightningd', 'commando-config'],
     })
     .addHealthCheck('check-synced', {
       ready: {
@@ -359,8 +366,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
           JSON.stringify(next?.watchtowerClients) &&
         JSON.stringify(prev?.customExternalHosts) ===
           JSON.stringify(next?.customExternalHosts) &&
-        JSON.stringify(prev?.clearnetVpn) ===
-          JSON.stringify(next?.clearnetVpn) &&
         (next?.rescan === undefined || prev?.rescan === next?.rescan) &&
         (next?.restore === undefined || prev?.restore === next?.restore),
     )
@@ -386,11 +391,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
                   result: 'failure',
                 })
                 return {
-                  command: [
-                    'lightning-cli',
-                    `--lightning-dir=${rootDir}`,
-                    'emergencyrecover',
-                  ],
+                  command: recoveryCommands(rootDir).emergency,
                 }
               },
             },
@@ -403,23 +404,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
         ? {
             subcontainer: lightningSub,
             exec: {
-              // A restored database restarts the wallet's address counter at
-              // zero, and CLN only recognizes addresses up to 50 past the
-              // highest known-used index (keyscan_gap, hardcoded upstream).
-              // The node's previous life burned indexes far faster than
-              // on-chain hits advance that window — the web UIs issue a fresh
-              // address per Receive view, observed in the field at ~140/day
-              // (index 4,838 within five weeks of node birth) — so without
-              // this a post-restore rescan silently misses wallet outputs
-              // beyond the first >50-index gap. newaddr persists
-              // bip32_max_index, so pre-registering 10,000 addresses widens
-              // the window for every later rescan. (1,000 was field-tested
-              // and proven too shallow.)
-              command: [
-                'sh',
-                '-c',
-                `i=0; while [ $i -lt 10000 ]; do lightning-cli --lightning-dir=${rootDir} newaddr all > /dev/null || exit 1; i=$((i+1)); done`,
-              ],
+              // The address window must be registered before a later rescan.
+              command: recoveryCommands(rootDir).addresses,
             },
             requires: ['lightningd'],
           }
@@ -484,6 +470,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: lightningSub,
       exec: {
         fn: async (subcontainer, abort) => {
+          const controller = new AbortController()
+          abort.addEventListener(
+            'abort',
+            () => controller.abort(abort.reason),
+            { once: true },
+          )
+          if (abort.aborted) controller.abort(abort.reason)
           if (!watchtowerClientLoaded) return null
 
           const listtowersRes = await subcontainer.exec(
@@ -525,12 +518,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
                   JSON.stringify(tower.host),
                   String(tower.port),
                 ],
-                { cwd: rootDir },
-                undefined,
-                {
-                  abort: abort.reason,
-                  signal: abort,
-                },
+                { cwd: rootDir, abort: controller },
               )
 
               if (
@@ -557,6 +545,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: lightningSub,
       exec: {
         fn: async (subcontainer, abort) => {
+          const controller = new AbortController()
+          abort.addEventListener(
+            'abort',
+            () => controller.abort(abort.reason),
+            { once: true },
+          )
+          if (abort.aborted) controller.abort(abort.reason)
           if (!watchtowerClientLoaded) return null
 
           const listtowersRes = await subcontainer.exec(
@@ -582,12 +577,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
               console.log(`Watchtower client removing ${tower}`)
               const res = await subcontainer.exec(
                 ['lightning-cli', 'abandontower', id],
-                { cwd: rootDir },
-                undefined,
-                {
-                  abort: abort.reason,
-                  signal: abort,
-                },
+                { cwd: rootDir, abort: controller },
               )
 
               if (
@@ -619,153 +609,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
       // server was disabled (SDK 2.0's Daemons.build enforces requires-ordering).
       requires: ['lightningd', 'watchtower-client'],
     })
-    .addHealthCheck('watchtowers', () =>
-      watchtowerClientLoaded && store.watchtowerClients.length
-        ? {
-            ready: {
-              display: i18n('Watchtowers'),
-              trigger: sdk.trigger.statusTrigger(60_000, { starting: 5_000 }),
-              fn: async () => {
-                const res = await lightningSub.exec(
-                  ['lightning-cli', 'listtowers'],
-                  { cwd: rootDir },
-                )
-                if (res.exitCode !== 0) {
-                  return {
-                    result: 'failure',
-                    message: i18n('Could not list watchtowers: ${error}', {
-                      error: literal(errorMessage(res)),
-                    }),
-                  }
-                }
-                const registered: ListTowers = JSON.parse(res.stdout as string)
-                const labels =
-                  (await storeJson.read((s) => s.watchtowerLabels).once()) ?? []
-                const statuses = store.watchtowerClients.map((entry) => {
-                  const id = parseTowerUri(entry)?.id
-                  return {
-                    name: labels.find((l) => l.id === id)?.label ?? id ?? entry,
-                    status: (id && registered[id]?.status) || 'unregistered',
-                  }
-                })
-                const down = statuses.filter(
-                  (t) =>
-                    t.status !== 'reachable' &&
-                    t.status !== 'temporary_unreachable',
-                )
-                if (down.length) {
-                  return {
-                    result: 'failure',
-                    message: i18n(
-                      '${count} of ${total} watchtowers are unreachable or not registered: ${towers}',
-                      {
-                        count: String(down.length),
-                        total: String(statuses.length),
-                        towers: literal(down.map((t) => t.name).join(', ')),
-                      },
-                    ),
-                  }
-                }
-                const retrying = statuses.filter(
-                  (t) => t.status === 'temporary_unreachable',
-                )
-                if (retrying.length) {
-                  return {
-                    result: 'loading',
-                    message: i18n(
-                      'Retrying ${count} of ${total} watchtowers: ${towers}',
-                      {
-                        count: String(retrying.length),
-                        total: String(statuses.length),
-                        towers: literal(retrying.map((t) => t.name).join(', ')),
-                      },
-                    ),
-                  }
-                }
-                return {
-                  result: 'success',
-                  message: i18n('All ${total} watchtowers are reachable', {
-                    total: String(statuses.length),
-                  }),
-                }
-              },
-            },
-            requires: ['abandontowers'],
-          }
-        : null,
-    )
-    .addHealthCheck('vpn-tunnel', () =>
-      vpn
-        ? {
-            ready: {
-              display: i18n('Clearnet VPN'),
-              trigger: sdk.trigger.statusTrigger(30_000, {
-                starting: 5_000,
-                failure: 30_000,
-              }),
-              fn: async () => {
-                const currentConfig =
-                  (await storeJson
-                    .read((s) => s.clearnetVpn?.config ?? null)
-                    .once()) ?? null
-                if (currentConfig !== vpnHealthConfig) {
-                  vpnHealthConfig = currentConfig
-                  vpnNoHandshakeSince = Date.now()
-                }
-                const noHandshake = () => {
-                  const ageMs = Date.now() - vpnNoHandshakeSince
-                  return ageMs > handshakeStaleMs
-                    ? {
-                        result: 'failure' as const,
-                        message: i18n(
-                          'No WireGuard handshake for ${minutes} minutes. Clearnet traffic is held until the tunnel returns, not sent over your ISP connection.',
-                          { minutes: String(Math.floor(ageMs / 60_000)) },
-                        ),
-                      }
-                    : {
-                        result: 'starting' as const,
-                        message: i18n(
-                          'Waiting for the first WireGuard handshake.',
-                        ),
-                      }
-                }
-                let res
-                try {
-                  res = await lightningSub.exec(
-                    ['wg', 'show', vpnIface, 'latest-handshakes'],
-                    {},
-                    10_000,
-                  )
-                } catch {
-                  return noHandshake()
-                }
-                if (res.exitCode !== 0) return noHandshake()
-                const epoch = Number(
-                  String(res.stdout).trim().split(/\s+/)[1] ?? 0,
-                )
-                if (!epoch) return noHandshake()
-                const ageMs = Date.now() - epoch * 1000
-                if (ageMs > handshakeStaleMs) {
-                  return {
-                    result: 'failure',
-                    message: i18n(
-                      'No WireGuard handshake for ${minutes} minutes. Clearnet traffic is held until the tunnel returns, not sent over your ISP connection.',
-                      { minutes: String(Math.floor(ageMs / 60_000)) },
-                    ),
-                  }
-                }
-                return {
-                  result: 'success',
-                  message: i18n('Tunnel up; last handshake ${seconds}s ago.', {
-                    seconds: String(Math.floor(ageMs / 1000)),
-                  }),
-                }
-              },
-            },
-            requires: ['vpn'],
-          }
-        : null,
-    )
     .addHealthCheck('custom-external-host', () =>
       conf?.['tor-only'] === true && store.customExternalHosts.length
         ? {
@@ -774,7 +617,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
               // Nothing here initializes, so the default grace period would
               // only show this as "starting" for its first 10 seconds.
               gracePeriod: 0,
-              trigger: sdk.trigger.cooldownTrigger(60_000),
               fn: async () => ({
                 result: 'failure' as const,
                 message: i18n(
@@ -785,5 +627,72 @@ export const main = sdk.setupMain(async ({ effects }) => {
             requires: [],
           }
         : null,
+    )
+    .addHealthCheck('xbt-restored', () =>
+      restored
+        ? {
+            ready: {
+              display: 'Recovered XBT wallet',
+              gracePeriod: 0,
+              fn: async () => ({
+                result: 'failure' as const,
+                message:
+                  'This wallet was restored. Recover and drain funds; do not reuse it for new channels or swaps.',
+              }),
+            },
+            requires: ['lightningd'],
+          }
+        : null,
+    )
+    .addDaemon('cln-application', {
+      subcontainer: sdk.SubContainer.of(
+        effects,
+        {
+          imageId: 'ui',
+        },
+        mainMounts,
+        'cln-application-sub',
+      ),
+      exec: {
+        command: ['node', '/app/apps/backend/dist/server.js'],
+        env: {
+          BITCOIN_NETWORK: 'bitcoin',
+          LIGHTNING_DATA_DIR: rootDir,
+          APP_PROTOCOL: 'https',
+          APP_HOST: '0.0.0.0',
+          APP_PORT: String(uiPort),
+          PEER_ADDRESSES_FILE: `${rootDir}/peer-ui-addresses.json`,
+          APP_CONFIG_FILE: `${rootDir}/data/app/config.json`,
+          APP_LOG_FILE: `${rootDir}/data/app/application-cln.log`,
+          LIGHTNING_VARS_FILE: `${rootDir}/.commando-env`,
+          // Talk to lightningd over CLNrest, not commando. Commando rides the
+          // Lightning peer protocol, and this build advertises a required
+          // feature bit, so it refuses any peer that does not also adopt the
+          // fork. The UI is not such a peer and would be disconnected.
+          APP_CONNECT: 'REST',
+          LIGHTNING_WS_PORT: String(wsPort),
+          LIGHTNING_REST_PORT: String(clnrestPort),
+          // clnrest runs plaintext (clnrest-protocol=http); the app defaults
+          // this to https and would otherwise look for TLS certs.
+          LIGHTNING_REST_PROTOCOL: 'http',
+          LIGHTNING_REST_HOST: '127.0.0.1',
+          LIGHTNING_GRPC_PORT: String(grpcPort),
+        },
+      },
+      ready: {
+        display: i18n('Web Interface'),
+        fn: () =>
+          sdk.healthCheck.checkPortListening(effects, uiPort, {
+            successMessage: i18n('The Web Interface is ready'),
+            errorMessage: i18n('The Web Interface is not ready'),
+          }),
+      },
+      requires: store.restore
+        ? ['lightningd', 'commando-config', 'consume-flags']
+        : ['lightningd', 'commando-config'],
+    })
+    .addDaemon(
+      'local-controller-publication',
+      publicationDaemon(effects, coordinatorProfile, coordinatorCall),
     )
 })

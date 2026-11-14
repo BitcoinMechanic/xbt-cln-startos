@@ -1,0 +1,550 @@
+{
+  "btc-a": {
+    "authority_plugin.py": {
+      "sha256": "de9b817e1399d6b76e53a42aba4eddfe9fa60fb620f0434b0b45050b3491e73d",
+      "executable": false
+    },
+    "bolt11.py": {
+      "sha256": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80",
+      "executable": false
+    },
+    "bounded_authority.py": {
+      "sha256": "f116bbc42fcf5a0a5f6c6219bb3b975b8f47a1edbed6b0c3e95a9885560e34e7",
+      "executable": false
+    },
+    "chain_identity.py": {
+      "sha256": "fea8a32a10f0d6eae207d1e3534f71727e8bbdeac8577b8cd58ec3ef13d2cbda",
+      "executable": false
+    },
+    "chain_recovery.py": {
+      "sha256": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b",
+      "executable": false
+    },
+    "coordinator_admin.py": {
+      "sha256": "7592c45bdf83870c9ce50b738adec00150ae070b808fa309f87cd84edbb210cd",
+      "executable": false
+    },
+    "coordinator_admin_cli.py": {
+      "sha256": "8a8e61fd5e4e9106a0bfd1f87dc13bd4daedd5e17d933f5df2bfcc73fa02ed77",
+      "executable": false
+    },
+    "customer_invoice.py": {
+      "sha256": "be13243a221a18c7cf0f9a72ccf8af34c6f7bd47a32dab4df7becb845ae2d041",
+      "executable": false
+    },
+    "customer_plugin.py": {
+      "sha256": "7a834e7abcadd7ef82c2c5bcff53e0aeceafaa84743e60bd211efb9d51370083",
+      "executable": false
+    },
+    "customer_remote.py": {
+      "sha256": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c",
+      "executable": false
+    },
+    "deadline_protection.py": {
+      "sha256": "eebbd05d4e0337f655a0c0a7d533cbf040714525ed343b808a5ce329a022063e",
+      "executable": false
+    },
+    "gate_plugin.py": {
+      "sha256": "92de4aa6561738cc332489f08fd44afe1a8be81332ec9c401f0b572eafc41c0a",
+      "executable": false
+    },
+    "held_gate.py": {
+      "sha256": "c0f5e8245604faf11b3291d1980dc14d78ec466ac1d88481b04040fe00e0e262",
+      "executable": false
+    },
+    "onchain_retirement.py": {
+      "sha256": "55793af2ebd79b60ea5aecd9f57b6adbeaf5fd282d2660bb10f405beedc4d827",
+      "executable": false
+    },
+    "package_admin.py": {
+      "sha256": "c2d0d478a929a06f0c1256bee275dda3fd8368c859538ad403cfb77189f85248",
+      "executable": true
+    },
+    "package_customer.py": {
+      "sha256": "eeef9d38b62c246a884227f98cf26e366df0c95eb52d9b899fa9a287a8d6d236",
+      "executable": true
+    },
+    "package_gate.py": {
+      "sha256": "3e91bdf3015b498ef38f1d23911d0342c30e126672a8051933ef5c67ccfc3692",
+      "executable": true
+    },
+    "package_verify.py": {
+      "sha256": "6cd428c31a6f0a12147f27ee21ddf49a155fd13969453558baefd2fe65f9567b",
+      "executable": false
+    },
+    "remote_authority.py": {
+      "sha256": "8119c58defdb3c9b38b4f82e0ae722db84b6d5cdfcba019f7f96fa6444187e7b",
+      "executable": false
+    },
+    "restore_barrier.py": {
+      "sha256": "b22226be30ad966652bf5fd39f03eb281180516653e6fd58d5cdb24eac8a32e6",
+      "executable": false
+    },
+    "route_plan.py": {
+      "sha256": "9009ca272783c0a5cb9d52cb3def6eb657c8ebbf90701285a95d47af5951b0e4",
+      "executable": false
+    },
+    "runtime-manifest.json": {
+      "sha256": "b4fd59aa9f802fe460eabfecca0883dd9e9edfa5e51246f8bb034a239f0daeda",
+      "executable": false
+    }
+  },
+  "xbt-a": {
+    "authority_plugin.py": {
+      "sha256": "de9b817e1399d6b76e53a42aba4eddfe9fa60fb620f0434b0b45050b3491e73d",
+      "executable": false
+    },
+    "bolt11.py": {
+      "sha256": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80",
+      "executable": false
+    },
+    "bounded_authority.py": {
+      "sha256": "f116bbc42fcf5a0a5f6c6219bb3b975b8f47a1edbed6b0c3e95a9885560e34e7",
+      "executable": false
+    },
+    "chain_identity.py": {
+      "sha256": "fea8a32a10f0d6eae207d1e3534f71727e8bbdeac8577b8cd58ec3ef13d2cbda",
+      "executable": false
+    },
+    "chain_recovery.py": {
+      "sha256": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b",
+      "executable": false
+    },
+    "coordinator_admin.py": {
+      "sha256": "7592c45bdf83870c9ce50b738adec00150ae070b808fa309f87cd84edbb210cd",
+      "executable": false
+    },
+    "coordinator_admin_cli.py": {
+      "sha256": "8a8e61fd5e4e9106a0bfd1f87dc13bd4daedd5e17d933f5df2bfcc73fa02ed77",
+      "executable": false
+    },
+    "customer_invoice.py": {
+      "sha256": "be13243a221a18c7cf0f9a72ccf8af34c6f7bd47a32dab4df7becb845ae2d041",
+      "executable": false
+    },
+    "customer_plugin.py": {
+      "sha256": "7a834e7abcadd7ef82c2c5bcff53e0aeceafaa84743e60bd211efb9d51370083",
+      "executable": false
+    },
+    "customer_remote.py": {
+      "sha256": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c",
+      "executable": false
+    },
+    "deadline_protection.py": {
+      "sha256": "eebbd05d4e0337f655a0c0a7d533cbf040714525ed343b808a5ce329a022063e",
+      "executable": false
+    },
+    "gate_plugin.py": {
+      "sha256": "92de4aa6561738cc332489f08fd44afe1a8be81332ec9c401f0b572eafc41c0a",
+      "executable": false
+    },
+    "held_gate.py": {
+      "sha256": "c0f5e8245604faf11b3291d1980dc14d78ec466ac1d88481b04040fe00e0e262",
+      "executable": false
+    },
+    "onchain_retirement.py": {
+      "sha256": "55793af2ebd79b60ea5aecd9f57b6adbeaf5fd282d2660bb10f405beedc4d827",
+      "executable": false
+    },
+    "package_admin.py": {
+      "sha256": "c2d0d478a929a06f0c1256bee275dda3fd8368c859538ad403cfb77189f85248",
+      "executable": true
+    },
+    "package_customer.py": {
+      "sha256": "eeef9d38b62c246a884227f98cf26e366df0c95eb52d9b899fa9a287a8d6d236",
+      "executable": true
+    },
+    "package_gate.py": {
+      "sha256": "3e91bdf3015b498ef38f1d23911d0342c30e126672a8051933ef5c67ccfc3692",
+      "executable": true
+    },
+    "package_verify.py": {
+      "sha256": "6cd428c31a6f0a12147f27ee21ddf49a155fd13969453558baefd2fe65f9567b",
+      "executable": false
+    },
+    "remote_authority.py": {
+      "sha256": "8119c58defdb3c9b38b4f82e0ae722db84b6d5cdfcba019f7f96fa6444187e7b",
+      "executable": false
+    },
+    "restore_barrier.py": {
+      "sha256": "b22226be30ad966652bf5fd39f03eb281180516653e6fd58d5cdb24eac8a32e6",
+      "executable": false
+    },
+    "route_plan.py": {
+      "sha256": "9009ca272783c0a5cb9d52cb3def6eb657c8ebbf90701285a95d47af5951b0e4",
+      "executable": false
+    },
+    "runtime-manifest.json": {
+      "sha256": "b4fd59aa9f802fe460eabfecca0883dd9e9edfa5e51246f8bb034a239f0daeda",
+      "executable": false
+    }
+  },
+  "controller-a": {
+    "bolt11.py": {
+      "sha256": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80",
+      "executable": false
+    },
+    "bounded_authority.py": {
+      "sha256": "f116bbc42fcf5a0a5f6c6219bb3b975b8f47a1edbed6b0c3e95a9885560e34e7",
+      "executable": false
+    },
+    "chain_identity.py": {
+      "sha256": "fea8a32a10f0d6eae207d1e3534f71727e8bbdeac8577b8cd58ec3ef13d2cbda",
+      "executable": false
+    },
+    "chain_recovery.py": {
+      "sha256": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b",
+      "executable": false
+    },
+    "cross_contract.py": {
+      "sha256": "9083509399363eb3b2687e10c5b5887fef7e08012148ce641f74024eb10deb7b",
+      "executable": false
+    },
+    "cross_worker.py": {
+      "sha256": "f86965b2a94031d00aca6e6210ec4c36bb14c6fe0918205cf5c46553ac8071e9",
+      "executable": false
+    },
+    "customer_https.py": {
+      "sha256": "efdd811c997f8452799c15a11f6111ca06e74f9f57270b5cb40bc6ffcbc45020",
+      "executable": false
+    },
+    "customer_invoice.py": {
+      "sha256": "be13243a221a18c7cf0f9a72ccf8af34c6f7bd47a32dab4df7becb845ae2d041",
+      "executable": false
+    },
+    "customer_remote.py": {
+      "sha256": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c",
+      "executable": false
+    },
+    "deadline_protection.py": {
+      "sha256": "eebbd05d4e0337f655a0c0a7d533cbf040714525ed343b808a5ce329a022063e",
+      "executable": false
+    },
+    "held_gate.py": {
+      "sha256": "c0f5e8245604faf11b3291d1980dc14d78ec466ac1d88481b04040fe00e0e262",
+      "executable": false
+    },
+    "market_quote.py": {
+      "sha256": "8f463006633ae6f4da69b53bdd2f6bc4a3a3d1d926a21df9528706140e141914",
+      "executable": false
+    },
+    "onchain_retirement.py": {
+      "sha256": "55793af2ebd79b60ea5aecd9f57b6adbeaf5fd282d2660bb10f405beedc4d827",
+      "executable": false
+    },
+    "package_service.py": {
+      "sha256": "1acf3004c07fe3c20ef4abde693ee23887a5bcbc59c7e25eab49759243178c1e",
+      "executable": true
+    },
+    "package_verify.py": {
+      "sha256": "6cd428c31a6f0a12147f27ee21ddf49a155fd13969453558baefd2fe65f9567b",
+      "executable": false
+    },
+    "remote_authority.py": {
+      "sha256": "8119c58defdb3c9b38b4f82e0ae722db84b6d5cdfcba019f7f96fa6444187e7b",
+      "executable": false
+    },
+    "restore_barrier.py": {
+      "sha256": "b22226be30ad966652bf5fd39f03eb281180516653e6fd58d5cdb24eac8a32e6",
+      "executable": false
+    },
+    "route_plan.py": {
+      "sha256": "9009ca272783c0a5cb9d52cb3def6eb657c8ebbf90701285a95d47af5951b0e4",
+      "executable": false
+    },
+    "runtime-manifest.json": {
+      "sha256": "dfd29b2d582ac9e0af4f197f521a1714dd1995449e7d276f4109427131054a6c",
+      "executable": false
+    },
+    "service.py": {
+      "sha256": "0f2c0881052cb62ca079c2c87f168d9544cfa997b4523f32d6d5e2b49fe9c0d8",
+      "executable": false
+    },
+    "service_cli.py": {
+      "sha256": "361692f40b74b23e76b0ec5a04a04753aeb3c2ad5bd4d0f1750ce1fab6531d4e",
+      "executable": false
+    },
+    "service_market.py": {
+      "sha256": "a7e68b1a7fceb2a22dd92d6acb82a97a24bba552e9c87d0451fde9c56e9afdee",
+      "executable": false
+    },
+    "worker_pairing.py": {
+      "sha256": "a4d0604ad59016f272e012bb73a93affd2e21fd8dea51ae44d25a07f1c0c6424",
+      "executable": false
+    }
+  },
+  "btc-b": {
+    "authority_plugin.py": {
+      "sha256": "de9b817e1399d6b76e53a42aba4eddfe9fa60fb620f0434b0b45050b3491e73d",
+      "executable": false
+    },
+    "bolt11.py": {
+      "sha256": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80",
+      "executable": false
+    },
+    "bounded_authority.py": {
+      "sha256": "f116bbc42fcf5a0a5f6c6219bb3b975b8f47a1edbed6b0c3e95a9885560e34e7",
+      "executable": false
+    },
+    "chain_identity.py": {
+      "sha256": "fea8a32a10f0d6eae207d1e3534f71727e8bbdeac8577b8cd58ec3ef13d2cbda",
+      "executable": false
+    },
+    "chain_recovery.py": {
+      "sha256": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b",
+      "executable": false
+    },
+    "coordinator_admin.py": {
+      "sha256": "7592c45bdf83870c9ce50b738adec00150ae070b808fa309f87cd84edbb210cd",
+      "executable": false
+    },
+    "coordinator_admin_cli.py": {
+      "sha256": "8a8e61fd5e4e9106a0bfd1f87dc13bd4daedd5e17d933f5df2bfcc73fa02ed77",
+      "executable": false
+    },
+    "customer_invoice.py": {
+      "sha256": "be13243a221a18c7cf0f9a72ccf8af34c6f7bd47a32dab4df7becb845ae2d041",
+      "executable": false
+    },
+    "customer_plugin.py": {
+      "sha256": "7a834e7abcadd7ef82c2c5bcff53e0aeceafaa84743e60bd211efb9d51370083",
+      "executable": false
+    },
+    "customer_remote.py": {
+      "sha256": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c",
+      "executable": false
+    },
+    "deadline_protection.py": {
+      "sha256": "eebbd05d4e0337f655a0c0a7d533cbf040714525ed343b808a5ce329a022063e",
+      "executable": false
+    },
+    "gate_plugin.py": {
+      "sha256": "92de4aa6561738cc332489f08fd44afe1a8be81332ec9c401f0b572eafc41c0a",
+      "executable": false
+    },
+    "held_gate.py": {
+      "sha256": "c0f5e8245604faf11b3291d1980dc14d78ec466ac1d88481b04040fe00e0e262",
+      "executable": false
+    },
+    "onchain_retirement.py": {
+      "sha256": "55793af2ebd79b60ea5aecd9f57b6adbeaf5fd282d2660bb10f405beedc4d827",
+      "executable": false
+    },
+    "package_admin.py": {
+      "sha256": "c2d0d478a929a06f0c1256bee275dda3fd8368c859538ad403cfb77189f85248",
+      "executable": true
+    },
+    "package_customer.py": {
+      "sha256": "eeef9d38b62c246a884227f98cf26e366df0c95eb52d9b899fa9a287a8d6d236",
+      "executable": true
+    },
+    "package_gate.py": {
+      "sha256": "3e91bdf3015b498ef38f1d23911d0342c30e126672a8051933ef5c67ccfc3692",
+      "executable": true
+    },
+    "package_verify.py": {
+      "sha256": "6cd428c31a6f0a12147f27ee21ddf49a155fd13969453558baefd2fe65f9567b",
+      "executable": false
+    },
+    "remote_authority.py": {
+      "sha256": "8119c58defdb3c9b38b4f82e0ae722db84b6d5cdfcba019f7f96fa6444187e7b",
+      "executable": false
+    },
+    "restore_barrier.py": {
+      "sha256": "b22226be30ad966652bf5fd39f03eb281180516653e6fd58d5cdb24eac8a32e6",
+      "executable": false
+    },
+    "route_plan.py": {
+      "sha256": "9009ca272783c0a5cb9d52cb3def6eb657c8ebbf90701285a95d47af5951b0e4",
+      "executable": false
+    },
+    "runtime-manifest.json": {
+      "sha256": "418e7f30db27bd2410212263feb70a05d0e3a2e7705ea9344b3696c8a1cf198b",
+      "executable": false
+    }
+  },
+  "xbt-b": {
+    "authority_plugin.py": {
+      "sha256": "de9b817e1399d6b76e53a42aba4eddfe9fa60fb620f0434b0b45050b3491e73d",
+      "executable": false
+    },
+    "bolt11.py": {
+      "sha256": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80",
+      "executable": false
+    },
+    "bounded_authority.py": {
+      "sha256": "f116bbc42fcf5a0a5f6c6219bb3b975b8f47a1edbed6b0c3e95a9885560e34e7",
+      "executable": false
+    },
+    "chain_identity.py": {
+      "sha256": "fea8a32a10f0d6eae207d1e3534f71727e8bbdeac8577b8cd58ec3ef13d2cbda",
+      "executable": false
+    },
+    "chain_recovery.py": {
+      "sha256": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b",
+      "executable": false
+    },
+    "coordinator_admin.py": {
+      "sha256": "7592c45bdf83870c9ce50b738adec00150ae070b808fa309f87cd84edbb210cd",
+      "executable": false
+    },
+    "coordinator_admin_cli.py": {
+      "sha256": "8a8e61fd5e4e9106a0bfd1f87dc13bd4daedd5e17d933f5df2bfcc73fa02ed77",
+      "executable": false
+    },
+    "customer_invoice.py": {
+      "sha256": "be13243a221a18c7cf0f9a72ccf8af34c6f7bd47a32dab4df7becb845ae2d041",
+      "executable": false
+    },
+    "customer_plugin.py": {
+      "sha256": "7a834e7abcadd7ef82c2c5bcff53e0aeceafaa84743e60bd211efb9d51370083",
+      "executable": false
+    },
+    "customer_remote.py": {
+      "sha256": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c",
+      "executable": false
+    },
+    "deadline_protection.py": {
+      "sha256": "eebbd05d4e0337f655a0c0a7d533cbf040714525ed343b808a5ce329a022063e",
+      "executable": false
+    },
+    "gate_plugin.py": {
+      "sha256": "92de4aa6561738cc332489f08fd44afe1a8be81332ec9c401f0b572eafc41c0a",
+      "executable": false
+    },
+    "held_gate.py": {
+      "sha256": "c0f5e8245604faf11b3291d1980dc14d78ec466ac1d88481b04040fe00e0e262",
+      "executable": false
+    },
+    "onchain_retirement.py": {
+      "sha256": "55793af2ebd79b60ea5aecd9f57b6adbeaf5fd282d2660bb10f405beedc4d827",
+      "executable": false
+    },
+    "package_admin.py": {
+      "sha256": "c2d0d478a929a06f0c1256bee275dda3fd8368c859538ad403cfb77189f85248",
+      "executable": true
+    },
+    "package_customer.py": {
+      "sha256": "eeef9d38b62c246a884227f98cf26e366df0c95eb52d9b899fa9a287a8d6d236",
+      "executable": true
+    },
+    "package_gate.py": {
+      "sha256": "3e91bdf3015b498ef38f1d23911d0342c30e126672a8051933ef5c67ccfc3692",
+      "executable": true
+    },
+    "package_verify.py": {
+      "sha256": "6cd428c31a6f0a12147f27ee21ddf49a155fd13969453558baefd2fe65f9567b",
+      "executable": false
+    },
+    "remote_authority.py": {
+      "sha256": "8119c58defdb3c9b38b4f82e0ae722db84b6d5cdfcba019f7f96fa6444187e7b",
+      "executable": false
+    },
+    "restore_barrier.py": {
+      "sha256": "b22226be30ad966652bf5fd39f03eb281180516653e6fd58d5cdb24eac8a32e6",
+      "executable": false
+    },
+    "route_plan.py": {
+      "sha256": "9009ca272783c0a5cb9d52cb3def6eb657c8ebbf90701285a95d47af5951b0e4",
+      "executable": false
+    },
+    "runtime-manifest.json": {
+      "sha256": "418e7f30db27bd2410212263feb70a05d0e3a2e7705ea9344b3696c8a1cf198b",
+      "executable": false
+    }
+  },
+  "controller-b": {
+    "bolt11.py": {
+      "sha256": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80",
+      "executable": false
+    },
+    "bounded_authority.py": {
+      "sha256": "f116bbc42fcf5a0a5f6c6219bb3b975b8f47a1edbed6b0c3e95a9885560e34e7",
+      "executable": false
+    },
+    "chain_identity.py": {
+      "sha256": "fea8a32a10f0d6eae207d1e3534f71727e8bbdeac8577b8cd58ec3ef13d2cbda",
+      "executable": false
+    },
+    "chain_recovery.py": {
+      "sha256": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b",
+      "executable": false
+    },
+    "cross_contract.py": {
+      "sha256": "9083509399363eb3b2687e10c5b5887fef7e08012148ce641f74024eb10deb7b",
+      "executable": false
+    },
+    "cross_worker.py": {
+      "sha256": "f86965b2a94031d00aca6e6210ec4c36bb14c6fe0918205cf5c46553ac8071e9",
+      "executable": false
+    },
+    "customer_https.py": {
+      "sha256": "efdd811c997f8452799c15a11f6111ca06e74f9f57270b5cb40bc6ffcbc45020",
+      "executable": false
+    },
+    "customer_invoice.py": {
+      "sha256": "be13243a221a18c7cf0f9a72ccf8af34c6f7bd47a32dab4df7becb845ae2d041",
+      "executable": false
+    },
+    "customer_remote.py": {
+      "sha256": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c",
+      "executable": false
+    },
+    "deadline_protection.py": {
+      "sha256": "eebbd05d4e0337f655a0c0a7d533cbf040714525ed343b808a5ce329a022063e",
+      "executable": false
+    },
+    "held_gate.py": {
+      "sha256": "c0f5e8245604faf11b3291d1980dc14d78ec466ac1d88481b04040fe00e0e262",
+      "executable": false
+    },
+    "market_quote.py": {
+      "sha256": "8f463006633ae6f4da69b53bdd2f6bc4a3a3d1d926a21df9528706140e141914",
+      "executable": false
+    },
+    "onchain_retirement.py": {
+      "sha256": "55793af2ebd79b60ea5aecd9f57b6adbeaf5fd282d2660bb10f405beedc4d827",
+      "executable": false
+    },
+    "package_service.py": {
+      "sha256": "1acf3004c07fe3c20ef4abde693ee23887a5bcbc59c7e25eab49759243178c1e",
+      "executable": true
+    },
+    "package_verify.py": {
+      "sha256": "6cd428c31a6f0a12147f27ee21ddf49a155fd13969453558baefd2fe65f9567b",
+      "executable": false
+    },
+    "remote_authority.py": {
+      "sha256": "8119c58defdb3c9b38b4f82e0ae722db84b6d5cdfcba019f7f96fa6444187e7b",
+      "executable": false
+    },
+    "restore_barrier.py": {
+      "sha256": "b22226be30ad966652bf5fd39f03eb281180516653e6fd58d5cdb24eac8a32e6",
+      "executable": false
+    },
+    "route_plan.py": {
+      "sha256": "9009ca272783c0a5cb9d52cb3def6eb657c8ebbf90701285a95d47af5951b0e4",
+      "executable": false
+    },
+    "runtime-manifest.json": {
+      "sha256": "e406ca903ab8a23bf6b3d94d31cdbbd28d7a0dbe1d8cfaac6496465580e17b57",
+      "executable": false
+    },
+    "service.py": {
+      "sha256": "0f2c0881052cb62ca079c2c87f168d9544cfa997b4523f32d6d5e2b49fe9c0d8",
+      "executable": false
+    },
+    "service_cli.py": {
+      "sha256": "361692f40b74b23e76b0ec5a04a04753aeb3c2ad5bd4d0f1750ce1fab6531d4e",
+      "executable": false
+    },
+    "service_market.py": {
+      "sha256": "a7e68b1a7fceb2a22dd92d6acb82a97a24bba552e9c87d0451fde9c56e9afdee",
+      "executable": false
+    },
+    "worker_pairing.py": {
+      "sha256": "a4d0604ad59016f272e012bb73a93affd2e21fd8dea51ae44d25a07f1c0c6424",
+      "executable": false
+    }
+  }
+}

@@ -1,0 +1,297 @@
+{
+  "manifest": {
+    "environments": [
+      "regtest",
+      "mainnet"
+    ],
+    "files": {
+      "authority_plugin.py": "b9cd5dfeebe9efc465f369b52816b960120a28eb00ac4531f7a0f3aae1862d24",
+      "bolt11.py": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80",
+      "bounded_authority.py": "f58bd9189427cebef78cdded41d349b544eb0589189309b45ee346953ace337c",
+      "chain_identity.py": "1996610f3066083722b6e8582e94484427b608840ed13fe960166c78e5acc58c",
+      "chain_recovery.py": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b",
+      "coordinator_admin.py": "abb0ee6b6e87a46774a13c3f89c27810ab2cc2971ac2329d4a9e4ab5de69884d",
+      "coordinator_admin_cli.py": "42f7bf34da71d0d1f9107c69c8efe02a802e1d9c46233ef4f7ae5feec7fb67ad",
+      "customer_invoice.py": "62b012ef5800c99af3dce975259513e137425d23fde4f55fad79e000363f3469",
+      "customer_plugin.py": "cfcca3f2fffae75624ebc0ce80490384d97fbe67ce141c0d0e997cb084c3993e",
+      "customer_remote.py": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c",
+      "deadline_protection.py": "c323e6c89446893fc007492b245a0763560305348fa82caeb1e7ea9427cf18e2",
+      "gate_plugin.py": "9bb34ce2ca0094f928f41a1cfbd8fdbd3f6709604d6b25a849dd1b6c2135309c",
+      "held_gate.py": "3dba1559dfb2317aa6cc6b5b8e97d93750687334f566aac104d5448d9e55ae22",
+      "node_bootstrap.py": "5425068785a798f20ccc95f711437880e5b2af9198293c60db7a7c4a15c44ab8",
+      "node_cli.py": "49d1dafcfbcdef0c63579c9d6cafc089b8bb6229b932b2bb06983aa07d58eb23",
+      "onchain_retirement.py": "8c23e5c30dbad746ac604fafe6255ee2ab36eaa21a880299462b9a777be9bbb2",
+      "package_admin.py": "90440f9bc9f9398ea5a8933de84a6de36dd80e7303bdbeb3fcee37f8ca33cc10",
+      "package_customer.py": "b3d8a003fc5b107b92f29bec43d298bb54f73bf033f59384c552f8ddae6a2c2e",
+      "package_gate.py": "6e80b9ee768d4312bc84d324134bdb560b8c8ba3d15a94f889e1819198127e2e",
+      "package_node.py": "3886d9c7b1efac31a9e3c24d2f9cecfc60a23f11d374ddf3a9f1633e7746aede",
+      "package_verify.py": "76dc6a1038f33a1dada16ba57feb1aed38b65a11fecb5f1ef00ee4310c684408",
+      "remote_authority.py": "f9e4c157a3aca94041713e255668bdfe21173918d8c943248278c8a23ff4cf33",
+      "restore_barrier.py": "502251697353357c4338af2c93f58a80a8756e2400c1227856f912ef145279df",
+      "route_plan.py": "3c148795b39c0a130a7845a56e869600b911d9eeafee80016cd3ec4898fb7460"
+    },
+    "fixture": "0102",
+    "generation": "a",
+    "regtest_only": false,
+    "role": "node",
+    "schema": 2
+  },
+  "native": {
+    "bin/lightning-cli": {
+      "executable": true,
+      "sha256": "6f8788ed3211ab2688884215dbf338867f85023dc97d60053e1736d0f39eed87"
+    },
+    "bin/lightning-hsmtool": {
+      "executable": true,
+      "sha256": "ac4796ef941fa3ab8b95b9c9c5c352289bee1f8124d1e94bcc6789e03fbf5115"
+    },
+    "bin/lightningd": {
+      "executable": true,
+      "sha256": "ea5f3958deb908dbcabdcdf4fbe01c0b6b8ee6f94a97c4381fe47724f6eb5ae6"
+    },
+    "bin/reckless": {
+      "executable": true,
+      "sha256": "a63f5f872eaee0cb44095b45314770ff6be04af11495fe68b2e87d3fb6031b51"
+    },
+    "libexec/c-lightning/lightning_channeld": {
+      "executable": true,
+      "sha256": "9c267c53243357030ffc60d765d5a788a6fe4fee746b610ee9adc402138c2eec"
+    },
+    "libexec/c-lightning/lightning_closingd": {
+      "executable": true,
+      "sha256": "e7a3cc9d5a2da980028b91c2c4f3218845e5e40cbd84e7675e128059f19f232b"
+    },
+    "libexec/c-lightning/lightning_connectd": {
+      "executable": true,
+      "sha256": "87ccc748c2866e0b24f6ce8187ae2f1af349a393120f79d1934289d4611217c1"
+    },
+    "libexec/c-lightning/lightning_dualopend": {
+      "executable": true,
+      "sha256": "2985b6f8b60b21a5546863812502425bd9f7a622a01ab90bfa1bb11284b66735"
+    },
+    "libexec/c-lightning/lightning_gossip_compactd": {
+      "executable": true,
+      "sha256": "0117e19ca821ddd277bcab617eabca0cd3abe8db8706f0065b49f64034d3d482"
+    },
+    "libexec/c-lightning/lightning_gossipd": {
+      "executable": true,
+      "sha256": "544f1a7bcd933ce122dc47e815fe3b5d95d471717bd0573adb16dd33514bcec8"
+    },
+    "libexec/c-lightning/lightning_hsmd": {
+      "executable": true,
+      "sha256": "71beeb687e20c7c20937f7c4f6218aa047cd4cfb469b8ec32c65c25e97270c17"
+    },
+    "libexec/c-lightning/lightning_onchaind": {
+      "executable": true,
+      "sha256": "05f5b35ecd485557ba15f8b0d465d3c185662d7e6bf1dfcc42a68951c0703a82"
+    },
+    "libexec/c-lightning/lightning_openingd": {
+      "executable": true,
+      "sha256": "19fb205da84105a50e842d1b45199d8a1bf66b369b65a6eec837ed54f536a484"
+    },
+    "libexec/c-lightning/lightning_websocketd": {
+      "executable": true,
+      "sha256": "0361fccf77798f518bacd24eec5843825c5c254c1315eefbe1710e062ff489df"
+    },
+    "libexec/c-lightning/plugins/autoclean": {
+      "executable": true,
+      "sha256": "8fa72b921562fa044b7a51f96a9e5b5e4500054bcc730fafe2d74801224641b4"
+    },
+    "libexec/c-lightning/plugins/bcli": {
+      "executable": true,
+      "sha256": "7c2cae9564310e016cdf9221c37fae13ed3e165943821a2c83d26f6ade78580d"
+    },
+    "libexec/c-lightning/plugins/bookkeeper": {
+      "executable": true,
+      "sha256": "8172b6eab0de7184016e98cdcee836c5d4a9c0da5b0bfb12282c779f55b27f66"
+    },
+    "libexec/c-lightning/plugins/chanbackup": {
+      "executable": true,
+      "sha256": "fe60c0d4798dfe3b47c2ff8a12703ffb5addc2dc0b4b340bad4c5ab646bd0046"
+    },
+    "libexec/c-lightning/plugins/cln-askrene": {
+      "executable": true,
+      "sha256": "d1411424c601ed8701cbac6c8cff9851134a208c244f62444bcd71fd06777208"
+    },
+    "libexec/c-lightning/plugins/cln-bwatch": {
+      "executable": true,
+      "sha256": "189527233a78e11270366f71885c82f6c8b924e4f0d6c1736a9997e877e0199f"
+    },
+    "libexec/c-lightning/plugins/cln-grpc": {
+      "executable": true,
+      "sha256": "0b4774e23b8eb81e79fabc0602a43cc53bac962fe229533098b258fd72a4ae06"
+    },
+    "libexec/c-lightning/plugins/cln-renepay": {
+      "executable": true,
+      "sha256": "c71e626d7d3364bf99808589921a57e9ba411c0fde05d586e4cf4983ef5d6764"
+    },
+    "libexec/c-lightning/plugins/cln-xpay": {
+      "executable": true,
+      "sha256": "b240cc78ccbb3cb817bd0a9022c3348a992bf86265e81270295f9c8c058c7355"
+    },
+    "libexec/c-lightning/plugins/clnrest": {
+      "executable": true,
+      "sha256": "ad9a2ba9bf14df2dfb6360eef1b48e9852c3c3226e18e9cc4da677ac6feaf1b5"
+    },
+    "libexec/c-lightning/plugins/commando": {
+      "executable": true,
+      "sha256": "d911c716f69ba15ea60c60347e358870df6b120ad07c6d8ace716bf91b2b44f3"
+    },
+    "libexec/c-lightning/plugins/exposesecret": {
+      "executable": true,
+      "sha256": "54cff368c104ec00bd27b7e4e61d1d0e83956986769f0b34a48c52faffe40f99"
+    },
+    "libexec/c-lightning/plugins/funder": {
+      "executable": true,
+      "sha256": "67398c94921e578b21cf5ad9d9ba274fccc33c90ccaa1d6536b9dc386bc88713"
+    },
+    "libexec/c-lightning/plugins/keysend": {
+      "executable": true,
+      "sha256": "1191dd3df7243a9c195339500526d1282a23369a765dd493e395eb63ac4034cc"
+    },
+    "libexec/c-lightning/plugins/offers": {
+      "executable": true,
+      "sha256": "29ebbcaf7a2dd5d5fb29a7d523944793102c605c8802f4e42c92dfed297453f0"
+    },
+    "libexec/c-lightning/plugins/pay": {
+      "executable": true,
+      "sha256": "1aa7f453ee2b7f82adeae959150b09866043898a9e4a2e322f8f251cc4da9759"
+    },
+    "libexec/c-lightning/plugins/recklessrpc": {
+      "executable": true,
+      "sha256": "f131e41c7472ae6fcc00686d9e783c48559ee7fc8382468ac643cb87bab2c38b"
+    },
+    "libexec/c-lightning/plugins/recover": {
+      "executable": true,
+      "sha256": "3f2ab011c264cee8a394b375c8aab83104257dd6ba88a9e27e971ee8e1b3b9ce"
+    },
+    "libexec/c-lightning/plugins/spenderp": {
+      "executable": true,
+      "sha256": "1f2d9c4cbafda1812044f610ef8ee8e5e55f9153030fcb8ce2dcee2bac8a8cff"
+    },
+    "libexec/c-lightning/plugins/sql": {
+      "executable": true,
+      "sha256": "81cdabacf5aef86e0b89e1bf922038520b8ac159f70ed07d91a0dd196c057770"
+    },
+    "libexec/c-lightning/plugins/topology": {
+      "executable": true,
+      "sha256": "b18e8e8a416f3e0b7206f870725d8af4b35460a1ccd6df4872d20a5a3cfbf873"
+    },
+    "libexec/c-lightning/plugins/txprepare": {
+      "executable": true,
+      "sha256": "dd82d59353f14ac7441588125117f7769f6ea30ed06a2337672f47747ab1f7f3"
+    },
+    "share/swap0094/baseline-recovery-weight.txt": {
+      "executable": false,
+      "sha256": "4d0c3d7cf5cad11e18d0a53bfab21f62cca55f16dc1f8983674a3087575f4dae"
+    },
+    "share/swap0094/patched-recovery-weight.txt": {
+      "executable": false,
+      "sha256": "2858961f330027ddf00e67051f28b1634e40220a9fb9d9485abd743b230ff71c"
+    }
+  },
+  "runtime": {
+    "authority_plugin.py": {
+      "executable": false,
+      "sha256": "b9cd5dfeebe9efc465f369b52816b960120a28eb00ac4531f7a0f3aae1862d24"
+    },
+    "bolt11.py": {
+      "executable": false,
+      "sha256": "8bf26568bce09894af34eab23db2546d9330e257df92f9232d4affff08919f80"
+    },
+    "bounded_authority.py": {
+      "executable": false,
+      "sha256": "f58bd9189427cebef78cdded41d349b544eb0589189309b45ee346953ace337c"
+    },
+    "chain_identity.py": {
+      "executable": false,
+      "sha256": "1996610f3066083722b6e8582e94484427b608840ed13fe960166c78e5acc58c"
+    },
+    "chain_recovery.py": {
+      "executable": false,
+      "sha256": "9fb7725e67b440e9c76dcfc4e3c17a5b740c0acd3880f120e7d83b789488741b"
+    },
+    "coordinator_admin.py": {
+      "executable": false,
+      "sha256": "abb0ee6b6e87a46774a13c3f89c27810ab2cc2971ac2329d4a9e4ab5de69884d"
+    },
+    "coordinator_admin_cli.py": {
+      "executable": false,
+      "sha256": "42f7bf34da71d0d1f9107c69c8efe02a802e1d9c46233ef4f7ae5feec7fb67ad"
+    },
+    "customer_invoice.py": {
+      "executable": false,
+      "sha256": "62b012ef5800c99af3dce975259513e137425d23fde4f55fad79e000363f3469"
+    },
+    "customer_plugin.py": {
+      "executable": false,
+      "sha256": "cfcca3f2fffae75624ebc0ce80490384d97fbe67ce141c0d0e997cb084c3993e"
+    },
+    "customer_remote.py": {
+      "executable": false,
+      "sha256": "7ecee9b1e0e3626782d4984d6fb1eaf7be7b17962ddcd17ddfacd8b30d9b912c"
+    },
+    "deadline_protection.py": {
+      "executable": false,
+      "sha256": "c323e6c89446893fc007492b245a0763560305348fa82caeb1e7ea9427cf18e2"
+    },
+    "gate_plugin.py": {
+      "executable": false,
+      "sha256": "9bb34ce2ca0094f928f41a1cfbd8fdbd3f6709604d6b25a849dd1b6c2135309c"
+    },
+    "held_gate.py": {
+      "executable": false,
+      "sha256": "3dba1559dfb2317aa6cc6b5b8e97d93750687334f566aac104d5448d9e55ae22"
+    },
+    "node_bootstrap.py": {
+      "executable": false,
+      "sha256": "5425068785a798f20ccc95f711437880e5b2af9198293c60db7a7c4a15c44ab8"
+    },
+    "node_cli.py": {
+      "executable": false,
+      "sha256": "49d1dafcfbcdef0c63579c9d6cafc089b8bb6229b932b2bb06983aa07d58eb23"
+    },
+    "onchain_retirement.py": {
+      "executable": false,
+      "sha256": "8c23e5c30dbad746ac604fafe6255ee2ab36eaa21a880299462b9a777be9bbb2"
+    },
+    "package_admin.py": {
+      "executable": true,
+      "sha256": "90440f9bc9f9398ea5a8933de84a6de36dd80e7303bdbeb3fcee37f8ca33cc10"
+    },
+    "package_customer.py": {
+      "executable": true,
+      "sha256": "b3d8a003fc5b107b92f29bec43d298bb54f73bf033f59384c552f8ddae6a2c2e"
+    },
+    "package_gate.py": {
+      "executable": true,
+      "sha256": "6e80b9ee768d4312bc84d324134bdb560b8c8ba3d15a94f889e1819198127e2e"
+    },
+    "package_node.py": {
+      "executable": true,
+      "sha256": "3886d9c7b1efac31a9e3c24d2f9cecfc60a23f11d374ddf3a9f1633e7746aede"
+    },
+    "package_verify.py": {
+      "executable": false,
+      "sha256": "76dc6a1038f33a1dada16ba57feb1aed38b65a11fecb5f1ef00ee4310c684408"
+    },
+    "remote_authority.py": {
+      "executable": false,
+      "sha256": "f9e4c157a3aca94041713e255668bdfe21173918d8c943248278c8a23ff4cf33"
+    },
+    "restore_barrier.py": {
+      "executable": false,
+      "sha256": "502251697353357c4338af2c93f58a80a8756e2400c1227856f912ef145279df"
+    },
+    "route_plan.py": {
+      "executable": false,
+      "sha256": "3c148795b39c0a130a7845a56e869600b911d9eeafee80016cd3ec4898fb7460"
+    },
+    "runtime-manifest.json": {
+      "executable": false,
+      "sha256": "b43a7c0e781fe4b7e894b708daef7fa9af08f4447e580f0e01b243551fb188c1"
+    }
+  },
+  "shared_libraries_available": true,
+  "version": "v26.06.9-blake2b.7-swap0094"
+}

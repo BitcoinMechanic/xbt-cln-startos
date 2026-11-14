@@ -1,4 +1,6 @@
-import { socksHostId, socksPort } from 'tor-startos/startos/utils'
+// Tor contract verified at 0ef9d2c06b49cb2ac5552bcffe29941817b2a1a7 (utils/index.ts).
+const socksHostId = 'socks'
+const socksPort = 9050
 import { clnConfig } from '../fileModels/config'
 import { storeJson } from '../fileModels/store.json'
 import { peerHostId, peerInterfaceId } from '../interfaces'
@@ -47,12 +49,8 @@ export const watchHosts = sdk.setupOnInit(async (effects, _) => {
     })
     .const()
 
-  const storedHosts = await storeJson
-    .read((s) => ({
-      custom: s.customExternalHosts,
-      vpn: s.clearnetVpn?.announce ?? null,
-    }))
-    .const(effects)
+  const customExternalHosts =
+    (await storeJson.read((s) => s.customExternalHosts).const(effects)) ?? []
 
   // `always-use-proxy` disables lightningd's DNS lookups, and an announce-addr
   // it cannot resolve is a fatal parse error, not a warning — writing the host
@@ -61,12 +59,7 @@ export const watchHosts = sdk.setupOnInit(async (effects, _) => {
   const torOnly = await clnConfig
     .read((c) => c['tor-only'] === true)
     .const(effects)
-  const externalHosts = torOnly
-    ? []
-    : [
-        ...(storedHosts?.custom ?? []),
-        ...(storedHosts?.vpn ? [storedHosts.vpn] : []),
-      ]
+  const externalHosts = torOnly ? [] : customExternalHosts
 
   // A tunnel endpoint stands in for this server's own address, so it replaces
   // the detected public IPs rather than joining them — announcing both hands

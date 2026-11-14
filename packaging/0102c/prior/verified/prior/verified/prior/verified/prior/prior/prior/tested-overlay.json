@@ -1,0 +1,30 @@
+{
+  "README.md": {
+    "after_sha256": "94c9ad2c1cae6be6ae177cc66a4684b9bbbe9ed393c471dbfac2e5c12fdd7535",
+    "before_sha256": "98c6f8d476e3ce3d09e9e873f6fcfb31956b98d78efc519091ae47dd44689e85"
+  },
+  "instructions.md": {
+    "after_sha256": "e4b34faca717db55792858dbb6f296cc6306c72baada3b91bf3e191b29cd9729",
+    "before_sha256": "1dfb5f9bba6ed4afcfe2f47f1279bcbacc28f5468e6daa45d684345590c6f098"
+  },
+  "scripts/fixtures/knots-mainnet-20261012.json": {
+    "after_sha256": "ea80fbafc072f0231c46e01a79c7730c3f4ff83a2d1cf570023072e520291cff",
+    "before_sha256": null
+  },
+  "scripts/test-package.cjs": {
+    "after_sha256": "dc4b74ce2119838088d8a76c300b05afa2c6a2ee60ef77de252975319e6f84f5",
+    "before_sha256": "dbe061e68d41304530b5ae114f27ec8fde658b7c7ca459c59d9b0eea2afe9958"
+  },
+  "startos/main.ts": {
+    "after_sha256": "68e73b1ca87737d984209fb8be78e38568dcc810a37bfea6a6930c034c5127f0",
+    "before_sha256": "a33f4418be409dddac4dc1ef1f26b6be57c0f9168f618191fb548f01ebdf6477"
+  },
+  "startos/versions/current.ts": {
+    "after_sha256": "73dd07850572fd1cb684ec33b3bde66dd5b370dd7486c72983952b4bd5438a29",
+    "before_sha256": "fdefa0cd6b47920911c63a4827f16c7c560e0633e7f0fe2d425725ee2a339621"
+  },
+  "startos/xbtPolicy.ts": {
+    "after_sha256": "6b8f81c8455674a9800dfbfa6c0d06bf6f6ac4219cac01aae6034af1b5c00563",
+    "before_sha256": "5433c938f782b6bf7a7f3dfe2e3ed941c1453a51a39d0448b2bcdf50141fbc7d"
+  }
+}

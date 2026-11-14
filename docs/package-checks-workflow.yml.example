@@ -1,0 +1,30 @@
+name: XBT package checks
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: ['integrate/**']
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:package
+      - run: node scripts/test-local-trust.cjs
+      - run: npm run build
+      - name: Verify sealed runtime and admission diagnostics
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONPATH: assets/swap-node
+        run: |
+          python3 -B -c "import package_verify; package_verify.verify('assets/swap-node', 'node')"
+          python3 -B -m unittest discover -s assets -p test_incoming_admission.py
+          python3 -B -m unittest discover -s assets -p test_timelock_errors.py

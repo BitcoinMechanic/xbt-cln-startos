@@ -1,0 +1,20 @@
+{
+  "unit_tests": {
+    "tests": 184,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "runner_regression_tests": {
+    "retained_evidence_lookup": 6,
+    "resume_pack": 9,
+    "packed_manifest": 10
+  },
+  "application_trees": {
+    "btc-cln-startos": "6aebe2ddad7f4cfa83a5606de0cf99ca1b5f45ce",
+    "lightning": "0fe05e7c50fdc9aba95d8b08a1eee0cf25c64d87",
+    "swap-controller-startos": "59ab1c79723ebffc1e69d8df87ec3346cee3c974",
+    "xbt-cln-startos": "296e53f0763a5ad46cf23fb2186c169f01170624"
+  },
+  "scope": "Local source checkpoint validation; no newly funded swaps, rebuild or live-node operations"
+}

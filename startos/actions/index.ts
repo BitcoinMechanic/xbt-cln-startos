@@ -1,3 +1,4 @@
+import { createActions } from '../live/actions'
 import { sdk } from '../sdk'
 import { experimental } from './config/experimental'
 import { config } from './config/config'
@@ -12,36 +13,18 @@ import { watchtowerClientInfo } from './watchtower/watchtowerClientInfo'
 import { rescanBlockchain } from './rescanBlockchain'
 import { nodeInfo } from './nodeInfo'
 import { displaySeed } from './displaySeed'
-import { clearnetVpn } from './clearnetVpn'
-import { payInvoice } from './payInvoice'
-import { receivePayment } from './receivePayment'
-import {
-  clbossIgnoreOnchain,
-  clbossNoticeOnchain,
-  clbossStatus,
-  clbossUnmanage,
-} from './clboss'
 
-export const actions = sdk.Actions.of()
+const nodeActions = sdk.Actions.of()
   .addAction(config)
   .addAction(displaySeed)
   .addAction(experimental)
-  .addAction(plugins)
-  .addAction(watchtower)
   .addAction(createRune)
   .addAction(revokeRunes)
   .addAction(deleteGossipStore)
   .addAction(resetPassword)
-  .addAction(watchtowerInfo)
-  .addAction(watchtowerClientInfo)
   .addAction(rescanBlockchain)
   .addAction(nodeInfo)
-  .addAction(clearnetVpn)
-  .addAction(payInvoice)
-  .addAction(receivePayment)
-  .addAction(clbossStatus)
-  .addAction(clbossIgnoreOnchain)
-  .addAction(clbossNoticeOnchain)
-  .addAction(clbossUnmanage)
 
 // @TODO generate-lnlink
+
+export const actions = createActions(undefined, nodeActions)

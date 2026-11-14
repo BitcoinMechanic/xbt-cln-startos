@@ -1,0 +1,382 @@
+2026-11-06T20:56:23.221Z INFO    lightningd: v26.06.9-blake2b.7-swap0094
+2026-11-06T20:56:23.240Z INFO    lightningd: Creating configuration directory /root/.lightning/bitcoin
+2026-11-06T20:56:23.278Z UNUSUAL plugin-bookkeeper: topic 'utxo_deposit' is not a known notification topic
+2026-11-06T20:56:23.278Z UNUSUAL plugin-bookkeeper: topic 'utxo_spend' is not a known notification topic
+Usage: /opt/xbt/bin/lightningd 
+A bitcoin lightning daemon (default values shown for network: bitcoin).
+--list-features-only                    List the features configured, and exit
+                                        immediately
+--developer                             Enable developer commands/options,
+                                        disable legacy APIs
+--conf=<file>                           Specify configuration file
+                                         (default: "/config")
+--lightning-dir=<dir>                   Set base directory: network-specific
+                                        subdirectory is under here
+                                         (default: "/root/.lightning")
+--network <arg>                         Select the network parameters (bitcoin,
+                                        testnet, signet, or regtest)
+                                         (default: bitcoin)
+--testnet                               Alias for --network=testnet
+--testnet4                              Alias for --network=testnet4
+--signet                                Alias for --network=signet
+--mainnet                               Alias for --network=bitcoin
+--regtest                               Alias for --network=regtest
+--version|-V                            Print version and exit
+--rpc-file <arg>                        Set JSON-RPC socket (or /dev/tty)
+                                         (default: "lightning-rpc")
+--test-daemons-only                     Test that subdaemons can be run, then
+                                        exit immediately
+--allow-deprecated-apis <arg>           Enable deprecated options, JSONRPC
+                                        commands, fields, etc. (default: true)
+--plugin <arg>                          Add a plugin to be run (can be used
+                                        multiple times)
+--plugin-dir <arg>                      Add a directory to load plugins from
+                                        (can be used multiple times)
+--clear-plugins                         Remove all plugins added before this
+                                        option
+--disable-plugin <arg>                  Disable a particular plugin by
+                                        filename/name
+--important-plugin <arg>                Add an important plugin to be run (can
+                                        be used multiple times). Die if the
+                                        plugin dies.
+--always-use-proxy <arg>                Use the proxy always (default: false)
+--daemon                                Run in the background, suppress
+                                        stdout/stderr
+--wallet <arg>                          Location of the wallet database.
+--recover <arg>                         Populate hsm_secret with the given
+                                        codex32/hex/mnemonic secret and starts
+                                        the node in `offline` mode.
+--experimental-dual-fund                experimental: Advertise dual-funding and
+                                        allow peers to establish channels via v2
+                                        channel open protocol.
+--experimental-splicing                 experimental: Enables the ability to
+                                        resize channels using splicing
+--experimental-shutdown-wrong-funding   EXPERIMENTAL: allow shutdown with
+                                        alternate txids
+--help|-h                               Print this message.
+--rgb <arg>                             RRGGBB hex color for node
+--alias <arg>                           Up to 32-byte alias for node
+--pid-file=<file>                       Specify pid file
+                                         (default: "/root/.lightning/lightningd-bitcoin.pid")
+--ignore-fee-limits <arg>               (DANGEROUS) allow peer to set any
+                                        feerate (default: false)
+--watchtime-blocks <arg>                Blocks before peer can unilaterally
+                                        spend funds (default: 144)
+--funding-confirms <arg>                Confirmations required for funding
+                                        transaction (default: 3)
+--require-confirmed-inputs <arg>        Confirmations required for inputs to
+                                        funding transaction (v2 opens only)
+                                         (default: false)
+--cltv-delta <arg>                      Number of blocks for cltv_expiry_delta
+                                         (default: 34)
+--cltv-final <arg>                      Number of blocks for final cltv_expiry
+                                         (default: 18)
+--commit-time=<millseconds>             Time after changes before sending out
+                                        COMMIT (default: 10)
+--fee-base <arg>                        Millisatoshi minimum to charge for HTLC
+                                         (default: 1000)
+--rescan <arg>                          Number of blocks to rescan from the
+                                        current head, or absolute blockheight if
+                                        negative (default: 15)
+--fee-per-satoshi <arg>                 Microsatoshi fee for every satoshi in
+                                        HTLC (default: 10)
+--htlc-minimum-msat <arg>               The default minimal value an HTLC must
+                                        carry in order to be forwardable for new
+                                        channels (default: 0)
+--htlc-maximum-msat <arg>               The default maximal value an HTLC must
+                                        carry in order to be forwardable for new
+                                        channel (default: 18446744073709551615)
+--max-concurrent-htlcs <arg>            Number of HTLCs one channel can handle
+                                        concurrently. Should be between 1 and
+                                        483 (default: 30)
+--max-dust-htlc-exposure-msat <arg>     Max HTLC amount that can be trimmed
+                                         (default: 50000000)
+--min-capacity-sat <arg>                Minimum capacity in satoshis for
+                                        accepting channels (default: 10000)
+--addr <arg>                            Set an IP address (v4 or v6) to listen
+                                        on and announce to the network for
+                                        incoming connections
+--bind-addr <arg>                       Set an IP address (v4 or v6) to listen
+                                        on, but not announce
+--announce-addr <arg>                   Set an IP address (v4 or v6) or .onion
+                                        v3 to announce, but not listen on
+--announce-addr-discovered <arg>        Explicitly turns IP discovery 'on' or
+                                        'off'. (default: auto)
+--announce-addr-discovered-port <arg>   Sets the public TCP port to use for
+                                        announcing discovered IPs.
+                                         (default: 9735)
+--offline                               Start in offline-mode (do not
+                                        automatically reconnect and do not
+                                        accept incoming connections)
+--autolisten <arg>                      If true, listen on default port and
+                                        announce if it seems to be a public
+                                        interface (default: true)
+--proxy <arg>                           Set a socks v5 proxy IP address and port
+--tor-service-password <arg>            Set a Tor hidden service password
+--accept-htlc-tlv-type <arg>            HTLC TLV type to accept (can be used
+                                        multiple times)
+--disable-dns                           Disable DNS lookups of peers
+--hsm-passphrase                        Prompt for passphrase for encrypted
+                                        hsm_secret (replaces --encrypted-hsm)
+--rpc-file-mode <arg>                   Set the file mode (permissions) for the
+                                        JSON-RPC socket (default: 0600)
+--force-feerates <arg>                  Set testnet/regtest feerates in sats
+                                        perkw,
+                                        opening/mutual_close/unlateral_close/delayed_to_us/htlc_resolution/penalty:
+                                        if fewer specified, last number applies
+                                        to remainder
+--commit-fee <arg>                      Percentage of fee to request for their
+                                        commitment (default: 100)
+--commit-feerate-offset <arg>           Additional feerate per kw to apply to
+                                        feerate updates as the channel opener
+                                         (default: 5)
+--min-emergency-msat <arg>              Amount to leave in wallet for spending
+                                        anchor closes (default: 25000000)
+--subdaemon <arg>                       Arg specified as SUBDAEMON:PATH.
+                                        Specifies an alternate subdaemon binary.
+                                        If the supplied path is relative the
+                                        subdaemon binary is found in the working
+                                        directory. This option may be specified
+                                        multiple times. For example,
+                                        --subdaemon=hsmd:remote_signer would use
+                                        a hypothetical remote signing subdaemon.
+--invoices-onchain-fallback             Include an onchain address in invoices
+                                        and mark them as paid if payment is
+                                        received on-chain
+--database-upgrade <arg>                Set to true to allow database upgrades
+                                        even on non-final releases (WARNING: you
+                                        won't be able to downgrade!)
+--i-promise-to-fix-broken-api-user <arg>
+                                        Re-enable a long-deprecated API (which
+                                        will be removed entirely next version!)
+--log-level <arg>                       log level (io, debug, info, unusual,
+                                        broken) [:prefix] (default: info)
+--log-timestamps <arg>                  prefix log messages with timestamp
+                                         (default: true)
+--log-prefix <arg>                      log prefix
+--log-file=<file>                       Also log to file (- for stdout)
+--payment-fronting-node <arg>           Put this node in all invoices and
+                                        offers, and use blinded path (bolt12) or
+                                        route hints (bolt11) to route to this
+                                        node.  Must be a neighboring node.  Can
+                                        be specified multiple times.
+--message-padding <arg>                 If true, pad all messages to peers to
+                                        make them equal length (default: false)
+--dev-debugger=<subprocess>             Invoke gdb at start of <subprocess>
+--dev-no-plugin-checksum                Don't checksum plugins to detect changes
+--dev-builtin-plugins-unimportant       Make builtin plugins unimportant so you
+                                        can plugin stop them.
+--dev-no-reconnect                      Disable automatic reconnect-attempts by
+                                        this node, but accept incoming
+--dev-no-reconnect-private              Disable automatic reconnect-attempts to
+                                        peers with private channel(s) only, but
+                                        accept incoming
+--dev-fast-reconnect                    Make max default reconnect delay 3 (not
+                                        300) seconds
+--dev-reject-closing-fee                Reject every closing fee the peer
+                                        offers, as if outside our limits
+--dev-disconnect=<filename>             File containing disconnection points
+--dev-blake2b-activation-height=<height>
+                                        Height at which the proof of work
+                                        changed, overriding the chain parameter
+                                         (default: 0)
+--dev-allow-localhost                   Announce and allow announcments for
+                                        localhost address
+--dev-bitcoind-poll <arg>               Time between polling for new
+                                        transactions (default: 30)
+--dev-fast-gossip                       Make gossip broadcast 1 second, etc
+--dev-fast-gossip-prune                 Make gossip pruning 120 seconds
+--dev-force-privkey <arg>               Force HSM to use this as node private
+                                        key
+--dev-force-bip32-seed <arg>            Force HSM to use this as bip32 seed
+--dev-force-channel-secrets <arg>       Force HSM to use these for all
+                                        per-channel secrets
+--dev-max-funding-unconfirmed-blocks <arg>
+                                        Maximum number of blocks we wait for a
+                                        channel funding transaction to confirm,
+                                        if we are the fundee. (default: 2016)
+--dev-force-tmp-channel-id <arg>        Force the temporary channel id, instead
+                                        of random
+--dev-no-htlc-timeout                   Don't kill channeld if HTLCs not
+                                        confirmed within 30 seconds
+--dev-fail-process-onionpacket          Force all processing of onion packets to
+                                        fail
+--dev-no-version-checks                 Skip calling subdaemons with --version
+                                        on startup
+--dev-force-features <arg>              Force the
+                                        init/globalinit/node_announce/channel/bolt11/
+                                        features, each comma-separated
+                                        bitnumbers OR a single +/-<bitnumber>
+--dev-timeout-secs <arg>                Seconds to timeout if we don't receive
+                                        INIT from peer (default: 60)
+--dev-no-modern-onion                   Ignore modern onion messages
+--dev-disable-commit-after <arg>        Disable commit timer after this many
+                                        commits (default: -1)
+--dev-no-ping-timer                     Don't hang up if we don't get a ping
+                                        response
+--dev-onion-reply-length <arg>          Send onion errors of custom length
+                                         (default: 256)
+--dev-max-fee-multiplier <arg>          Allow the fee proposed by the remote end
+                                        to be up to multiplier times higher than
+                                        our own. Small values will cause
+                                        channels to be closed more often due to
+                                        fee fluctuations, large values may
+                                        result in large fees. (default: 10)
+--dev-allowdustreserve <arg>            If true, we allow the `fundchannel` RPC
+                                        command and the `openchannel` plugin
+                                        hook to set a reserve that is below the
+                                        dust limit. (default: false)
+--dev-any-channel-type                  Allow sending any channel type, and
+                                        accept any
+--dev-splice-without-unified-sigs       Start a splice of a channel without
+                                        option_unified_sigs
+--dev-allow-shutdown-destination-change
+                                        Allow destination override on close,
+                                        even if risky
+--dev-hsmd-no-preapprove-check          Tell hsmd not to support
+                                        preapprove_check msgs
+--dev-hsmd-fail-preapprove              Tell hsmd to always deny
+                                        preapprove_invoice / preapprove_keysend
+--dev-fd-limit-multiplier <arg>         Try to set fd limit to this many times
+                                        by number of channels (default: 2)
+                                         (default: 2)
+--dev-handshake-no-reply                Don't send or read init message after
+                                        connection
+--dev-strict-forwarding                 Forward HTLCs along the channel
+                                        specified
+--dev-throttle-gossip                   Throttle gossip right down, for testing
+--dev-limit-connections-inflight        Throttle connection limiting down for
+                                        testing.
+--autoconnect-seeker-peers <arg>        Seeker autoconnects to maintain this
+                                        minimum number of gossip peers
+                                         (default: 10)
+--dev-low-prio-anchor-blocks <arg>      How many blocks to aim for low-priority
+                                        anchor closes (default: 2016)
+                                         (default: 2016)
+--dev-crash-after <arg>                 Crash if we are still going after this
+                                        long.
+--dev-warn-on-overgrind                 Warn if we create signatures that are
+                                        not exactly 71 bytes.
+--dev-save-plugin-io <arg>              Directory to place all plugin
+                                        notifications/hooks JSON into.
+--dev-keep-nagle                        Tell connectd not to set TCP_NODELAY.
+--dev-debug-self                        Fire up a terminal window with a
+                                        debugger in it on initialization
+--bkpr-currency <arg>                   Look up and record this currency on each
+                                        event
+--renepay-debug-mcf                     Enable renepay MCF debug info.
+--renepay-debug-payflow                 Enable renepay payment flows debug info.
+--xpay-handle-pay <arg>                 Make xpay take over pay commands it can
+                                        handle. (default: true)
+--xpay-slow-mode <arg>                  Wait until all parts have completed
+                                        before returning success or failure
+                                         (default: false)
+--xpay-user-layer <arg>                 Add a layer that will be used for every
+                                        payment
+--askrene-timeout <arg>                 How many seconds to try before giving up
+                                        on calculating a route. Defaults to 10
+                                        seconds (default: 10)
+--askrene-max-threads <arg>             How many routes to calculate at once.
+                                        Defaults to 4 (default: 4)
+--fetchinvoice-noconnect                Don't try to connect directly to
+                                        fetch/pay an invoice.
+--bitcoin-datadir <arg>                 -datadir arg for bitcoin-cli
+--bitcoin-cli <arg>                     bitcoin-cli pathname
+--bitcoin-rpcuser <arg>                 bitcoind RPC username
+--bitcoin-rpcpassword <arg>             bitcoind RPC password
+--bitcoin-rpcconnect <arg>              bitcoind RPC host to connect to
+--bitcoin-rpcport <arg>                 bitcoind RPC host's port
+--bitcoin-rpcclienttimeout <arg>        bitcoind RPC timeout in seconds during
+                                        HTTP requests (default: 60)
+--bitcoin-retry-timeout <arg>           how long to keep retrying to contact
+                                        bitcoind before fatally exiting
+                                         (default: 60)
+--experimental-bwatch                   experimental: enable the bwatch chain
+                                        watcher (off by default)
+--bwatch-poll-interval <arg>            Milliseconds between chain polls
+                                        (default: 30000) (default: 30000)
+--disable-mpp                           Disable multi-part payments.
+--grpc-host <arg>                       Which host should the grpc listen for
+                                        incomming connections?
+                                         (default: 127.0.0.1)
+--grpc-msg-buffer-size <arg>            Number of notifications which can be
+                                        stored in the grpc message buffer.
+                                        Notifications can be skipped if this
+                                        buffer is full (default: 1024)
+--grpc-port <arg>                       Which port should the grpc plugin listen
+                                        for incoming connections?
+                                         (default: 9736)
+--funder-policy <arg>                   Policy to use for dual-funding requests.
+                                        [match, available, fixed]
+                                         (default: fixed)
+--funder-policy-mod <arg>               Percent to apply policy at
+                                        (match/available); or amount to fund
+                                        (fixed) (default: 0)
+--funder-min-their-funding <arg>        Minimum funding peer must open with to
+                                        activate our policy (default: 10000sat)
+--funder-max-their-funding <arg>        Maximum funding peer may open with to
+                                        activate our policy
+                                         (default: 4294967295sat)
+--funder-per-channel-min <arg>          Minimum funding we'll add to a channel.
+                                        If we can't meet this, we don't fund
+                                         (default: 10000sat)
+--funder-per-channel-max <arg>          Maximum funding we'll add to a channel.
+                                        We cap all contributions to this
+                                         (default: 4294967295sat)
+--funder-reserve-tank <arg>             Amount of funds we'll always leave
+                                        available. (default: 0sat)
+--funder-fuzz-percent <arg>             Percent to fuzz the policy contribution
+                                        by. Defaults to 0%. Max is 100%
+                                         (default: 0)
+--funder-fund-probability <arg>         Percent of requests to consider.
+                                        Defaults to 100%. Setting to 0% will
+                                        disable dual-funding (default: 100)
+--funder-lease-requests-only <arg>      Only fund lease requests. Defaults to
+                                        true if channel lease rates are being
+                                        advertised (default: true)
+--lease-fee-base-sat <arg>              Channel lease rates, base fee for leased
+                                        funds, in satoshi.
+--lease-fee-basis <arg>                 Channel lease rates, basis charged for
+                                        leased funds (per 10,000 satoshi.)
+--lease-funding-weight <arg>            Channel lease rates, weight we'll ask
+                                        opening peer to pay for in funding
+                                        transaction
+--channel-fee-max-base-msat <arg>       Channel lease rates, maximum channel fee
+                                        base we'll charge for funds routed
+                                        through a leased channel.
+--channel-fee-max-proportional-thousandths <arg>
+                                        Channel lease rates, maximum
+                                        proportional fee (in thousandths, or
+                                        ppt) we'll charge for funds routed
+                                        through a leased channel. Note: 1ppt =
+                                        1,000ppm
+--exposesecret-passphrase <arg>         Enable exposesecret command to allow HSM
+                                        Secret backup, with this passphrase
+--autoclean-cycle <arg>                 Perform cleanup every given seconds
+                                         (default: 3600)
+--autoclean-succeededforwards-age <arg>
+                                        How old do successful forwards have to
+                                        be before deletion (0 = never)
+--autoclean-failedforwards-age <arg>    How old do failed forwards have to be
+                                        before deletion (0 = never)
+--autoclean-succeededpays-age <arg>     How old do successful pays have to be
+                                        before deletion (0 = never)
+--autoclean-failedpays-age <arg>        How old do failed pays have to be before
+                                        deletion (0 = never)
+--autoclean-paidinvoices-age <arg>      How old do paid invoices have to be
+                                        before deletion (0 = never)
+--autoclean-expiredinvoices-age <arg>   How old do expired invoices have to be
+                                        before deletion (0 = never)
+--autoclean-networkevents-age <arg>     How old do networkevents have to be
+                                        before deletion (0 = never)
+                                         (default: 2592000)
+--clnrest-host <arg>                    REST server host (default: 127.0.0.1)
+--clnrest-certs <arg>                   Path for certificates (for https)
+--clnrest-cors-origins <arg>            Cross origin resource sharing origins
+                                         (default: *)
+--clnrest-csp <arg>                     Content security policy (CSP) for the
+                                        server
+                                         (default: default-src 'self'; font-src 'self'; img-src 'self' data:; frame-src 'self'; sty...)
+--clnrest-swagger-root <arg>            Root path for Swagger UI (default: /)
+--clnrest-protocol <arg>                REST server protocol (default: https)
+--clnrest-port <arg>                    REST server port to listen

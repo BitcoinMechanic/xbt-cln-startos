@@ -53,15 +53,11 @@ export const watchtowerClientInfo = sdk.Action.withoutInput(
 
     if (res.exitCode === 0) {
       const towerInfo: ListTowers = JSON.parse(res.stdout as string)
-      const labels =
-        (await storeJson.read((s) => s.watchtowerLabels).once()) ?? []
 
       const towers: T.ActionResultMember[] =
         Object.entries(towerInfo).map((tower) => {
           return {
-            name:
-              labels.find((l) => l.id === tower[0])?.label ??
-              `Watchtower Pubkey #${tower[0]}`,
+            name: `Watchtower Pubkey #${tower[0]}`,
             description: i18n(
               'Share this Watchtower Server URI to allow other CLN nodes to register their watchtower clients with your watchtower',
             ),
@@ -71,6 +67,7 @@ export const watchtowerClientInfo = sdk.Action.withoutInput(
                 value: tower[1].net_addr,
                 description: i18n('Network address the tower is listening on'),
                 copyable: true,
+                launchable: false,
                 qr: false,
                 masked: false,
                 type: 'single',
@@ -80,6 +77,7 @@ export const watchtowerClientInfo = sdk.Action.withoutInput(
                 value: `${tower[1].available_slots}`,
                 description: i18n('Number of slots the tower has available'),
                 copyable: false,
+                launchable: false,
                 qr: false,
                 masked: false,
                 type: 'single',
@@ -89,6 +87,7 @@ export const watchtowerClientInfo = sdk.Action.withoutInput(
                 value: `${tower[1].subscription_start}`,
                 description: i18n('Block height when the subscription started'),
                 copyable: false,
+                launchable: false,
                 qr: false,
                 masked: false,
                 type: 'single',
@@ -100,6 +99,7 @@ export const watchtowerClientInfo = sdk.Action.withoutInput(
                   'Block height when the subscription will expire',
                 ),
                 copyable: false,
+                launchable: false,
                 qr: false,
                 masked: false,
                 type: 'single',
@@ -109,6 +109,7 @@ export const watchtowerClientInfo = sdk.Action.withoutInput(
                 value: `${tower[1].status}`,
                 description: i18n('Whether the tower is reachable'),
                 copyable: false,
+                launchable: false,
                 qr: false,
                 masked: false,
                 type: 'single',

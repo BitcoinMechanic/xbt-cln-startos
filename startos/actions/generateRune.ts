@@ -42,6 +42,7 @@ export const createRune = sdk.Action.withoutInput(
         message: i18n('Successfully added unrestricted rune'),
         result: {
           value: rune.rune,
+          launchable: false,
           qr: true,
           masked: true,
           copyable: true,

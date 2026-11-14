@@ -1,0 +1,7 @@
+{
+  "service.py": "0f2c0881052cb62ca079c2c87f168d9544cfa997b4523f32d6d5e2b49fe9c0d8",
+  "service_cli.py": "361692f40b74b23e76b0ec5a04a04753aeb3c2ad5bd4d0f1750ce1fab6531d4e",
+  "service_market.py": "a7e68b1a7fceb2a22dd92d6acb82a97a24bba552e9c87d0451fde9c56e9afdee",
+  "test_service.py": "8eb437bedbea1731e5e8ebc58b2c139ea52723f55ff3366eff0b5ac69d7436be",
+  "test_service_process.py": "ec9688770652cdab13076164a494221ba02e474c938c8e00a5f262a8e44a1aed"
+}
