@@ -1,0 +1,24 @@
+0101 local workflow validation
+
+PASS: exact 0100 patch objects reconstructed using temporary Git indexes.
+PASS: exact source/lock/compiler expectations and original historical validators.
+PASS: actual export/tower/sync workflow exercised in disposable repositories
+      with synthetic receipt inputs (never represented as funded acceptance).
+PASS: missing/altered raw receipts, SDK coverage, compiled input hashes, Node pin,
+      compiler versions, source hashes and historical evidence refused.
+PASS: six-case proof, zero closed channels and no host-acceptance claim enforced.
+PASS: export excludes unlisted files and all wallet/credential/raw-payment data.
+PASS: source, staging indexes, old stashes and original result files retained.
+PASS: dirty tower caches reused through detached worktrees; no large clone.
+PASS: four exact source commits and four annotated tags; no default-branch change.
+PASS: partial push resumes with the same commits; no force-push.
+PASS: all-repository preflight rejects remote/source divergence before VM stash.
+PASS: interrupted stash-before-merge resumes; older/new stashes preserved.
+PASS: repeated export/push/sync operations are idempotent.
+PASS: shell entry-point syntax and ZIP/checksum verification.
+
+The operator reported 0100 funded acceptance at
+/tmp/privkeyio-0100-results.l8yon5ti. The VM export must validate the actual raw
+receipts and source/build inputs there. Synthetic workflow test data is not
+shipped as acceptance. This checkpoint performs no build, payment, installer
+or live-node action, and does not assert StartOS host acceptance.

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "kind": "operator-reported-regtest-result",
+  "date": "2026-10-13",
+  "milestone": "0092a",
+  "reported": {
+    "grant_setups": 8,
+    "funded_service_cases": 6,
+    "populated_restore_refusal": true,
+    "exact_0091_checkpoint_verified": true,
+    "regtest_only": true,
+    "installer": false
+  },
+  "results_directory": "/tmp/privkeyio-0092a-results.n6T0lywn",
+  "evidence_basis": "Operator supplied READY output. Export separately validates the actual receipts and exact source trees."
+}

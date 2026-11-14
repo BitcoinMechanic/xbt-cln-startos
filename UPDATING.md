@@ -1,107 +1,29 @@
-# Updating the upstream version
+# Updating source inputs
 
-Core Lightning is built from a custom `Dockerfile` (the `lightning` image) that unpacks upstream's signed release tarball onto a `debian:bookworm-slim` base, plus a sidecar `ui` image pulled by tag. Several upstream components feed into the build, and a bump usually touches more than one.
+This package uses a tested XBT engine and sealed swap runtime. A generic ElementsProject BTC release is not an equivalent rebuild.
 
-## Determining the upstream version
+## Native engine
 
-For each independent upstream source below: a link to its canonical repo, one command to fetch the latest available version, and where the current pin lives in this repo.
+assets/source-lock.json records the historical base and recovery-weight patch. The accepted later engine has additional startup/replay safeguards and a repaired gRPC binary. Dockerfile.live requires exact staged CLI_IMAGE, PARENT_IMAGE, gRPC donor image and runtime inputs. These remain local build inputs, not a self-contained release recipe.
 
-### lightningd
+Before releasing from a clean checkout, reconstruct verifiable inputs for that exact engine, prove native recovery behavior, and supply both advertised architectures. Do not substitute a similarly named engine merely to make packaging succeed.
 
-- Upstream: [ElementsProject/lightning](https://github.com/ElementsProject/lightning).
-- **Take lightningd from the release tarballs, not the `elementsproject/lightningd` Docker image.** The tarballs are covered by a GPG-signed checksum manifest; the images carry no signature or provenance, so a tag or digest pin only fixes whichever artifact it captured.
-- Latest release tag:
-  ```sh
-  gh release view -R ElementsProject/lightning --json tagName -q .tagName
-  ```
-- Get the checksums and verify the manifest signature before trusting either:
-  ```sh
-  gh release download <tag> -R ElementsProject/lightning -p 'SHA256SUMS-*'
-  gpg --verify SHA256SUMS-<tag>.asc SHA256SUMS-<tag>
-  ```
-  Maintainer fingerprints are listed on the release page.
-- Current pin: the global `CLN_VERSION` at the top of `Dockerfile`, the per-arch `CLN_SHA256_*` args in the `lightningd-tarball` stage, and `CLN_SRC_SHA256` in the `lightningd-source` stage.
+assets/swap-runtime-source.json records the upstream engine comparison. Important-hook teardown, final-HTLC replay in closing states and anchor witness weight must be checked against the actual replacement. Run original/patched crash, replay and on-chain recovery fixtures before replacing native binaries.
 
-### bitcoin-cli
+## Python runtime
 
-- Upstream: [Bitcoin Core](https://bitcoincore.org/bin/). Only `bitcoin-cli` is taken; nothing else from the release is used.
-- **It is a hard runtime dependency, not a convenience.** CLN's own `plugin-bcli` execs it, and so does the `check-synced` health check. Without it `lightningd` exits at startup with `The Bitcoin backend died` and the service crash-loops.
-- It talks JSON-RPC to whatever `bitcoind` the user runs, so it does not need to track that package's version. **A new Bitcoin Core release is not a bump on its own: refresh this pin only when `CLN_VERSION` moves.**
-- Checksums:
-  ```sh
-  curl -fsS https://bitcoincore.org/bin/bitcoin-core-<version>/SHA256SUMS | grep -E 'x86_64-linux-gnu.tar.gz|aarch64-linux-gnu.tar.gz'
-  ```
-- Current pin: `BITCOIN_VERSION` plus the `BITCOIN_SHA256_*` args in the `bitcoin-cli` stage of `Dockerfile`.
+assets/swap-node is the complete tested, already-patched snapshot. Verify it:
 
-### CLN Application (Web UI)
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=assets/swap-node python3 -B -c "import package_verify; package_verify.verify('assets/swap-node', 'node')"
 
-- Upstream: [ElementsProject/cln-application](https://github.com/ElementsProject/cln-application) (published as the `ghcr.io/elementsproject/cln-application` image).
-- Latest release tag:
-  ```sh
-  gh release view -R ElementsProject/cln-application --json tagName -q .tagName
-  ```
-- Cross-check published GHCR tags:
-  ```sh
-  gh api /users/elementsproject/packages/container/cln-application/versions \
-    --jq '.[].metadata.container.tags[]' | sort -u | head -20
-  ```
-- Current pin: `images.ui.source.dockerTag` in `startos/manifest/index.ts` (`ghcr.io/elementsproject/cln-application:<version>`).
+Copy the entire directory without adding __pycache__ or modifying its contents. Do not reapply the historical patches/timelock-patches.json chain. Move the production Docker recipe to this verified input only as part of a complete validated clean-build change.
 
-### CLBOSS
+## CLN Application
 
-- Upstream: [ZmnSCPxj/clboss](https://github.com/ZmnSCPxj/clboss).
-- Latest release tag:
-  ```sh
-  gh release view -R ZmnSCPxj/clboss --json tagName -q .tagName
-  ```
-- If no GitHub release is published for the bump, fall back to tags:
-  ```sh
-  gh api repos/ZmnSCPxj/clboss/tags --jq '.[0].name'
-  ```
-- Current pin: commit checked out in the `clboss/` git submodule. Inspect with `git -C clboss describe --tags --always`.
+Dockerfile.ui pins the source commit, build-image digests and patch checksum. Upstream is https://github.com/ElementsProject/cln-application. Check assets/ui-xbt.patch against the chosen commit with git apply --check, update its checksum, and run the backend/frontend tests and production build specified in that Dockerfile. Preserve XBT invoice validation, local fiat conversion and bounded channel layouts.
 
-### TEOS (watchtower)
+## External contracts and packaging
 
-- Upstream: [talaia-labs/rust-teos](https://github.com/talaia-labs/rust-teos).
-- The newest release, `v0.2.0`, is from 2023 and the pin sits well past it on `master`, so move the pin along `master` and check any candidate is a descendant of the current one:
-  ```sh
-  git -C rust-teos ls-remote origin HEAD
-  git -C rust-teos merge-base --is-ancestor HEAD <candidate> && echo "safe to advance"
-  ```
-- Current pin: commit checked out in the `rust-teos/` git submodule. Inspect with `git -C rust-teos describe --tags --always` — the `-N-g<sha>` suffix is how far ahead of the last release it is.
+startos/backend.ts and startos/init/watchHosts.ts record checked source commits for Bitcoin RPC and Tor SOCKS constants. They intentionally avoid importing another service's full SDK runtime. Verify these contracts when changing supported backends.
 
-### Sling
-
-- Upstream: [daywalker90/sling](https://github.com/daywalker90/sling) (consumed as a prebuilt release binary).
-- Latest release tag:
-  ```sh
-  gh release view -R daywalker90/sling --json tagName -q .tagName
-  ```
-- Current pin: `ARG SLING_VERSION=v<version>` in the `sling` stage of `Dockerfile`.
-
-## Applying the bump
-
-### lightningd
-
-- Update `CLN_VERSION` and both `CLN_SHA256_*` args in the `lightningd-tarball` stage of `Dockerfile`, taking the hashes from the GPG-verified `SHA256SUMS` for the `Ubuntu-22.04` tarballs. That build's glibc runs on the bookworm final stage, which is what every other binary in the image is compiled against — check that still holds if you move to a different tarball.
-- **If the release has no arm64 tarball**, arm64 builds from source: set `CLN_SRC_SHA256` to the manifest's hash for `clightning-<tag>.zip`, leave `CLN_SHA256_ARM64` empty, and point `lightningd-dist-arm64` at `lightningd-source`. When arm64 tarballs are published again, fill in `CLN_SHA256_ARM64` and point it back at `lightningd-tarball`.
-
-### bitcoin-cli
-
-- Only alongside a lightningd bump. Update `BITCOIN_VERSION` and both `BITCOIN_SHA256_*` args in the `bitcoin-cli` stage of `Dockerfile`.
-
-### CLN Application (Web UI)
-
-- Bump the `dockerTag` for the `ui` image in `startos/manifest/index.ts` to `ghcr.io/elementsproject/cln-application:<new version>`.
-
-### CLBOSS
-
-- `cd clboss && git fetch --tags && git checkout <new ref> && cd .. && git add clboss`.
-
-### TEOS
-
-- `cd rust-teos && git fetch --tags && git checkout <new ref> && cd .. && git add rust-teos`.
-
-### Sling
-
-- Update the `SLING_VERSION` ARG in `Dockerfile` to the new release tag (including the leading `v`).
+The CLBOSS and TEOS submodules are retained but not activated; preserve their pins. For SDK updates, follow the workspace guide, review crossed breaking changes, stabilize the npm lockfile, and rerun package/runtime validation.

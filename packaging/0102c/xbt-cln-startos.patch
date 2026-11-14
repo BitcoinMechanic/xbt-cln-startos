@@ -1,0 +1,522 @@
+diff --git a/Dockerfile.live b/Dockerfile.live
+new file mode 100644
+index 0000000000000000000000000000000000000000..14dfd2221aaeb297aba23463c46574f0aa017a7f
+--- /dev/null
++++ b/Dockerfile.live
+@@ -0,0 +1,11 @@
++# 0102: requires exact accepted image IDs and sealed runtime staged by the bundle.
++ARG CLI_IMAGE
++ARG PARENT_IMAGE
++FROM ${CLI_IMAGE} AS cli
++FROM ${PARENT_IMAGE}
++USER root
++RUN rm -rf /usr/local/libexec/swap-node
++COPY runtime/ /usr/local/libexec/swap-node/
++COPY --from=cli /usr/bin/bitcoin-cli /usr/local/bin/bitcoin-cli
++ENV PATH="/opt/xbt/bin:${PATH}"
++RUN ln -sf /opt/xbt/bin/lightning-cli /usr/local/bin/lightning-cli && ln -sf /opt/xbt/bin/lightningd /usr/local/bin/lightningd
+diff --git a/README.md b/README.md
+index 2a33108d3b4a3559351ab75c9f6cc1957cf54eee..c52541ac89054331626a7ac6d2032e53c7dd493d 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,36 @@
++# 0102 dedicated live integration candidate
++
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
++
++Start the native node, wait for chain synchronization, and open/fund channels
++normally. Open Enable Swap Coordinator and confirm once. Restart the service;
++then review and confirm separate incoming/outgoing bounded grants. Copy each
++bounded controller credential into the controller pairing action. No SCID entry
++is required. The actual incoming channel is bound when the payment arrives.
++
++The CLNrest interface must be enabled. Use its StartOS HTTPS URL (without a wallet
++scheme prefix or embedded rune) and the corresponding root CA when pairing.
++The native web UI and ordinary payments remain available.
++
++This revision can update the accepted privkeyio XBT candidate :1 to :2 on the
++same volume. Existing identity, unified-signature channels, UI password and
++journals remain in place. It refuses the old experimental XBT wallet layout.
++
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
++
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
++
++## Historical development notes
++
++The following records describe earlier checkpoints and their original scope.
++
+ ## Packaged migration runtime candidate (0098)
+ 
+ The separate runtime Dockerfiles and `tools/swap/package_runtime.py` export an
+diff --git a/docs/live-integration-0102.md b/docs/live-integration-0102.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..8d59d49b3031b7e73eaa4177965159b5bce76d6e
+--- /dev/null
++++ b/docs/live-integration-0102.md
+@@ -0,0 +1,28 @@
++# 0102 dedicated live integration candidate
++
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
++
++Start the native node, wait for chain synchronization, and open/fund channels
++normally. Open Enable Swap Coordinator and confirm once. Restart the service;
++then review and confirm separate incoming/outgoing bounded grants. Copy each
++bounded controller credential into the controller pairing action. No SCID entry
++is required. The actual incoming channel is bound when the payment arrives.
++
++The CLNrest interface must be enabled. Use its StartOS HTTPS URL (without a wallet
++scheme prefix or embedded rune) and the corresponding root CA when pairing.
++The native web UI and ordinary payments remain available.
++
++This revision can update the accepted privkeyio XBT candidate :1 to :2 on the
++same volume. Existing identity, unified-signature channels, UI password and
++journals remain in place. It refuses the old experimental XBT wallet layout.
++
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
++
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
+diff --git a/instructions.md b/instructions.md
+index ec99ab1ff4067b956426683ee790c72109a59800..8d59d49b3031b7e73eaa4177965159b5bce76d6e 100644
+--- a/instructions.md
++++ b/instructions.md
+@@ -1,132 +1,28 @@
+-## Migration runtime validation (0098)
+-
+-This source checkpoint adds isolated regtest runtime-image validation. It does
+-not change your installed service or provide a new installer. Normal restarts
+-and image replacement are tested with the original data and open channels.
+-No backup restore or force-close exercise is part of this step.
+-
+-# XBT Core Lightning
+-
+-This migration candidate adds a wallet and channel dashboard to the XBT node. It requires synced, unpruned BLAKE2b Knots. It is not yet an update for your installed experimental XBT node.
+-
+-The dashboard supports XBT wallet addresses, channels, BOLT11 invoices and payments. Set its own password on first use. XBT units and explorer links are explicit; fiat estimates are unavailable. BTC invoices are refused before payment. BOLT12 offers, external watchtowers and automatic rebalancing are not enabled in this candidate.
+-
+-The node verifies the BLAKE2b backend before creating or opening its wallet. Internally the fork still calls its network and wallet directory `bitcoin`; that name does not mean it is following BTC.
+-
+-Backups preserve keys and emergency channel recovery data, not a copy of the live channel database. A restored node attempts recovery, asks for a rescan and remains marked as restored. Recover and drain funds before starting fresh. Funded regtest recovery and empty-wallet StartOS backup/restore have passed; funded StartOS recovery remains to be validated. Recovery depends on peers cooperating, and the automatic address window is bounded.
+-
+-Your existing swap controller and nodes remain in use. The migrated swap modules are bundled but not activated by this package. Do not import an existing experimental XBT wallet or channel directory into it.
+-
+-The retained 0088b fixture verified funded regtest recovery and default-fee withdrawals. The 0090b x86_64 test installer reuses that engine and the validated UI. Historical fixture runners retain their original checkpoint requirements; a source checkpoint does not require rerunning or rebuilding them.
+-
+-The 0090b startup correction accepts Knots' top-level BLAKE2b activation metadata. It preserves all chain and synchronization checks. Version `#privkeyio:26.6.9:1` can update the prior `#privkeyio:26.6.9:0` candidate in place; no wallet conversion is needed. Existing experimental XBT wallets and channels remain unsupported.
+-
+-
+-## Empty-wallet StartOS acceptance
+-
+-Candidate 0090b has passed the operator's empty-wallet StartOS startup and
+-backup/restore checks. The dashboard retained its password and node identity;
+-a database marker survived backup and disappeared after restoration.
+-This does not establish funded StartOS recovery or legacy channel migration.
+-
+-After restoring, start the service and allow emergency recovery and preparation
+-of 10,000 addresses to finish. A ready RPC interface does not mean these steps
+-are complete. The recovered-wallet warning remains by design. An empty test
+-wallet has no funds to drain, but its restored identity must not be reused for
+-new channels or swaps. A canary check does not need a full historical rescan.
+-
+-For Rescan Blockchain, a negative number selects an absolute starting block:
+-`-976900` means start at block 976900. A positive number is a rewind depth and
+-can unintentionally select almost the entire chain. Funded recovery must cover
+-the wallet's relevant history; `-1` scans from block 1 and can take many hours.
+-
+-## 0092 coordinator administration prerequisite
+-
+-The operator reported the fresh 0090b nodes paid 10,000 XBT sats A to B,
+-1,000 B to A, and 1,000 each direction after both services restarted. Funding
+-and UI passwords were retained. This is operator-reported node/UI acceptance;
+-it does not establish live swap execution, funded StartOS restore or migration
+-of legacy channels.
+-
+-0092 adds local, bounded grant review/confirmation in the isolated migration
+-engine sources. Eligible channels are selected automatically; no SCID entry.
+-A 120-second review records exact channel funding and limits before confirmation.
+-A lost confirmation recovers the same grant; it cannot renew, unpause or enlarge
+-it. Saved grants are never reconstructed from missing authority state. Incoming
+-liquidity must cover the amount cap; outgoing liquidity also covers the fee cap.
+-More than eight eligible channels is refused pending a separate selection UX.
+-
+-Restored swap journals now observe both their own restored.json and the shared
+-swap-restored.json or existing node-restored.json parent markers. Gate hooks
+-cannot fall through or disclose a saved preimage after a restore marker appears.
+-This is a refusal barrier, not a funded swap recovery or credential-revocation
+-solution. A marker on a restored copy does not revoke a still-running original.
+-
+-All migrated swap execution remains regtest-only. No installer, StartOS grant
+-menus, backup enablement or mainnet activation is included. The package backup
+-and update guards also recognize coordinator-admin-v1, so introducing the new
+-journal cannot bypass the existing coordinator-state refusal. Deadline/on-chain
+-protection and coordinator-aware backup/restore must precede live activation.
+-
+-## 0094 deadline protection candidate
+-
+-The separate regtest coordinator supports explicitly reviewed incoming grants
+-with `close_before_blocks: 72` and format `swap-bounded-authority-v2`. Existing
+-grants and credentials retain their previous authority. Before its single send,
+-the worker arms the exact committed incoming HTLC and rechecks the contract's
+-remaining-block margin. The node's customer facade watches armed enrollments
+-locally, including while the controller or outgoing coordinator is unavailable.
+-It records the exact close intent before dispatching `close` once. A lost reply
+-or crash between intent and dispatch never authorizes a second close or payment.
+-Admission expiry and pause do not stop enrolled recovery; restore markers do.
+-
+-A narrow engine patch allows an already committed final HTLC to reach its held
+-gate after a closing-channel restart. New arrivals and replayed forwarding HTLCs
+-remain refused there; a recovery hook that continues cannot invoke a core invoice.
+-The original important-plugin shutdown/crash fix and the XBT package’s 0088b
+-recovery fee-weight patch are retained in the new build. A saved preimage
+-uses the core's existing persisted fulfillment and onchaind claim path.
+-
+-The scoped `chain` operation checks fresh funding-spend, HTLC witness, expiry,
+-CSV sweep and wallet observations. It does not cache success. Confirmations and
+-wallet ownership are supplied by the paired CLN; the funded fixture separately
+-checks confirmed backend blocks and reconciles every satoshi. A close/release
+-reply is never settlement proof. On-chain cases remain `onchain_recovery`,
+-nonterminal and unavailable for grant renewal or another swap in that journal.
+-Automatic retirement of closed-channel history is a separate later change.
+-
+-The 0094 runner requires original-binary replay controls, six patched funded
+-cases in both directions (claim, timeout, closing restart), and the prior six
+-service cases on the new engines. Local unit checks are not funded acceptance.
+-The existing 0093 evidence keeps its original provenance. This is a source/test
+-candidate only: no installer, production activation, coordinator backup support,
+-legacy-channel migration, multipart payments or automatic payment retries.
+-
+-
+-### Migration recovery retirement (0096)
+-
+-The migration source adds explicit local review and confirmation after a
+-protected channel has fully resolved on chain. The coordinator verifies the
+-original funding and claim or timeout; the controller separately verifies the
+-original outgoing payment. History and used grant budgets remain saved. New
+-grants use eligible open channels and require their own confirmation. Existing
+-runes do not gain retirement authority. The packaging VM's 0096 regtest matrix
+-is required for acceptance; no installer or installed-node action is included.
+-
+-
+-## StartOS action integration candidate (0100)
+-
+-`startos/migration/` contains a separate set of real SDK forms and handlers for
+-the accepted packaged swap runtime. It is not registered by `startos/index.ts`
+-and does not change the installed menus, node startup, restore policy or UI.
+-The protocol and candidate commands still require disposable regtest.
+-
+-The 0100 runner compiles the handlers and exercises them around the unchanged
+-0098a runtime images. Its six funded cases cover both directions, failure,
+-ordinary restart and executable-image replacement on the same volumes, with
+-original channels, credentials, HTLCs and payment attempts retained. The
+-StartOS effects boundary is a subprocess fixture: this is not host installation
+-or upgrade acceptance. No installer is produced.
+-
+-See the controller repository's `docs/migrated-startos-actions.md` for the
+-candidate action flow, retained boundaries and remaining activation work.
++# 0102 dedicated live integration candidate
++
++Build this candidate with the verified 0102 bundle runner. It binds exact engine,
++UI and Python-runtime image IDs into an isolated packaging copy and compiles the
++installed StartOS registry. The source manifest alone is not an installer.
++
++Start the native node, wait for chain synchronization, and open/fund channels
++normally. Open Enable Swap Coordinator and confirm once. Restart the service;
++then review and confirm separate incoming/outgoing bounded grants. Copy each
++bounded controller credential into the controller pairing action. No SCID entry
++is required. The actual incoming channel is bound when the payment arrives.
++
++The CLNrest interface must be enabled. Use its StartOS HTTPS URL (without a wallet
++scheme prefix or embedded rune) and the corresponding root CA when pairing.
++The native web UI and ordinary payments remain available.
++
++This revision can update the accepted privkeyio XBT candidate :1 to :2 on the
++same volume. Existing identity, unified-signature channels, UI password and
++journals remain in place. It refuses the old experimental XBT wallet layout.
++
++Ordinary restart/update is not backup restoration. Restored wallets remain fenced
++from new coordinator authority; recovery may force-close channels. Incoming
++swap deadline protection can also close the actual receiving channel if a swap
++cannot resolve before its approved deadline. Grants require explicit review.
++
++0102 validation distinguishes synthetic mainnet policy checks, actual funded
++regtest fixtures, packed-file checks, and pending StartOS host acceptance. It
++does not claim a mainnet swap or StartOS host test from a regtest receipt.
+diff --git a/scripts/test-package.cjs b/scripts/test-package.cjs
+index a97d435600c01917815710aa36f962fd529ff168..5e0452d255374574f7ddc31bcf56c4a2de5bb4b0 100644
+--- a/scripts/test-package.cjs
++++ b/scripts/test-package.cjs
+@@ -115,6 +115,7 @@ async function main() {
+     console.log('PASS: real Knots response through the actual startup hook; '+rejected.length+' invalid backend cases refused')
+     assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.requires,['xbt-backend-identity'])
+     assert.ok(chain.find(x=>x.id==='cln-application').spec.requires.includes('consume-flags'))
++    assert.deepEqual(chain.find(x=>x.id==='lightningd').spec.exec.command.slice(0,7), ['/usr/local/libexec/swap-node/package_node.py','--mainnet','--profile','xbt-privkeyio-v1','--root','/root/.lightning','launch'])
+     assert.deepEqual(flags,[]) // Merely reading startup flags never consumes them.
+     const emergency = chain.find(x=>x.id==='emergency-recover').spec()
+     assert.deepEqual((await emergency.exec.fn()).command, recovery.recoveryCommands('/root/.lightning').emergency)
+@@ -125,17 +126,20 @@ async function main() {
+     const { ExtendedVersion } = Module.createRequire(require.resolve('@start9labs/start-sdk'))('@start9labs/start-core/exver')
+     const current = load('startos/versions/current.ts', {'../sdk':{sdk},'../xbtPolicy':policy}).current
+     const graph = VersionGraph.of({current, other:[]})
+-    const from = ExtendedVersion.parse('#privkeyio:26.6.9:0')
+-    const to = ExtendedVersion.parse('#privkeyio:26.6.9:1')
++    const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
++    const to = ExtendedVersion.parse('#privkeyio:26.6.9:2')
+     assert.ok(graph.canMigrateFrom().satisfiedBy(from))
+-    for (const version of ['26.6.9:0','#privkeyio:26.6.8:0','#privkeyio:26.6.9:2','#legacy:26.6.9:0']) {
++    for (const version of ['26.6.9:0','#privkeyio:26.6.8:0','#privkeyio:26.6.9:0','#legacy:26.6.9:0']) {
+       assert.equal(graph.canMigrateFrom().satisfiedBy(ExtendedVersion.parse(version)),false)
+     }
+     assert.equal(graph.canMigrateTo().satisfiedBy(from),false)
+     const savedVersions=[]
+     const migrationEffects={setDataVersion:async({version})=>savedVersions.push(version)}
+     const identityBefore=await fs.readFile(path.join(root,policy.marker),'utf8')
++    await fs.mkdir(path.join(root,'bitcoin/swap-coordinator-v1'))
++    await fs.writeFile(path.join(root,'bitcoin/swap-coordinator-v1/sentinel'),'existing-journal')
+     await graph.migrate({effects:migrationEffects,from,to})
++    assert.equal(await fs.readFile(path.join(root,'bitcoin/swap-coordinator-v1/sentinel'),'utf8'),'existing-journal')
+     assert.equal(await fs.readFile(path.join(root,policy.marker),'utf8'),identityBefore)
+     assert.equal(savedVersions.at(-1),to.toString())
+     await fs.mkdir(path.join(root,policy.swapDirs[0]))
+@@ -146,7 +150,7 @@ async function main() {
+     const b=load('startos/backups.ts',mocks)
+     await b.createBackup()
+     await backup.before()
+-    for (const name of ['bitcoin/lightningd.sqlite3','bitcoin/lightningd.sqlite3-wal','bitcoin/lightningd.sqlite3-shm','.commando-env']) assert.ok(backup.options.exclude.includes(name))
++    for (const name of ['bitcoin/swap-coordinator-v1','bitcoin/.swap-setup-*','bitcoin/lightningd.sqlite3','bitcoin/lightningd.sqlite3-wal','bitcoin/lightningd.sqlite3-shm','.commando-env']) assert.ok(backup.options.exclude.includes(name))
+     await fs.writeFile(path.join(root,'bitcoin/emergency.recover'),'recovery-copy')
+     await fs.writeFile(path.join(root,'.commando-env'),'discarded-credential')
+     await backup.after({})
+diff --git a/startos/actions/index.ts b/startos/actions/index.ts
+index 40bfa821b5202c1977a220aff6cb85f06d2989c9..dd4351afa22c0f0a58f10c5085b14eb832de60a9 100644
+--- a/startos/actions/index.ts
++++ b/startos/actions/index.ts
+@@ -1,3 +1,4 @@
++import { createActions } from '../live/actions'
+ import { sdk } from '../sdk'
+ import { experimental } from './config/experimental'
+ import { config } from './config/config'
+@@ -13,7 +14,7 @@ import { rescanBlockchain } from './rescanBlockchain'
+ import { nodeInfo } from './nodeInfo'
+ import { displaySeed } from './displaySeed'
+ 
+-export const actions = sdk.Actions.of()
++const nodeActions = sdk.Actions.of()
+   .addAction(config)
+   .addAction(displaySeed)
+   .addAction(experimental)
+@@ -25,3 +26,5 @@ export const actions = sdk.Actions.of()
+   .addAction(nodeInfo)
+ 
+ // @TODO generate-lnlink
++
++export const actions = createActions(undefined, nodeActions)
+diff --git a/startos/live/actions.ts b/startos/live/actions.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..9620ce86e0f4f1d695122f778355813d34a55086
+--- /dev/null
++++ b/startos/live/actions.ts
+@@ -0,0 +1,104 @@
++import { T } from '@start9labs/start-sdk'
++import { sdk } from '../sdk'
++import { mainMounts, rootDir } from '../volume'
++
++export const profile = 'xbt-privkeyio-v1'
++export const directory = rootDir + '/bitcoin'
++export const adminCommand = ['/usr/local/libexec/swap-node/package_admin.py', '--mainnet', '--network-directory', directory, '--profile', profile]
++export type Call = (effects: T.Effects, request: Record<string, unknown>) => Promise<any>
++const refuse = () => new Error('Coordinator request refused or reply unavailable. Inspect grant status and preserve its records. Private details withheld.')
++const hex = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v)
++export async function executeRequest(request: Record<string, unknown>, exec: (argv: string[], options?: { input: string }) => Promise<any>) {
++    const run = async (argv: string[], options?: { input: string }) => {
++      try { return await exec(argv, options) } catch { throw refuse() }
++    }
++    if (request.action === 'credential') {
++      if (!hex(request.grant_id) || request.confirmed !== true || Object.keys(request).sort().join() !== 'action,confirmed,grant_id') throw refuse()
++      const cli = ['/opt/xbt/bin/lightning-cli', '--lightning-dir=' + rootDir, '--network=bitcoin', '--json', '--notifications=none', '-k']
++      const ask = async (method: string, args: string[]) => {
++        const r = await run([...cli, method, ...args])
++        if (r.exitCode !== 0) throw refuse()
++        try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
++      }
++      const credential = await ask('swap-customer-credential', ['grant_id=' + request.grant_id, 'confirmed=true'])
++      const info = await ask('swap-customer-call', ['grant_id=' + request.grant_id, 'operation=info', 'body={}'])
++      if (typeof credential?.rune !== 'string' || !/^[A-Za-z0-9_=-]{32,8192}$/.test(credential.rune) || info?.regtest_only !== false ||
++          info?.grant?.chain?.profile !== profile || info?.grant?.chain?.environment !== 'mainnet') throw refuse()
++      return { credential: { grant: info.grant, rune: credential.rune } }
++    }
++    if (request.action === 'setup') {
++      if (request.confirmed !== true || Object.keys(request).sort().join() !== 'action,confirmed') throw refuse()
++      const r = await run(['/usr/local/libexec/swap-node/package_node.py', '--mainnet', '--root', rootDir, '--profile', profile, 'prepare'], { input: JSON.stringify({ confirmed: true }) })
++      if (r.exitCode !== 0) throw refuse()
++      try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
++    }
++    const r = await run(adminCommand, { input: JSON.stringify(request) })
++    if (r.exitCode !== 0) throw refuse()
++    try { return JSON.parse(String(r.stdout)) } catch { throw refuse() }
++}
++export const invoke: Call = async (effects, request) => sdk.SubContainer.withTemp(
++  effects, { imageId: 'lightning' }, mainMounts, 'migrated-grant-action', sub => executeRequest(request, (argv, options) => sub.exec(argv, options)))
++const text = (name: string) => sdk.Value.text({ name, masked: false, required: true, default: null, placeholder: null })
++const number = (name: string, value: number, min: number, max: number) => sdk.Value.number({ name, default: value, required: true, integer: true, min, max })
++const confirm = () => sdk.Value.toggle({ name: 'Confirm this exact grant and its channel protection authority', default: false })
++const meta = (name: string) => async () => ({ name, group: 'Swap Coordinator', allowedStatuses: 'only-running' as const,
++  visibility: 'enabled' as const, description: 'Bounded coordinator grants for explicitly confirmed BTC/XBT swaps.',
++  warning: 'Incoming protection may force-close the actual receiving channel, including other payments, near the agreed deadline.' })
++export function display(report: any): T.ActionResult & { version: '1' } {
++  if (!report || typeof report !== 'object') throw refuse()
++  const rows: any[] = []
++  const add = (name: string, value: string, copyable = false, masked = false) => rows.push({ name, value, copyable, masked, type: 'single', description: null, qr: false })
++  if (report.credential) {
++    const c = report.credential
++    if (typeof c.rune !== 'string' || !c.grant || c.grant.chain?.profile !== profile || c.grant.chain?.environment !== 'mainnet') throw refuse()
++    add('Bounded controller credential', JSON.stringify({ grant: c.grant, rune: c.rune }), true, true)
++  }
++  const records = Array.isArray(report.reviews) ? report.reviews : [report]
++  for (const r of records) {
++    if (hex(r?.confirmation)) add('Grant confirmation', r.confirmation, true)
++    if (['incoming', 'outgoing'].includes(r?.kind)) add('Role', r.kind)
++    if (['review', 'intent', 'saved', 'cancelled'].includes(r?.phase)) add('Phase', r.phase)
++    for (const k of ['blocked', 'current', 'paused', 'initialized', 'restart_required', 'existing_records', 'recovery_preserved']) if (typeof r?.[k] === 'boolean') add(k, String(r[k]))
++    if (Number.isSafeInteger(r?.channel_count) && r.channel_count >= 0 && r.channel_count <= 8) add('Automatically selected channels', String(r.channel_count))
++    for (const k of ['max_swaps', 'max_amount_msat', 'total_amount_msat', 'max_fee_msat', 'max_delay_blocks', 'max_hops', 'min_cltv_delta', 'max_cltv_delta', 'close_before_blocks']) {
++      if (Number.isSafeInteger(r?.limits?.[k]) && r.limits[k] >= 0) add(k, String(r.limits[k]))
++    }
++    for (const k of ['expires_at', 'confirm_before']) if (Number.isSafeInteger(r?.[k]) && r[k] >= 0 && r[k] <= 2 ** 35) add(k + ' (UTC)', new Date(r[k] * 1000).toISOString())
++  }
++  return { version: '1', title: 'Coordinator Grant', message: report.restart_required === true ? 'Coordinator state is ready. Restart this node, then review and confirm bounded grants.' : 'Review the automatically selected channels and bounded amounts, then confirm the exact grant. Existing swap records remain recoverable.', result: { type: 'group', value: rows } }
++}
++export function createActions(call: Call = invoke, base = sdk.Actions.of()) {
++  let actions = base
++  const add = (a: any) => { actions = actions.addAction(a) }
++  add(sdk.Action.withInput('migrated-admin-init', meta('Enable Swap Coordinator'), sdk.InputSpec.of({ confirmed: confirm() }), async () => ({ confirmed: false }),
++    async ({ effects, input }) => {
++      if (input.confirmed !== true) throw refuse()
++      return display(await call(effects, { action: 'setup', confirmed: true }))
++    }))
++  for (const kind of ['incoming', 'outgoing'] as const) {
++    const bounds = { maxSwaps: number('Maximum swaps', 4, 1, 10), maxAmount: number('Maximum amount per swap (millisats)', 10000000, 1, 1000010000),
++      totalAmount: number('Total grant budget (millisats)', 30000000, 1, 10000100000), lifetime: number('Grant lifetime (seconds)', 86400, 300, 86400) }
++    const timing: Record<string, ReturnType<typeof number>> = kind === 'incoming' ? { minDelay: number('Minimum incoming delay (blocks)', 350, 216, 2016), maxDelay: number('Maximum incoming delay (blocks)', 2016, 216, 2016) }
++      : { maxFee: number('Maximum routing fee (millisats)', 10000, 0, 10000), maxDelay: number('Maximum outgoing delay (blocks)', 288, 1, 288), maxHops: number('Maximum hops', 4, 1, 4) }
++    add(sdk.Action.withInput('migrated-review-' + kind, meta('Review ' + kind + ' Grant'), sdk.InputSpec.of({ ...bounds, ...timing }), async () => {},
++      async ({ effects, input }: any) => {
++        if (input.totalAmount < input.maxAmount) throw new Error('The total budget must cover at least one swap at the per-swap maximum.')
++        if (kind === 'incoming' && input.maxDelay < input.minDelay) throw new Error('The maximum incoming delay must be at least the minimum.')
++        const limits = { max_swaps: input.maxSwaps, max_amount_msat: input.maxAmount, total_amount_msat: input.totalAmount,
++          ...(kind === 'incoming' ? { min_cltv_delta: input.minDelay, max_cltv_delta: input.maxDelay, close_before_blocks: 72 }
++            : { max_fee_msat: input.maxFee, max_delay_blocks: input.maxDelay, max_hops: input.maxHops }) }
++        return display(await call(effects, { action: 'review', kind, limits, lifetime_seconds: input.lifetime }))
++      }))
++  }
++  for (const action of ['confirm', 'cancel', 'pause', 'credential'] as const) add(sdk.Action.withInput('migrated-grant-' + action,
++    meta({ confirm: 'Confirm Reviewed Grant', cancel: 'Cancel Grant Review', pause: 'Pause Grant', credential: 'Show Bounded Controller Credential' }[action]),
++    sdk.InputSpec.of({ confirmation: text('Exact grant confirmation'), confirmed: confirm() }), async () => ({ confirmed: false }),
++    async ({ effects, input }) => {
++      if (!hex(input.confirmation) || input.confirmed !== true) throw refuse()
++      const field = action === 'pause' || action === 'credential' ? 'grant_id' : 'confirmation'
++      return display(await call(effects, { action, [field]: input.confirmation, ...(action === 'cancel' ? {} : { confirmed: true }) }))
++    }))
++  add(sdk.Action.withInput('migrated-grant-status', meta('Grant Status'), sdk.InputSpec.of({}), async () => {}, async ({ effects }) => display(await call(effects, { action: 'status' }))))
++  return actions
++}
++export const actions = createActions()
+diff --git a/startos/main.ts b/startos/main.ts
+index cda002909a0f101b336e332ab80ec7c4735063fa..31eec54a985f1d900e9f8d2f48ce89b27e669050 100644
+--- a/startos/main.ts
++++ b/startos/main.ts
+@@ -124,8 +124,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
+       subcontainer: lightningSub,
+       exec: {
+         command: [
+-          'lightningd',
+-          `--lightning-dir=${rootDir}`,
++          '/usr/local/libexec/swap-node/package_node.py',
++          '--mainnet', '--profile', 'xbt-privkeyio-v1', '--root', rootDir, 'launch',
+           `--conf=${rootDir}/config`,
+           ...lightningdArgs,
+         ],
+diff --git a/startos/manifest/i18n.ts b/startos/manifest/i18n.ts
+index b4836e4819b447e5102bef67c25e3f1f1fa27e53..16ec5be2616ec5fcb7c2800274ba72debf23ae3f 100644
+--- a/startos/manifest/i18n.ts
++++ b/startos/manifest/i18n.ts
+@@ -1,3 +1,3 @@
+ export const short = { en_US: 'XBT Lightning node with wallet and channel dashboard' }
+-export const long = { en_US: 'Core Lightning on the BLAKE2b chain, with the CLN Application dashboard. Requires synced, unpruned BLAKE2b Knots. Fresh-wallet candidate; importing existing Lightning state and migrating installed experimental XBT channels are not supported. Swap modules are bundled but inactive.' }
++export const long = { en_US: 'Core Lightning on the BLAKE2b chain, with the CLN Application dashboard. Requires synced, unpruned BLAKE2b Knots. Fresh-wallet candidate; importing existing Lightning state and migrating installed experimental XBT channels are not supported. Bounded swap coordinator support requires explicit setup and reviewed grants.' }
+ export const depBitcoindDescription = { en_US: 'Synced, unpruned BLAKE2b Knots with the pinned activation checkpoint. The bitcoind package ID alone does not identify the chain.' }
+diff --git a/startos/manifest/index.ts b/startos/manifest/index.ts
+index ee0be58d65cc13a76889e6b4d8160ff54319b0bd..6ff206838d2a7b22af9035dce1bc2f3e35ee3dba 100644
+--- a/startos/manifest/index.ts
++++ b/startos/manifest/index.ts
+@@ -15,7 +15,7 @@ export const manifest = setupManifest({
+     lightning: {
+       source: {
+         dockerBuild: {
+-          dockerfile: 'Dockerfile',
++          dockerfile: 'Dockerfile.live',
+           workdir: '.',
+         },
+       },
+diff --git a/startos/recovery.ts b/startos/recovery.ts
+index bf9c32de4f57589a35a6d3ea3c883421c9d64fdb..dcbcbc3513a9ef3f77dd97316b7f9dc346928a79 100644
+--- a/startos/recovery.ts
++++ b/startos/recovery.ts
+@@ -5,7 +5,7 @@ import { verifyVolume, requireInactiveSwaps, exists } from './xbtPolicy'
+ 
+ // Shared with the funded recovery fixture. Never back up a resumable channel DB.
+ export const backupExcludes = [
+-  'bitcoin/lightning-rpc', 'bitcoin/lightningd.sqlite3',
++  'bitcoin/swap-coordinator-v1', 'bitcoin/.swap-setup-*', 'bitcoin/lightning-rpc', 'bitcoin/lightningd.sqlite3',
+   'bitcoin/lightningd.sqlite3-wal', 'bitcoin/lightningd.sqlite3-shm',
+   'bitcoin/gossip_store', '.commando-env',
+   'data/app/application-cln.log', 'bitcoin/*.log',
+diff --git a/startos/versions/current.ts b/startos/versions/current.ts
+index 2d556667d3b8301665714170c02b37c919a435c0..e41fdbb8fab57212f228d0fcacc9076e4bc9f3de 100644
+--- a/startos/versions/current.ts
++++ b/startos/versions/current.ts
+@@ -2,13 +2,13 @@ import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
+ import { sdk } from '../sdk'
+ import { requireInactiveSwaps, verifyVolume } from '../xbtPolicy'
+ export const current = VersionInfo.of({
+-  version: '#privkeyio:26.6.9:1',
+-  releaseNotes: { en_US: 'Correct the Knots activation response parsing that blocked first startup. Node engine, UI and wallet format are unchanged. Updates only the previous privkeyio candidate; legacy wallet/channel import and swap activation remain unavailable.' },
++  version: '#privkeyio:26.6.9:2',
++  releaseNotes: { en_US: 'Add explicitly enabled, bounded BTC/XBT swap coordinator actions and static recovery plugins. Preserve this privkeyio wallet, identity and channels on an ordinary update. Experimental XBT wallet import remains unsupported.' },
+   migrations: {
+     up: IMPOSSIBLE,
+     down: IMPOSSIBLE,
+     other: {
+-      '=#privkeyio:26.6.9:0': {
++      '=#privkeyio:26.6.9:1': {
+         up: async () => {
+           const root = sdk.volumes.main.subpath('')
+           await verifyVolume(root)
+diff --git a/startos/xbtPolicy.ts b/startos/xbtPolicy.ts
+index 76f8af4e529f58fbd6ff9d81c2321c2f01b677b3..fdb09eb5cbbbb2aa11cb1c06f480db681437f30c 100644
+--- a/startos/xbtPolicy.ts
++++ b/startos/xbtPolicy.ts
+@@ -54,8 +54,8 @@ export async function verifyVolume(root: string, fresh = false) {
+ }
+ 
+ export async function requireInactiveSwaps(root: string) {
+-  // No active coordinator adapter is registered by this node-only candidate.
+-  // Unknown authority must never be silently omitted and later re-created.
++  // Legacy flat journals must not be imported into the new namespace.
++  // The separately activated swap-coordinator-v1 namespace is preserved.
+   for (const base of [root, join(root, 'bitcoin')]) {
+     for (const name of swapDirs) if (await exists(join(base, name))) throw new Error('Swap state requires coordinator-aware backup and restore')
+   }

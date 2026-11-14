@@ -1,0 +1,20 @@
+Checkpoint bounded deadline protection and on-chain recovery
+
+Require explicit new incoming grants before arming protection of the actual
+bound channel and HTLC. Check fresh timing before the sole outgoing attempt;
+let the local coordinator watchdog record one close intent at the deadline.
+Preserve exact attempts and bindings across lost replies and closing restarts.
+
+Permit narrowly scoped replay of committed final HTLCs after channel close,
+retaining the important-plugin crash fix and the XBT recovery fee overlay.
+Inspect fresh funding descendants, claim/timeout scripts and wallet returns.
+Keep on-chain recovery nonterminal pending explicit retirement handling.
+
+0094a evidence: 149 unit tests, six funded bidirectional deadline cases and
+six automatic-service regressions. Retain original-binary replay controls,
+signed-witness weight controls and engine hashes with their original provenance.
+Fix the disposable worker directory prefix and test all six setups through
+fresh worker processes without changing its path guard.
+
+Three source commits and four annotated migration checkpoint tags. No installer,
+installed-service changes, legacy wallet import or production activation.

@@ -52,6 +52,7 @@ export const displaySeed = sdk.Action.withoutInput(
       result: {
         copyable: true,
         masked: true,
+        launchable: false,
         qr: false,
         type: 'single',
         value: hsmSecretContents!

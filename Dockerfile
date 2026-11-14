@@ -1,132 +1,47 @@
-ARG CLN_VERSION=v26.06.8
+# Full patched engine, including native REST, gRPC and ordinary node plugins.
+FROM rust:1.92.0-bookworm AS engine
+ARG BUILD_JOBS=8
+ENV CARGO_BUILD_JOBS=4 PYTHON=python3 PYTEST=""
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf automake build-essential ca-certificates gettext git jq libgmp-dev \
+    libpq-dev libsodium-dev libsqlite3-dev libssl-dev libtool lowdown pkg-config \
+    protobuf-compiler python3 python3-mako zlib1g-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+RUN git init && git remote add origin https://github.com/BitcoinMechanic/lightning.git && \
+    git fetch --depth=1 origin ddd89e1d70d0ba415880a0ff02db7b053c73a298 && \
+    git checkout --detach FETCH_HEAD && \
+    test "$(git rev-parse HEAD^{tree})" = 21369587e10687c21634ec2b1d15a5de6db09496 && \
+    git submodule update --init --recursive
+RUN ./configure --prefix=/usr/local --enable-rust --disable-valgrind && \
+    make -j"${BUILD_JOBS}" install-program DESTDIR=/dist RUST_PROFILE=release \
+      VERSION=v26.06.9-blake2b.7-swap0086
 
-# Shared base with common dependencies
+
+# Preserve the cached 0086 engine build, then prove and fix recovery fee weight.
+FROM engine AS engine-fixed
+COPY assets/test-recovery-weight.c /src/bitcoin/test/run-recovery-weight.c
+RUN --network=none make -j"${BUILD_JOBS}" bitcoin/test/run-recovery-weight RUST_PROFILE=release \
+      VERSION=v26.06.9-blake2b.7-swap0086 && \
+    bitcoin/test/run-recovery-weight --expect-underestimate > /baseline-recovery-weight.txt && \
+    cat /baseline-recovery-weight.txt
+COPY assets/engine-recovery-fees.patch /tmp/engine-recovery-fees.patch
+RUN --network=none echo '86c80ef9bb4a9f1f52d31a647b54f04b2a6ca4d55031fd5154603eb0e6984219  /tmp/engine-recovery-fees.patch' | sha256sum -c - && \
+    git apply --check /tmp/engine-recovery-fees.patch && git apply /tmp/engine-recovery-fees.patch && \
+    make -j"${BUILD_JOBS}" install-program bitcoin/test/run-recovery-weight DESTDIR=/dist \
+      RUST_PROFILE=release VERSION=v26.06.9-blake2b.7-swap0088b && \
+    bitcoin/test/run-recovery-weight > /patched-recovery-weight.txt && \
+    cat /patched-recovery-weight.txt && \
+    mkdir -p /dist/usr/local/share/xbt-cln/recovery-fees && \
+    cp /baseline-recovery-weight.txt /patched-recovery-weight.txt /dist/usr/local/share/xbt-cln/recovery-fees/ && \
+    cd /dist && sha256sum usr/local/bin/lightningd > usr/local/share/xbt-cln/recovery-fees/engine.sha256
+
 FROM debian:bookworm-slim AS base
-RUN apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends \
-    build-essential \
-    git \
-    pkg-config \
-    curl && \
-    rm -rf /var/lib/apt/lists/*
-
-# clboss builder
-FROM base AS clboss
-RUN apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends \
-    autoconf-archive \
-    automake \
-    libcurl4-gnutls-dev \
-    libev-dev \
-    libsqlite3-dev \
-    libtool \
-    libunwind-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY clboss/. /tmp/clboss
-WORKDIR /tmp/clboss
-RUN autoreconf -i && \
-    ./configure && \
-    ./generate_commit_hash.sh && \
-    make -j$(nproc) && \
-    make install && \
-    strip /usr/local/bin/clboss
-
-# sling - download prebuilt binary
-FROM base AS sling
-ARG TARGETARCH
-ARG SLING_VERSION=v4.3.1
-RUN apt-get update -qq && apt-get install -qq -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/* && \
-    if [ "$TARGETARCH" = "amd64" ]; then SLING_ARCH=x86_64; else SLING_ARCH=aarch64; fi && \
-    curl -fSL "https://github.com/daywalker90/sling/releases/download/${SLING_VERSION}/sling-${SLING_VERSION}-${SLING_ARCH}-linux-gnu.tar.gz" \
-    | tar xz -C /usr/local/bin/
-
-# Rust toolchain, shared by rust-teos and the lightningd source build
-FROM base AS rust-base
-ENV RUST_PROFILE=release \
-    PATH="/root/.cargo/bin:/root/.local/bin:$PATH" \
-    PROTOBUF_VERSION=21.12 \
-    PROTOC=/usr/bin/protoc \
-    PROTOC_INCLUDE=/usr/local/include
-
-RUN apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends \
-    autoconf automake ca-certificates dirmngr gettext \
-    gnupg jq libpq-dev libtool libffi-dev libssl-dev \
-    protobuf-compiler libev-dev libevent-dev \
-    qemu-user-static wget unzip tclsh && \
-    rm -rf /var/lib/apt/lists/* && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    rustup toolchain install stable --component rustfmt --allow-downgrade && \
-    curl -fsSLO --retry 3 https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
-    tar -xzf protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
-    cp -r protobuf-${PROTOBUF_VERSION}/src/google /usr/local/include/ && \
-    rm -rf protobuf*
-
-# rust-teos builder
-FROM rust-base AS builder-rust
-COPY ./rust-teos /tmp/rust-teos
-WORKDIR /tmp/rust-teos
-RUN cargo install --locked --path teos && \
-    cargo install --locked --path watchtower-plugin
-
-# lightningd from the signed release tarballs. These hashes come from
-# SHA256SUMS-v26.06.8, GPG-verified against maintainer key
-# 4E4A142F8BD3C38A56B362ED578CAC08472545C5.
-FROM base AS lightningd-tarball
-ARG TARGETARCH
-ARG CLN_VERSION
-ARG CLN_SHA256_AMD64=0c05412ff8078dc3ad649385e7068a5935c384979ece785db0333f532e9244b6
-ARG CLN_SHA256_ARM64=
-RUN apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends ca-certificates xz-utils && \
-    rm -rf /var/lib/apt/lists/*
-# Ubuntu 22.04 build: its glibc 2.35 runs on bookworm's 2.36, so the runtime
-# stays the distro every other binary here is compiled against.
-RUN set -eu; \
-    case "$TARGETARCH" in \
-      amd64) SHA="$CLN_SHA256_AMD64" ;; \
-      arm64) SHA="$CLN_SHA256_ARM64" ;; \
-      *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    TARBALL="clightning-${CLN_VERSION}-Ubuntu-22.04-${TARGETARCH}.tar.xz"; \
-    curl -fsSLO "https://github.com/ElementsProject/lightning/releases/download/${CLN_VERSION}/${TARBALL}"; \
-    echo "${SHA}  ${TARBALL}" | sha256sum -c -; \
-    mkdir -p /dist/usr/local; \
-    tar -xf "$TARBALL" -C /dist/usr/local --strip-components=2
-
-# lightningd built from the release's source zip, for an arch upstream
-# published no tarball for. The hash is from the same signed SHA256SUMS.
-FROM rust-base AS lightningd-source
-ARG CLN_VERSION
-ARG CLN_SRC_SHA256=2809c4f6aba5e928317d9857fbff5b29232b5e799ed74e1150872a9bf11de025
-RUN apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends \
-    libsodium-dev libsqlite3-dev zlib1g-dev python3-mako lowdown unzip && \
-    rm -rf /var/lib/apt/lists/*
-WORKDIR /tmp
-RUN set -eu; \
-    ZIP="clightning-${CLN_VERSION}.zip"; \
-    curl -fsSLO --retry 3 "https://github.com/ElementsProject/lightning/releases/download/${CLN_VERSION}/${ZIP}"; \
-    echo "${CLN_SRC_SHA256}  ${ZIP}" | sha256sum -c -; \
-    unzip -q "$ZIP"; \
-    cd "clightning-${CLN_VERSION}"; \
-    ./configure --prefix=/usr/local --disable-valgrind; \
-    make -j"$(nproc)" install-program DESTDIR=/dist RUST_PROFILE=release VERSION="${CLN_VERSION}"
-
-# v26.06.8 has no arm64 tarball (ElementsProject/lightning#9557).
-FROM lightningd-tarball AS lightningd-dist-amd64
-FROM lightningd-source AS lightningd-dist-arm64
-FROM lightningd-dist-${TARGETARCH} AS lightningd-dist
-
-# bitcoin-cli, which CLN's own plugin-bcli and our check-synced health check
-# both exec; without it lightningd dies at startup with "The Bitcoin backend
-# died". Checksums are from bitcoincore.org's SHA256SUMS.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
 FROM base AS bitcoin-cli
 ARG TARGETARCH
-ARG BITCOIN_VERSION=31.1
-ARG BITCOIN_SHA256_AMD64=b80d9c3e04da78fb6f0569685673418cf686fadba9042d926d13fb87ff503f9e
-ARG BITCOIN_SHA256_ARM64=dcf1873f2208ba4f962f3398d47e154c39c0084be8f4553e05c940d0ace3d004
+ARG BITCOIN_VERSION=27.1
+ARG BITCOIN_SHA256_AMD64=c9840607d230d65f6938b81deaec0b98fe9cb14c3a41a5b13b2c05d044a48422
+ARG BITCOIN_SHA256_ARM64=bb878df4f8ff8fb8acfb94207c50f959c462c39e652f507c2a2db20acc6a1eee
 RUN apt-get update -qq && \
     apt-get install -qq -y --no-install-recommends ca-certificates && \
     rm -rf /var/lib/apt/lists/*
@@ -142,23 +57,22 @@ RUN set -eu; \
     tar -xf "$TARBALL" "bitcoin-${BITCOIN_VERSION}/bin/bitcoin-cli"; \
     install -m 755 "bitcoin-${BITCOIN_VERSION}/bin/bitcoin-cli" /usr/bin/bitcoin-cli
 
-# Final stage - simplified
-#
-# `ca-certificates` is load-bearing: the slim base carries no CA store, and none
-# of the -dev packages below pull one in. Without it watchtower-client cannot
-# build an HTTPS client, so no tower ever registers (see README.md).
-#
-# `libpq5` and `libsodium23` are lightningd's own runtime deps.
-FROM debian:bookworm-slim AS final
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    ca-certificates libev-dev libcurl4-gnutls-dev libsqlite3-dev libunwind-dev \
-    libpq5 libsodium23 wireguard-tools iptables iproute2 procps && \
-    rm -rf /var/lib/apt/lists/*
 
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libgmp10 libpq5 libsodium23 libsqlite3-0 libssl3 libstdc++6 zlib1g python3 && \
+    rm -rf /var/lib/apt/lists/*
+COPY --from=engine-fixed /dist/usr/local/ /usr/local/
 COPY --from=bitcoin-cli /usr/bin/bitcoin-cli /usr/bin/bitcoin-cli
-COPY --from=lightningd-dist /dist/usr/local /usr/local
-COPY --from=clboss /usr/local/bin/clboss /usr/local/libexec/c-lightning/plugins/
-COPY --from=builder-rust /root/.cargo/bin/teos* /usr/local/bin/
-COPY --from=builder-rust /root/.cargo/bin/watchtower-client /usr/local/libexec/c-lightning/plugins/
-COPY --from=sling /usr/local/bin/sling /usr/local/libexec/c-lightning/plugins/
+# Bundled separately: no swap plugin discovery or mainnet activation.
+COPY --from=engine /src/tools/swap/ /usr/local/libexec/xbt-swap/
+COPY --from=engine /src/LICENSE /usr/local/share/xbt-cln/LICENSE
+COPY assets/source-lock.json /usr/local/share/xbt-cln/source-lock.json
+RUN lightningd --version && \
+    test -x /usr/local/libexec/c-lightning/plugins/clnrest && \
+    test -x /usr/local/libexec/c-lightning/plugins/cln-grpc && \
+    test -x /usr/local/libexec/c-lightning/plugins/cln-askrene && \
+    test -x /usr/local/libexec/c-lightning/plugins/pay && \
+    test -x /usr/local/libexec/c-lightning/plugins/bookkeeper && \
+    test -x /usr/local/libexec/c-lightning/plugins/sql
+CMD ["lightningd", "--version"]

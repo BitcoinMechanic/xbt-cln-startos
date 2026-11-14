@@ -1,0 +1,3 @@
+# Keep checksum-bound historical sources and captured logs byte-for-byte.
+0102c/** -whitespace
+grpc-repair-20261106/*.log -whitespace

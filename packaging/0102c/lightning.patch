@@ -1,0 +1,1153 @@
+diff --git a/tools/swap/authority_plugin.py b/tools/swap/authority_plugin.py
+index 73b2bb7ef6bda125aadeead9ac4c3807e4863d4a..a6d4071b9d2f00ed2f68136b588cacac21767f3a 100755
+--- a/tools/swap/authority_plugin.py
++++ b/tools/swap/authority_plugin.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Static regtest RPC facade; authentication belongs to CLN's rune transport."""
++"""Static environment-bound RPC facade; authentication belongs to CLN's rune transport."""
+ import json
+ from pathlib import Path
+ import socket
+@@ -18,8 +18,8 @@ REMOTE_DIR = 'remote-authority-v1'
+ 
+ def manifest():
+     return dict(options=[dict(name='swap-authority-profile', type='string',
+-                              description='Explicit protocol; disposable regtest only')],
+-        rpcmethods=[dict(name=remote.CALL, usage='grant_id operation body', description='Scoped regtest authority'),
++                              description='Explicit BTC/XBT protocol')],
++        rpcmethods=[dict(name=remote.CALL, usage='grant_id operation body', description='Scoped coordinator authority'),
+                     dict(name=remote.CREDENTIAL, usage='grant_id confirmed', description='Local credential setup')],
+         subscriptions=[], hooks=[], dynamic=False, nonnumericids=True)
+ 
+@@ -55,9 +55,9 @@ class RPC:
+ 
+ class Service:
+     def __init__(self, configuration, profile, rpc_factory=RPC, clock=time.time):
+-        hg.need(configuration.get('network') == 'regtest' and configuration.get('startup') is True
+-                and profile in (ba.ci.BTC, ba.ci.PRIVKEYIO_XBT), 'static_regtest_required')
+-        self.root = Path(configuration['lightning-dir'])
++        import node_bootstrap
++        hg.need(profile in (ba.ci.BTC, ba.ci.PRIVKEYIO_XBT), 'profile_refused')
++        self.root,self.environment = node_bootstrap.plugin_root(configuration,profile)
+         self.rpc = rpc_factory(configuration)
+         self.clock = clock
+         self.chain = self.invoke(None, None, profile)
+@@ -69,6 +69,7 @@ class Service:
+         other = None
+         try:
+             chain = hg.binding(journal.read()['chain'])
++            hg.need(chain['environment']==self.environment, 'environment_changed')
+             if profile is not None: hg.need(chain['profile'] == profile, 'profile_changed')
+             else: ba.ci.same_binding(chain, self.chain)
+             authority = ba.Authority(journal, chain, self.rpc, self.clock)
+diff --git a/tools/swap/bounded_authority.py b/tools/swap/bounded_authority.py
+index 75c0d882c584189af6c6e3fff4a2cdc13094f0e1..4e849b9d29095d354b44d846a96c824f9e9b955a 100644
+--- a/tools/swap/bounded_authority.py
++++ b/tools/swap/bounded_authority.py
+@@ -1,4 +1,4 @@
+-"""Versioned local authority for one-part payments. Disposable regtest only.
++"""Versioned local authority for one-part payments. Explicit environment and protocol binding.
+ 
+ No RPC passthrough, remote credential, price policy or cross-chain worker. An
+ operator grants finite local risk; an enrolled outgoing payment still needs a
+@@ -310,7 +310,7 @@ class Authority:
+                     'payment_hash_already_used')
+ 
+     def invoice(self, data):
+-        d = ci.invoice(self.rpc('decode', string=data['invoice']), self.chain['profile'], 'regtest')
++        d = ci.invoice(self.rpc('decode', string=data['invoice']), self.chain['profile'], self.chain['environment'])
+         expected = dict(payment_hash=data['payment_hash'], payment_secret=data['payment_secret'],
+                         payee=data['recipient'], amount_msat=data['amount_msat'])
+         now = int(self.clock())
+@@ -531,12 +531,12 @@ class Authority:
+         # Local cached status contains no hash, invoice, secret, preimage or RPC.
+         restored = restore_barrier.blocked(self.journal.directory)
+         if eid is None:
+-            return dict(format=FORMAT, regtest_only=True, blocked=self.blocked or restored,
++            return dict(format=FORMAT, regtest_only=hg.regtest(self.chain), blocked=self.blocked or restored,
+                         grants=len(self.record['grants']), enrollments=len(self.record['entries']))
+         hg.need(type(eid) is str and eid in self.record['entries'], 'unknown_enrollment')
+         e = self.record['entries'][eid]; kind = self.record['grants'][e['grant_id']]['terms']['kind']
+         state = entry_state(e)
+-        return dict(kind=kind, state=state, terminal='terminal' in e, regtest_only=True,
++        return dict(kind=kind, state=state, terminal='terminal' in e, regtest_only=hg.regtest(self.chain),
+                     blocked=self.blocked or restored)
+ 
+ 
+diff --git a/tools/swap/chain_identity.py b/tools/swap/chain_identity.py
+index 6262e1c03edb12db070240ec68ff37542b9d0958..94a36cd380b0b4f1a594f9b3d2b84ef6d7482073 100644
+--- a/tools/swap/chain_identity.py
++++ b/tools/swap/chain_identity.py
+@@ -151,3 +151,12 @@ def mainnet_xbt_backend(chain, deployments, checkpoint):
+     require(deployment.get('active') is True and type(deployment.get('height')) is int
+             and deployment['height'] == ACTIVATION_HEIGHT and checkpoint == ACTIVATION_HASH,
+             'wrong_xbt_backend')
++
++
++def invoice_text(value, chain):
++    """Cheap pre-decode HRP boundary. Signature and bit 512 checks remain mandatory."""
++    same_binding(chain,chain)
++    if type(value) is not str or not 1 <= len(value) <= 16384:return False
++    currency=wire(chain['profile'],chain['environment'])[1]
++    if chain['environment']=='regtest':return value.startswith('ln'+currency)
++    return re.fullmatch(r'ln'+currency+r'[0-9]+[munp]?1[023456789acdefghjklmnpqrstuvwxyz]+',value) is not None
+diff --git a/tools/swap/coordinator_admin.py b/tools/swap/coordinator_admin.py
+index 1d5dd2805fdfba48c18f799896c9e2e5f5a8f8fa..676a4f8ea61a21cf0c175a968fd40b3c4fd20dfd 100644
+--- a/tools/swap/coordinator_admin.py
++++ b/tools/swap/coordinator_admin.py
+@@ -1,4 +1,4 @@
+-"""Local, finite grant administration for the migrated disposable-regtest node.
++"""Local, finite grant administration for the environment-bound coordinator.
+ 
+ The package adapter supplies the node directory and protocol profile. No SCID,
+ RPC method, credential, or endpoint comes from an administration request.
+@@ -112,7 +112,7 @@ class Admin:
+             limits=copy.deepcopy(g['limits']), expires_at=g['expires_at'],
+             confirm_before=min(g['created_at']+REVIEW_SECONDS, g['expires_at']),
+             current=self.authority.record['current'][g['kind']] == gid,
+-            paused=None if saved is None else saved['paused'], regtest_only=True)
++            paused=None if saved is None else saved['paused'], regtest_only=hg.regtest(self.authority.chain))
+         if ba.protected(g):
+             result['protection'] = dict(close_before_blocks=g['limits']['close_before_blocks'],
+                 scope='The actual incoming channel may be force-closed, including its other payments.',
+@@ -160,7 +160,7 @@ class Admin:
+         return retirement.confirm(self.authority, entry_id, confirmation, confirmed=confirmed)
+ 
+     def status(self):
+-        return dict(read_only=True, regtest_only=True,
++        return dict(read_only=True, regtest_only=hg.regtest(self.authority.chain),
+             blocked=self.blocked or restore_barrier.blocked(self.journal.directory)
+                 or self.authority.status()['blocked'],
+             reviews=[self.summary(gid) for gid in self.record['reviews']],
+@@ -187,7 +187,7 @@ def execute(root, chain, rpc, request, *, clock=time.time):
+             hg.need(request['confirmed'] is True, 'confirmation_required')
+             authority.read_node(admission=True)
+             initialize(root/DIRECTORY, chain)
+-            return dict(initialized=True, regtest_only=True)
++            return dict(initialized=True, regtest_only=hg.regtest(chain))
+         journals.append(hg.Journal(root/DIRECTORY)); admin = Admin(authority, journals[1], clock)
+         return getattr(admin, action)(**{k:v for k,v in request.items() if k != 'action'})
+     finally:
+diff --git a/tools/swap/coordinator_admin_cli.py b/tools/swap/coordinator_admin_cli.py
+index e795ce24016d6d35057073dd3030815dff3970ce..1f2b7f02be2bd24fdf6a096fe335a8c1c1ead4c5 100644
+--- a/tools/swap/coordinator_admin_cli.py
++++ b/tools/swap/coordinator_admin_cli.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Local fixed-action adapter; disposable regtest only, no raw RPC forwarding."""
++"""Local fixed-action adapter; explicit environment, no raw RPC forwarding."""
+ import argparse
+ import json
+ import os
+@@ -13,19 +13,27 @@ import held_gate as hg
+ 
+ def main():
+     p = argparse.ArgumentParser(description=__doc__)
+-    p.add_argument('--disposable-regtest', required=True, action='store_true')
++    mode=p.add_mutually_exclusive_group(required=True)
++    mode.add_argument('--disposable-regtest', action='store_true')
++    mode.add_argument('--mainnet', action='store_true')
+     p.add_argument('--network-directory', type=Path, required=True)
+     p.add_argument('--profile', choices=(admin.ba.ci.BTC, admin.ba.ci.PRIVKEYIO_XBT), required=True)
+     args = p.parse_args(); os.umask(0o077)
+     raw = sys.stdin.buffer.read(16385)
+     hg.need(len(raw) <= 16384, 'admin_request_too_large')
+     request = json.loads(raw, object_pairs_hook=hg.unique_object)
+-    root = args.network_directory.absolute()
++    network_root = args.network_directory.absolute()
++    import node_bootstrap
++    environment='mainnet' if args.mainnet else 'regtest'
++    root=node_bootstrap.state_root(network_root,environment)
++    if args.mainnet:
++        hg.need(network_root.name=='bitcoin','mainnet_directory_required')
++        node_bootstrap.activation(root,args.profile)
+     j = hg.Journal(root/ap.AUTHORITY_DIR)
+     try: chain = hg.binding(j.read()['chain'])
+     finally: j.close()
+-    hg.need(chain['profile'] == args.profile, 'profile_changed')
+-    rpc = ap.RPC({'lightning-dir':str(root), 'rpc-file':'lightning-rpc'})
++    hg.need(chain['profile'] == args.profile and chain['environment']==environment, 'profile_changed')
++    rpc = ap.RPC({'lightning-dir':str(network_root), 'rpc-file':'lightning-rpc'})
+     print(json.dumps(admin.execute(root, chain, rpc, request)))
+ 
+ 
+diff --git a/tools/swap/cross_contract.py b/tools/swap/cross_contract.py
+index 4d5a374452ab1041cde5dd04d0c67dffa4d932ab..550dc2b814baa0774f77a5531dc8f25f9d87cf49 100644
+--- a/tools/swap/cross_contract.py
++++ b/tools/swap/cross_contract.py
+@@ -28,6 +28,7 @@ def grant_pair(grants, direction):
+     for kind, profile in zip(('incoming', 'outgoing'), profiles):
+         g = grants[kind]; ba.grant(g, hg.binding(g['chain']))
+         hg.need(g['kind'] == kind and g['chain']['profile'] == profile, 'contract_chain_or_kind_changed')
++    hg.need(grants['incoming']['chain']['environment'] == grants['outgoing']['chain']['environment'], 'contract_environment_changed')
+     hg.need(grants['incoming']['chain']['node_id'] != grants['outgoing']['chain']['node_id'], 'contract_nodes_not_distinct')
+ 
+ 
+@@ -91,7 +92,7 @@ def inspection(c, kind, observed, now, *, entry_id=None):
+     info = observed['info']
+     hg.need(type(info) is dict and set(info) == {'format', 'grant', 'paused', 'current', 'remaining', 'reserved_msat', 'regtest_only'}
+             and info['format'] == remote.FORMAT and ba.equal(info['grant'], g)
+-            and info['paused'] is False and info['current'] is True and info['regtest_only'] is True
++            and info['paused'] is False and info['current'] is True and info['regtest_only'] is hg.regtest(g['chain'])
+             and hg.integer(info['remaining'], 0, g['limits']['max_swaps'])
+             and hg.integer(info['reserved_msat'], 0, g['limits']['total_amount_msat']), 'contract_grant_changed')
+     if entry_id is not None:
+@@ -137,7 +138,7 @@ def held_margin(c, evidence, *, incoming_height):
+     hg.need(ba.equal(e['payload'], quote) and e['grant_id'] == gid and 'incoming' in e
+             and 'decision' not in e and 'terminal' not in e and 'closing' not in e
+             and 'close' not in e.get('protection', {}) and evidence['status'] ==
+-                dict(kind='incoming', state='held', terminal=False, regtest_only=True, blocked=False),
++                dict(kind='incoming', state='held', terminal=False, regtest_only=hg.regtest(g['chain']), blocked=False),
+             'contract_incoming_not_held')
+     hg.need(hg.integer(incoming_height, 0, 2**32-1) and quote['min_cltv_delta'] <=
+             e['incoming']['expiry']-incoming_height <= quote['max_cltv_delta'], 'contract_held_margin_insufficient')
+@@ -151,4 +152,4 @@ def review(c):
+         routing_fee_msat=c['pricing']['routing_fee_msat'], markup_bps=c['pricing']['markup_bps'],
+         expires_at=c['pay_until'], outgoing_hops=len(c['outgoing']['route']),
+         outgoing_delay_blocks=c['outgoing']['route'][0]['delay'],
+-        incoming_channel='Detected when payment arrives', regtest_only=True)
++        incoming_channel='Detected when payment arrives', regtest_only=hg.regtest(c['incoming']['chain']))
+diff --git a/tools/swap/cross_worker.py b/tools/swap/cross_worker.py
+index 455fece6e2dae9f54b63d3d97b2e823b7e33e72f..b46997e3d1d6ba1b2f8b7487cb4001480f05335f 100644
+--- a/tools/swap/cross_worker.py
++++ b/tools/swap/cross_worker.py
+@@ -1,4 +1,4 @@
+-"""Durable single-part cross-chain worker, explicit BTC/new-XBT regtest only.
++"""Durable single-part cross-chain worker, explicit BTC/new-XBT environment binding.
+ 
+ The caller supplies authenticated, fixed-endpoint customer RPC adapters. This
+ module never accepts raw RPC, chooses routes, reprices or submits a payment
+@@ -35,7 +35,7 @@ def evidence(c, kind, value):
+     hg.need(e['grant_id'] == gid and ba.equal(e['payload'], c[kind]), 'worker_enrollment_changed')
+     state = ba.entry_state(e)
+     hg.need(ba.equal(value['status'], dict(kind=kind, state=state, terminal='terminal' in e,
+-            regtest_only=True, blocked=False)), 'worker_evidence_status_invalid')
++            regtest_only=hg.regtest(g['chain']), blocked=False)), 'worker_evidence_status_invalid')
+     return e
+ 
+ 
+@@ -64,7 +64,7 @@ def enrolled_admission(c, observations, now):
+ def publication(c, value):
+     hg.need(type(value) is dict and set(value) == {'format', 'entry_id', 'invoice', 'expires_at'}
+             and value['format'] == invoice.FORMAT and value['entry_id'] == enrollment(c, 'incoming')
+-            and type(value['invoice']) is str and value['invoice'].startswith('lnbcrt')
++            and ba.ci.invoice_text(value['invoice'],c['incoming']['chain'])
+             and 100 <= len(value['invoice']) <= 16384
+             and ba.equal(value['expires_at'], c['pay_until']), 'worker_invoice_invalid')
+     # The scoped publisher authenticates every signed field with CLN decode.
+@@ -259,7 +259,7 @@ class Worker:
+         return dict(confirmation=ba.digest(value),contract_id=cid,direction=s['contract']['direction'],
+             outcome=value['outcome'],original_attempt_verified=True,
+             incoming_retirement_verified=True,confirmed='recovery_retirement' in s,
+-            read_only=True,regtest_only=True)
++            read_only=True,regtest_only=hg.regtest(s['contract']['incoming']['chain']))
+ 
+     def recovery_confirm(self, cid, confirmation, confirmed=False):
+         self.guard(); hg.need(confirmed is True,'confirmation_required')
+@@ -368,4 +368,4 @@ class Worker:
+         elif 'approval' in s: state = 'setting_up'
+         else: state = 'ready_for_confirmation'
+         return dict(format=FORMAT,direction=s['contract']['direction'],state=state,terminal=terminal,
+-            blocked=self.blocked or restore_barrier.blocked(self.journal.directory),regtest_only=True)
++            blocked=self.blocked or restore_barrier.blocked(self.journal.directory),regtest_only=hg.regtest(s['contract']['incoming']['chain']))
+diff --git a/tools/swap/customer_https.py b/tools/swap/customer_https.py
+index 5cfd16db1296c0ecba660b54f4b8fad8a572eb15..937d76abb683bd5ab4a820679daa4fee28548686 100644
+--- a/tools/swap/customer_https.py
++++ b/tools/swap/customer_https.py
+@@ -69,7 +69,7 @@ def context(pem):
+ def info(value, grant):
+     hg.need(type(value) is dict and set(value) == {'format','grant','paused','current','remaining','reserved_msat','regtest_only'}
+         and value['format'] == remote.FORMAT and ba.equal(value['grant'],grant)
+-        and type(value['paused']) is bool and type(value['current']) is bool and value['regtest_only'] is True
++        and type(value['paused']) is bool and type(value['current']) is bool and value['regtest_only'] is hg.regtest(grant['chain'])
+         and hg.integer(value['remaining'],0,grant['limits']['max_swaps'])
+         and hg.integer(value['reserved_msat'],0,grant['limits']['total_amount_msat']), 'https_grant_or_identity_changed')
+     return value
+diff --git a/tools/swap/customer_invoice.py b/tools/swap/customer_invoice.py
+index 2713681cacd628db9c870df8569c131eaf070c3b..40077fb847c7f7539a33a7479d595c7a2eb91dcf 100644
+--- a/tools/swap/customer_invoice.py
++++ b/tools/swap/customer_invoice.py
+@@ -85,7 +85,7 @@ def unsigned(quote, timestamp, hints):
+     hg.need(final <= quote['max_cltv_delta'] and hg.integer(timestamp, 1, quote['expires_at']-1)
+             and quote['expires_at']-timestamp <= 3600, 'invoice_timing_invalid')
+     text = bolt11.unsigned(quote['payment_hash'], quote['payment_secret'], quote['amount_msat'],
+-        profile=quote['chain']['profile'], environment='regtest', timestamp=timestamp,
++        profile=quote['chain']['profile'], environment=quote['chain']['environment'], timestamp=timestamp,
+         expiry=quote['expires_at']-timestamp, final_cltv=final)
+     hrp, data = text.rsplit('1', 1)
+     words = [bolt11.CHARSET.index(c) for c in data][:-110]
+@@ -100,7 +100,7 @@ def unsigned(quote, timestamp, hints):
+ 
+ 
+ def check_decode(decoded, quote, saved):
+-    d = ba.ci.invoice(decoded, quote['chain']['profile'], 'regtest')
++    d = ba.ci.invoice(decoded, quote['chain']['profile'], quote['chain']['environment'])
+     expected = dict(payment_hash=quote['payment_hash'], payment_secret=quote['payment_secret'],
+         amount_msat=quote['amount_msat'], payee=quote['chain']['node_id'], created_at=saved['timestamp'],
+         expiry=quote['expires_at']-saved['timestamp'], min_final_cltv_expiry=quote['min_cltv_delta']+24,
+@@ -126,8 +126,7 @@ def validate(record, authority):
+                 'publisher_entry_invalid')
+         hg.need(saved['unsigned'] == unsigned(e['payload'], saved['timestamp'], saved['hints']), 'publication_intent_changed')
+         if 'invoice' in saved:
+-            hg.need(type(saved['invoice']) is str and saved['invoice'].startswith('lnbcrt')
+-                    and len(saved['invoice']) <= 16384, 'customer_invoice_invalid')
++            hg.need(ba.ci.invoice_text(saved['invoice'],authority.chain), 'customer_invoice_invalid')
+     return record
+ 
+ 
+diff --git a/tools/swap/customer_plugin.py b/tools/swap/customer_plugin.py
+index 6fa21b5fdda427c4b37dcc96c6601a1a6b15dd8f..2481b497966b32ac225e92fc4e4a99f27a8c39e9 100755
+--- a/tools/swap/customer_plugin.py
++++ b/tools/swap/customer_plugin.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Static regtest customer facade. Fresh journals; no StartOS activation."""
++"""Static customer facade for explicitly initialized coordinator journals."""
+ from pathlib import Path
+ import sys
+ import time
+@@ -18,7 +18,7 @@ INVOICE_DIR = 'customer-invoices-v1'
+ def manifest():
+     result = plugin.manifest()
+     result['rpcmethods'] = [
+-        dict(name=remote.CALL, usage='grant_id operation body', description='Scoped regtest customer contract operations'),
++        dict(name=remote.CALL, usage='grant_id operation body', description='Scoped customer contract operations'),
+         dict(name=remote.CREDENTIAL, usage='grant_id confirmed', description='Local customer credential setup')]
+     return result
+ 
+@@ -68,6 +68,7 @@ class Service(plugin.Service):
+             for name in (plugin.AUTHORITY_DIR, REMOTE_DIR, INVOICE_DIR):
+                 journals.append(hg.Journal(self.root/name))
+             chain = hg.binding(journals[0].read()['chain'])
++            hg.need(chain['environment']==self.environment, 'environment_changed')
+             if profile is not None: hg.need(chain['profile'] == profile, 'profile_changed')
+             else: ba.ci.same_binding(chain, self.chain)
+             a = ba.Authority(journals[0], chain, self.rpc, self.clock)
+diff --git a/tools/swap/deadline_protection.py b/tools/swap/deadline_protection.py
+index 59a2c1a246dde5ebb97b004423c345a91a4b4069..c9d11093fadb7e132487d29aa719732ef9e34b89 100644
+--- a/tools/swap/deadline_protection.py
++++ b/tools/swap/deadline_protection.py
+@@ -84,4 +84,4 @@ def inspect(a, eid):
+         rows.get('transactions'), funds.get('outputs'), height, allow_spent=True)
+     hg.need(a.read_node(admission=True) == height, 'chain_advanced_retry_inspection')
+     return dict(format=FORMAT, entry_id=eid, height=height, **result, read_only=True,
+-                confirmation_source='paired_cln', independent_chain_proof=False, regtest_only=True)
++                confirmation_source='paired_cln', independent_chain_proof=False, regtest_only=hg.regtest(a.chain))
+diff --git a/tools/swap/gate_plugin.py b/tools/swap/gate_plugin.py
+index 6d07a2f10d0be5b6e1964400fac1dda2e4c8af4e..42def38341a36a837b0095cd755115a3539e9f74 100755
+--- a/tools/swap/gate_plugin.py
++++ b/tools/swap/gate_plugin.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""Static, disposable-regtest CLN plugin for held_gate. No remote authority."""
++"""Static, environment-bound CLN plugin for held_gate. No remote authority."""
+ import json
+ from pathlib import Path
+ import socket
+@@ -14,7 +14,7 @@ METHODS = {'swap-gate-register': 'quote', 'swap-gate-status': 'payment_hash',
+ 
+ def manifest():
+     return dict(options=[dict(name='swap-gate-profile', type='string',
+-                              description='Explicit protocol profile; disposable regtest only')],
++                              description='Explicit BTC/XBT protocol profile')],
+                 rpcmethods=[dict(name=name, usage=usage, description='Regtest held HTLC gate')
+                             for name, usage in METHODS.items()],
+                 subscriptions=[], hooks=[dict(name='htlc_accepted')],
+@@ -111,14 +111,14 @@ def main():
+                 hg.need(gate is None, 'already_initialized')
+                 p = request['params']
+                 config = p['configuration']
+-                hg.need(config.get('network') == 'regtest' and config.get('startup') is True,
+-                        'static_disposable_regtest_required')
+                 profile = p['options']['swap-gate-profile']
+                 hg.need(profile in (hg.ci.BTC, hg.ci.PRIVKEYIO_XBT), 'profile_refused')
+-                journal = hg.Journal(Path(config['lightning-dir'])/'swap-gate-v1')
++                import node_bootstrap
++                root,environment = node_bootstrap.plugin_root(config,profile)
++                journal = hg.Journal(root/'swap-gate-v1')
+                 saved = journal.read()
+                 chain = saved['chain']
+-                hg.need(chain['profile'] == profile, 'profile_changed')
++                hg.need(chain['profile'] == profile and chain['environment']==environment, 'profile_changed')
+                 gate = hg.Gate(journal, chain, ReadRPC(config))
+                 emit(response(request['id'], {}))
+                 continue
+diff --git a/tools/swap/held_gate.py b/tools/swap/held_gate.py
+index d460f6e4489109d83c65b03384e24b3f91d1ea6d..9406b34b751ca5694e3e572333ee8915a7fa3381 100644
+--- a/tools/swap/held_gate.py
++++ b/tools/swap/held_gate.py
+@@ -54,10 +54,14 @@ def scid(value):
+ def binding(value):
+     ci.same_binding(value, value)
+     need(value['profile'] in (ci.BTC, ci.PRIVKEYIO_XBT)
+-         and value['environment'] == 'regtest', 'disposable_regtest_required')
++         and value['environment'] in ci.ENVIRONMENTS, 'unsupported_swap_environment')
+     return value
+ 
+ 
++def regtest(chain):
++    return binding(chain)['environment'] == 'regtest'
++
++
+ def observe(info, expected, *, admission=False):
+     """Recovery may start while syncing; new admission requires full readiness.
+ 
+@@ -66,14 +70,14 @@ def observe(info, expected, *, admission=False):
+     """
+     binding(expected)
+     need(type(info) is dict and info.get('network') == expected['network'], 'network_changed')
+-    observed = ci.binding(expected['profile'], 'regtest', info.get('id'))
++    observed = ci.binding(expected['profile'], expected['environment'], info.get('id'))
+     ci.same_binding(expected, observed)
+     need(type(info.get('our_features')) is dict, 'features_missing')
+     for place in ('init', 'node', 'invoice'):
+         ci._features(info['our_features'].get(place), expected['profile'], place)
+     need(integer(info.get('blockheight'), 0, 2**32-1), 'height_invalid')
+     if admission:
+-        ci.node(info, expected['profile'], 'regtest', expected_id=expected['node_id'])
++        ci.node(info, expected['profile'], expected['environment'], expected_id=expected['node_id'])
+     return info['blockheight']
+ 
+ 
+@@ -260,7 +264,7 @@ class Journal:
+ 
+ 
+ def initialize_fixture(directory, chain):
+-    """Fresh regtest fixture only. Never called by the plugin or on an old dir."""
++    """Initialize an empty journal. Never called on an existing directory or by plugin startup."""
+     binding(chain)
+     directory = Path(directory)
+     need(not restore_barrier.blocked(directory), "restored_gate_blocked")
+diff --git a/tools/swap/node_bootstrap.py b/tools/swap/node_bootstrap.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a390253f334550adb0a53e524856cbddceafa7f
+--- /dev/null
++++ b/tools/swap/node_bootstrap.py
+@@ -0,0 +1,115 @@
++"""Explicit coordinator setup on an authenticated running node.
++
++One atomic namespace publication. Startup never creates journals, imports old
++state, or repairs a missing journal. Incomplete staging remains private evidence.
++"""
++import json
++import os
++from pathlib import Path
++import stat
++import tempfile
++
++import chain_identity as ci
++import held_gate as hg
++import bounded_authority as ba
++import coordinator_admin as admin
++import customer_invoice as invoice
++import customer_remote as remote
++import restore_barrier
++
++DIRECTORY = 'swap-coordinator-v1'
++ACTIVATION = 'activation.json'
++JOURNALS = ('swap-gate-v1','bounded-authority-v1','customer-remote-v1','customer-invoices-v1','coordinator-admin-v1')
++
++
++def state_root(network_root, environment):
++    hg.need(environment in ci.ENVIRONMENTS, 'unsupported_swap_environment')
++    namespace=Path(network_root)/DIRECTORY
++    return namespace if environment == 'mainnet' or os.path.lexists(namespace) else Path(network_root)
++
++
++def sync(path):
++    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
++    try: os.fsync(fd)
++    finally: os.close(fd)
++
++
++def activation(root, profile, environment='mainnet'):
++    root = Path(root)
++    hg.need(not restore_barrier.blocked(root/'authority'), 'restored_authority_blocked')
++    for p in (root,*root.parents): hg.need(not p.is_symlink(), 'bootstrap_path_refused')
++    st = root.stat()
++    hg.need(stat.S_ISDIR(st.st_mode) and st.st_uid == os.getuid() and st.st_mode & 0o077 == 0,
++            'bootstrap_directory_not_private')
++    fd = os.open(root/ACTIVATION, os.O_RDONLY | os.O_NOFOLLOW)
++    with os.fdopen(fd,'rb') as f:
++        hg.Journal.check_file(f.fileno()); raw=f.read(4097)
++    hg.need(len(raw)<=4096,'activation_invalid')
++    r=json.loads(raw,object_pairs_hook=hg.unique_object)
++    hg.need(type(r) is dict and set(r)=={'schema','chain','journals'} and type(r['schema']) is int and r['schema']==1
++            and r['journals']==list(JOURNALS),'activation_invalid')
++    c=hg.binding(r['chain'])
++    hg.need(c['profile']==profile and c['environment']==environment,'activation_chain_changed')
++    # Read only file shape here: live gate owns its journal lock. Complete
++    # semantic validation is performed by each owner before any operation.
++    for name in JOURNALS:
++        p=root/name
++        hg.need(not p.is_symlink(),'bootstrap_path_refused')
++        st=p.stat()
++        hg.need(stat.S_ISDIR(st.st_mode) and st.st_uid==os.getuid() and st.st_mode & 0o077==0,'bootstrap_directory_not_private')
++        fd=os.open(p/'state.json',os.O_RDONLY|os.O_NOFOLLOW)
++        with os.fdopen(fd,'rb') as f:
++            hg.Journal.check_file(f.fileno()); raw=f.read(hg.MAX_BYTES+1)
++        hg.need(len(raw)<=hg.MAX_BYTES,'activation_journal_invalid')
++        data=json.loads(raw,object_pairs_hook=hg.unique_object)
++        ci.same_binding(data.get('chain'),c)
++    return c
++
++
++def prepare(network_root, profile, rpc, *, confirmed=False, environment='mainnet'):
++    hg.need(confirmed is True,'confirmation_required')
++    hg.need(profile in (ci.BTC,ci.PRIVKEYIO_XBT),'profile_refused')
++    network_root=Path(network_root)
++    hg.need(network_root.name==ci.wire(profile,environment)[0],'network_directory_required')
++    root=network_root/DIRECTORY
++    hg.need(not restore_barrier.blocked(root/'authority'),'restored_authority_blocked')
++    chain=ci.node(rpc('getinfo'),profile,environment)
++    # Existing namespace is recovery, never an initializer. A repeated successful
++    # setup checks identity and returns the saved activation without rewriting it.
++    if os.path.lexists(root):
++        ci.same_binding(activation(root,profile,environment),chain)
++        return dict(initialized=True,restart_required=True,existing_records=True)
++    for p in (network_root,*network_root.parents):hg.need(not p.is_symlink(),'bootstrap_path_refused')
++    # Direct journals belong to the regtest-era layout; do not gain mainnet authority.
++    hg.need(not any(os.path.lexists(network_root/n) for n in JOURNALS),'foreign_authority_present')
++    stage=Path(tempfile.mkdtemp(prefix='.swap-setup-',dir=network_root))
++    hg.initialize_fixture(stage/'swap-gate-v1',chain)
++    ba.initialize_fixture(stage/'bounded-authority-v1',chain)
++    remote.initialize_fixture(stage/'customer-remote-v1',chain)
++    invoice.initialize_fixture(stage/'customer-invoices-v1',chain)
++    admin.initialize(stage/'coordinator-admin-v1',chain)
++    fd=os.open(stage/ACTIVATION,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
++    with os.fdopen(fd,'w') as f:
++        json.dump(dict(schema=1,chain=chain,journals=list(JOURNALS)),f);f.flush();os.fsync(f.fileno())
++    activation(stage,profile,environment)
++    ci.same_binding(ci.node(rpc('getinfo'),profile,environment),chain)
++    sync(stage)
++    # rename refuses an existing nonempty namespace; concurrent setup cannot
++    # overwrite an activation. Retain staging on any error for inspection.
++    os.rename(stage,root);sync(network_root)
++    return dict(initialized=True,restart_required=True,existing_records=False)
++
++
++def plugin_root(configuration, profile):
++    network=configuration.get('network')
++    hg.need(configuration.get('startup') is True and network in ('bitcoin','regtest'),'static_network_required')
++    environment='mainnet' if network=='bitcoin' else 'regtest'
++    hg.need(type(configuration.get('lightning-dir')) is str,'static_network_required')
++    root=state_root(configuration['lightning-dir'],environment)
++    if environment=='mainnet':
++        import package_verify
++        manifest=package_verify.verify(Path(__file__).parent,'node')
++        hg.need(manifest.get('environments')==['regtest','mainnet'],'runtime_environment_refused')
++        activation(root,profile,environment)
++    elif root.name==DIRECTORY:activation(root,profile,environment)
++    return root,environment
+diff --git a/tools/swap/node_cli.py b/tools/swap/node_cli.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4f45c00fd7e6961a88b7077ab538b11b1f0b97f7
+--- /dev/null
++++ b/tools/swap/node_cli.py
+@@ -0,0 +1,50 @@
++"""Fixed package launch and explicit coordinator bootstrap; no payments."""
++import argparse
++import json
++import os
++from pathlib import Path
++import sys
++
++import chain_identity as ci
++import held_gate as hg
++import node_bootstrap as boot
++
++
++def main():
++    p=argparse.ArgumentParser(description=__doc__)
++    mode=p.add_mutually_exclusive_group(required=True)
++    mode.add_argument('--mainnet',action='store_true')
++    mode.add_argument('--disposable-regtest',action='store_true')
++    p.add_argument('--profile',choices=(ci.BTC,ci.PRIVKEYIO_XBT),required=True)
++    p.add_argument('--root',type=Path,required=True)
++    p.add_argument('mode',choices=('prepare','launch','status'))
++    p.add_argument('arguments',nargs=argparse.REMAINDER)
++    a=p.parse_args();os.umask(0o077)
++    environment='mainnet' if a.mainnet else 'regtest'
++    wire=ci.wire(a.profile,environment)[0]
++    root=a.root.absolute();network=root/wire;state=network/boot.DIRECTORY
++    if a.mode=='launch':
++        args=a.arguments
++        hg.need(not any(x.startswith(('--network','--lightning-dir','--plugin-dir','--swap-')) for x in args),'launch_arguments_refused')
++        extra=[]
++        if os.path.lexists(state):
++            boot.activation(state,a.profile,environment)
++            package=Path(__file__).parent
++            extra=['--important-plugin='+str(package/'package_gate.py'),
++                   '--swap-gate-profile='+a.profile,'--important-plugin='+str(package/'package_customer.py'),
++                   '--swap-authority-profile='+a.profile]
++        asset='btc' if a.profile==ci.BTC else 'xbt'
++        binary='/opt/'+asset+'/bin/lightningd'
++        os.execv(binary,[binary,'--network='+wire,'--lightning-dir='+str(root),*args,*extra])
++    hg.need(not a.arguments,'node_request_invalid')
++    if a.mode=='status':
++        ready=os.path.lexists(state)
++        if ready:boot.activation(state,a.profile,environment)
++        print(json.dumps(dict(initialized=ready,read_only=True)));return
++    import authority_plugin
++    raw=sys.stdin.buffer.read(1025)
++    hg.need(len(raw)<=1024,'node_request_invalid')
++    request=json.loads(raw,object_pairs_hook=hg.unique_object)
++    hg.need(request=={'confirmed':True} and type(request['confirmed']) is bool,'confirmation_required')
++    rpc=authority_plugin.RPC({'lightning-dir':str(network),'rpc-file':'lightning-rpc'})
++    print(json.dumps(boot.prepare(network,a.profile,rpc,confirmed=True,environment=environment)))
+diff --git a/tools/swap/onchain_retirement.py b/tools/swap/onchain_retirement.py
+index 333f4d46575086bdcb2f45b43029a7e6f8df666e..5f5792cec570daa6f33320c172442b0ec84084e4 100644
+--- a/tools/swap/onchain_retirement.py
++++ b/tools/swap/onchain_retirement.py
+@@ -104,17 +104,17 @@ def recheck(a, eid):
+     return value, height
+ 
+ 
+-def summary(value, height, confirmed):
++def summary(value, height, confirmed, chain):
+     return dict(confirmation=ba.digest(value),entry_id=value['entry_id'],phase=value['phase'],
+         checked_height=height,minimum_confirmations=DEPTH,confirmed=confirmed,
+-        read_only=True,regtest_only=True,confirmation_source='paired_cln',independent_chain_proof=False,
++        read_only=True,regtest_only=hg.regtest(chain),confirmation_source='paired_cln',independent_chain_proof=False,
+         next_step='Review the original outgoing attempt in the controller before retiring the swap.')
+ 
+ 
+ def review(a, eid):
+     e, _ = a.entry(eid,'incoming')
+     value, height = recheck(a,eid) if 'onchain_retirement' in e else snapshot(a,eid)
+-    return summary(value,height,'onchain_retirement' in e)
++    return summary(value,height,'onchain_retirement' in e,a.chain)
+ 
+ 
+ def confirm(a, eid, confirmation, *, confirmed=False):
+@@ -127,5 +127,5 @@ def confirm(a, eid, confirmation, *, confirmed=False):
+             confirmed_height=height,confirmed_at=int(a.clock()))
+         e['terminal'] = OUTCOMES[e['decision']['action']][1]
+         validate(e,g); a.update(eid,e)
+-    result = summary(value,height,True); result['read_only'] = False
++    result = summary(value,height,True,a.chain); result['read_only'] = False
+     return result
+diff --git a/tools/swap/package_admin.py b/tools/swap/package_admin.py
+index 977c4923a4410f3e7754210a00fc0d190b016b64..f41996b7c6a0630e14d703d6fee04acebf502fe2 100755
+--- a/tools/swap/package_admin.py
++++ b/tools/swap/package_admin.py
+@@ -6,7 +6,9 @@ sys.dont_write_bytecode = True
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ try:
+     import package_verify
+-    package_verify.verify(Path(__file__).parent, 'node')
++    manifest = package_verify.verify(Path(__file__).parent, 'node')
++    if '--mainnet' in sys.argv and manifest.get('environments') != ['regtest','mainnet']:
++        raise ValueError('runtime_environment_refused')
+     import coordinator_admin_cli
+     coordinator_admin_cli.main()
+ except Exception:
+diff --git a/tools/swap/package_customer.py b/tools/swap/package_customer.py
+index 5a8d469ddd30f81d05ee977d1026b91f045422dc..66f68b7d2188e5b1798a08d08b04e3e2d3f40c13 100755
+--- a/tools/swap/package_customer.py
++++ b/tools/swap/package_customer.py
+@@ -6,7 +6,9 @@ sys.dont_write_bytecode = True
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ try:
+     import package_verify
+-    package_verify.verify(Path(__file__).parent, 'node')
++    manifest = package_verify.verify(Path(__file__).parent, 'node')
++    if '--mainnet' in sys.argv and manifest.get('environments') != ['regtest','mainnet']:
++        raise ValueError('runtime_environment_refused')
+     import authority_plugin
+     import customer_plugin
+     authority_plugin.main(customer_plugin.RPC, customer_plugin.Service, customer_plugin.manifest)
+diff --git a/tools/swap/package_gate.py b/tools/swap/package_gate.py
+index 993de5bc4bd30fa8a4f0c243286848094aa9502d..674ed9643e142fb70a966d3e91e031493032a0da 100755
+--- a/tools/swap/package_gate.py
++++ b/tools/swap/package_gate.py
+@@ -6,7 +6,9 @@ sys.dont_write_bytecode = True
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ try:
+     import package_verify
+-    package_verify.verify(Path(__file__).parent, 'node')
++    manifest = package_verify.verify(Path(__file__).parent, 'node')
++    if '--mainnet' in sys.argv and manifest.get('environments') != ['regtest','mainnet']:
++        raise ValueError('runtime_environment_refused')
+     import gate_plugin
+     gate_plugin.main()
+ except Exception:
+diff --git a/tools/swap/package_node.py b/tools/swap/package_node.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4620c79af2df4c507ee689b9720704058c800702
+--- /dev/null
++++ b/tools/swap/package_node.py
+@@ -0,0 +1,15 @@
++#!/usr/bin/python3 -I
++"""Verified production node entry point; all authority requires explicit setup."""
++from pathlib import Path
++import sys
++sys.dont_write_bytecode=True
++sys.path.insert(0,str(Path(__file__).resolve().parent))
++try:
++    import package_verify
++    m=package_verify.verify(Path(__file__).parent,'node')
++    if m.get('environments')!=['regtest','mainnet']:raise ValueError('runtime_environment_refused')
++    import node_cli
++    node_cli.main()
++except Exception:
++    print('{"result":"REFUSED","reason":"node_setup_or_startup_refused","records_preserved":true}')
++    raise SystemExit(1) from None
+diff --git a/tools/swap/package_runtime.py b/tools/swap/package_runtime.py
+index f14cb5848f4631b41e51d2dc14b5067512cda5e8..d8aaa1ed863996735f2aa5a439a3c649d482b33e 100755
+--- a/tools/swap/package_runtime.py
++++ b/tools/swap/package_runtime.py
+@@ -8,7 +8,7 @@ from pathlib import Path
+ import shutil
+ import sys
+ 
+-ROOTS = {'node': ('package_gate','package_customer','package_admin'),
++ROOTS = {'node': ('package_gate','package_customer','package_admin','package_node'),
+          'controller': ('package_service',)}
+ 
+ 
+@@ -36,12 +36,14 @@ def closure(roots, sources):
+     return selected
+ 
+ 
+-def stage(swap, controller, destination, role, generation):
++def stage(swap, controller, destination, role, generation, *, live=False):
+     if role not in ROOTS or generation not in ('a','b'): raise ValueError('runtime_role_invalid')
+     destination = Path(destination)
+     destination.mkdir()  # Never replace an existing runtime.
+     files = closure(ROOTS[role], [Path(swap),Path(controller)])
+     manifest = dict(schema=1,fixture='0098',role=role,generation=generation,regtest_only=True,files={})
++    if live:
++        manifest.update(schema=2,fixture='0102',regtest_only=False,environments=['regtest','mainnet'])
+     for name, source in sorted(files.items()):
+         target=destination/(name+'.py'); shutil.copyfile(source,target); target.chmod(0o755 if name in ROOTS[role] else 0o644)
+         manifest['files'][target.name]=hashlib.sha256(target.read_bytes()).hexdigest()
+@@ -54,4 +56,5 @@ if __name__=='__main__':
+     p=argparse.ArgumentParser(description=__doc__)
+     for key in ('swap','controller','destination'):p.add_argument(key,type=Path)
+     p.add_argument('role',choices=ROOTS);p.add_argument('generation',choices=('a','b'))
+-    a=p.parse_args();stage(a.swap,a.controller,a.destination,a.role,a.generation)
++    p.add_argument('--live',action='store_true')
++    a=p.parse_args();stage(a.swap,a.controller,a.destination,a.role,a.generation,live=a.live)
+diff --git a/tools/swap/package_verify.py b/tools/swap/package_verify.py
+index b50244e8e060038e523362bf80fc85dfe9cd6668..aa830909466a667ff480e1501635be60be0daa0b 100644
+--- a/tools/swap/package_verify.py
++++ b/tools/swap/package_verify.py
+@@ -10,9 +10,12 @@ def verify(directory, role):
+     raw = (root/'runtime-manifest.json').read_bytes()
+     if len(raw) > 65536: raise ValueError('runtime_manifest_invalid')
+     m = json.loads(raw)
+-    if (set(m) != {'schema','fixture','role','generation','regtest_only','files'}
+-            or m['schema'] != 1 or m['fixture'] != '0098' or m['role'] != role
+-            or m['generation'] not in ('a','b') or m['regtest_only'] is not True
++    old = (m.get('schema')==1 and m.get('fixture')=='0098' and m.get('regtest_only') is True
++           and set(m)=={'schema','fixture','role','generation','regtest_only','files'})
++    live = (m.get('schema')==2 and m.get('fixture')=='0102' and m.get('regtest_only') is False
++            and m.get('environments')==['regtest','mainnet']
++            and set(m)=={'schema','fixture','role','generation','regtest_only','files','environments'})
++    if (not (old or live) or m['role']!=role or m['generation'] not in ('a','b')
+             or not isinstance(m['files'],dict) or not m['files']):
+         raise ValueError('runtime_manifest_invalid')
+     present = {p.name for p in root.iterdir()}
+diff --git a/tools/swap/remote_authority.py b/tools/swap/remote_authority.py
+index e6055c3bde74cfb2c93c78b34e162e70139a75ef..6a5f9669e5d7b025fa5486302bca36b11c0f3087 100644
+--- a/tools/swap/remote_authority.py
++++ b/tools/swap/remote_authority.py
+@@ -176,7 +176,7 @@ class Remote:
+             own = [e for e in a.record['entries'].values() if e['grant_id'] == gid]
+             return dict(format=self.format_name, grant=copy.deepcopy(g), paused=a.record['grants'][gid]['paused'],
+                 current=a.record['current'][g['kind']] == gid, remaining=g['limits']['max_swaps']-len(own),
+-                reserved_msat=sum(ba.payload(e['payload'], g) for e in own), regtest_only=True)
++                reserved_msat=sum(ba.payload(e['payload'], g) for e in own), regtest_only=hg.regtest(g['chain']))
+         if op == 'enroll':
+             hg.need(set(body) == {'data', 'confirmation'} and type(body['confirmation']) is str
+                     and body['confirmation'] == ba.digest(body['data']), 'confirmation_required')
+diff --git a/tools/swap/restore_barrier.py b/tools/swap/restore_barrier.py
+index 0311d376731a2a4c51aafe4f64b68c457d9ec398..1f2f06bd5fa2e06f1e39950e1605f79f40c21ed8 100644
+--- a/tools/swap/restore_barrier.py
++++ b/tools/swap/restore_barrier.py
+@@ -19,6 +19,8 @@ def blocked(directory):
+         paths += [p.parent.parent/MARKER, p.parent.parent/'node-restored.json']
+     # Even an invalid file or dangling symlink blocks. Parsing must not turn a
+     # damaged restore marker into permission to execute.
++    for parent in p.parents:
++        paths += [parent/MARKER, parent/'node-restored.json']
+     return any(os.path.lexists(x) for x in paths)
+ 
+ 
+diff --git a/tools/swap/route_plan.py b/tools/swap/route_plan.py
+index 67823564bd48e8e99cd4c7bc3ab12b5fe8e7b065..e73a458e816a3802b2110254e066314914c1265e 100644
+--- a/tools/swap/route_plan.py
++++ b/tools/swap/route_plan.py
+@@ -1,4 +1,4 @@
+-"""Protocol-bound read-only route adapter. Disposable regtest only.
++"""Protocol-bound read-only route adapter. Explicit environment and protocol binding.
+ 
+ A plan is data, never a grant. No payment, layer, credential or journal writes.
+ The future coordinator must revalidate the invoice/channel, reserve authority
+@@ -165,7 +165,7 @@ def validate_plan(plan):
+          'plan_fields_invalid')
+     need(type(plan['schema']) is int and plan['schema'] == 1 and plan['format'] == FORMAT, 'plan_format_invalid')
+     binding(plan['chain']); limits(plan['limits'])
+-    need(type(plan['invoice']) is str and plan['invoice'].startswith('lnbcrt') and len(plan['invoice']) <= 16384,
++    need(ci.invoice_text(plan['invoice'],plan['chain']),
+          'plan_invoice_invalid')
+     need(ci.hex_field(plan['payment_hash'], 64) and ci.hex_field(plan['payment_secret'], 64)
+          and integer(plan['amount_msat'], 1, 1000000000)
+@@ -186,9 +186,9 @@ def digest(plan):
+ 
+ def plan(rpc, chain, invoice, approved_channels, bounds, *, clock=time.time):
+     binding(chain); limits(bounds)
+-    need(type(invoice) is str and invoice.startswith('lnbcrt') and len(invoice) <= 16384, 'recipient_invoice_invalid')
+-    ci.same_binding(chain, ci.node(rpc('getinfo'), chain['profile'], 'regtest'))
+-    decoded = ci.invoice(rpc('decode', string=invoice), chain['profile'], 'regtest')
++    need(ci.invoice_text(invoice,chain), 'recipient_invoice_invalid')
++    ci.same_binding(chain, ci.node(rpc('getinfo'), chain['profile'], chain['environment']))
++    decoded = ci.invoice(rpc('decode', string=invoice), chain['profile'], chain['environment'])
+     now = int(clock())
+     need(integer(decoded.get('created_at'), 1, now) and integer(decoded.get('expiry'), 1, 2**35-1)
+          and now+120 <= decoded['created_at']+decoded['expiry'] < 2**35,
+@@ -234,7 +234,7 @@ def observe_attempt(rpc, saved_plan, original=None):
+     """
+     validate_plan(saved_plan)
+     chain = saved_plan['chain']
+-    ci.same_binding(chain, ci.node(rpc('getinfo'), chain['profile'], 'regtest'))
++    ci.same_binding(chain, ci.node(rpc('getinfo'), chain['profile'], chain['environment']))
+     reply = rpc('listsendpays', payment_hash=saved_plan['payment_hash'])
+     need(type(reply) is dict and type(reply.get('payments')) is list, 'attempts_unavailable')
+     rows = reply['payments']
+diff --git a/tools/swap/test_held_gate.py b/tools/swap/test_held_gate.py
+index 1630e41976e9800e9189e4e40dcab14c3059ade1..5b4794e125af160d9b2fafd50251301ebd9d45b0 100644
+--- a/tools/swap/test_held_gate.py
++++ b/tools/swap/test_held_gate.py
+@@ -222,9 +222,9 @@ class GateTests(unittest.TestCase):
+         with self.assertRaises(ValueError):
+             self.open_gate()
+ 
+-    def test_mainnet_and_wrong_protocol_features_refused(self):
++    def test_environment_change_and_wrong_protocol_features_refused(self):
+         with self.assertRaises(hg.Refused):
+-            hg.binding(ci.binding(ci.PRIVKEYIO_XBT,'mainnet',self.chain['node_id']))
++            hg.observe(self.info,ci.binding(ci.PRIVKEYIO_XBT,'mainnet',self.chain['node_id']))
+         self.info['our_features']['init'] = ''
+         with self.assertRaises(ValueError):
+             self.open_gate()
+diff --git a/tools/swap/test_live_bootstrap.py b/tools/swap/test_live_bootstrap.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f8f5bff63e518938d69fc09473abb724981ec340
+--- /dev/null
++++ b/tools/swap/test_live_bootstrap.py
+@@ -0,0 +1,100 @@
++#!/usr/bin/env python3
++"""Actual package launcher/bootstrap on funded regtest channels; never mainnet."""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import subprocess
++import tempfile
++
++import chain_identity as ci
++import held_gate as hg
++import node_bootstrap as boot
++import test_engine as engine
++import test_gate_engine as gate
++import test_deadline_engine as deadline
++
++NODE=Path('/usr/local/libexec/swap-node/package_node.py')
++
++
++class Lab(engine.Lab):
++    engine_versions={**deadline.VERSIONS,ci.PRIVKEYIO_XBT:(*deadline.VERSIONS[ci.PRIVKEYIO_XBT],'v26.06.9-blake2b.7-swap0088b')}
++    before_xbt=True
++    def start(self,command,log):
++        if Path(command[0]).name=='lightningd':
++            profile=ci.PRIVKEYIO_XBT if '/xbt/' in str(command[0]) or '/xbt-before/' in str(command[0]) else ci.BTC
++            if profile==ci.PRIVKEYIO_XBT and self.before_xbt:return super().start(command,log)
++            root=next(str(a).split('=',1)[1] for a in command if str(a).startswith('--lightning-dir='))
++            extra=[str(a) for a in command[1:] if not str(a).startswith(('--network=','--lightning-dir='))]
++            command=[NODE,'--disposable-regtest','--profile',profile,'--root',root,'launch',*extra]
++        return super().start(command,log)
++    def lightning(self,name,profile,backend,**kw):
++        node=super().lightning(name,profile,backend,**kw)
++        node.update(name=name,profile=profile,backend=backend)
++        return node
++
++
++def run(lab):
++    result=[]
++    for label,profile in [('btc',ci.BTC),('xbt',ci.PRIVKEYIO_XBT)]:
++        lab.checkpoint(label+'-fund-channel-before-coordinator-setup')
++        backend=lab.backend(label+'-backend',profile==ci.PRIVKEYIO_XBT)
++        if profile==ci.PRIVKEYIO_XBT:lab.args.xbt_prefix=Path('/opt/xbt-before')
++        a=lab.lightning(label+'-payer',profile,backend);b=lab.lightning(label+'-receiver',profile,backend)
++        lab.rpc(backend['cli'],'sendtoaddress',engine.funding_address(lab,a),'0.01');lab.mine(backend);lab.synced(backend,a,b)
++        lab.rpc(a['cli'],'connect',b['identity']['node_id'],'127.0.0.1',b['port'])
++        lab.rpc(a['cli'],'fundchannel',b['identity']['node_id'],300000,timeout=90)
++        lab.mine(backend);lab.synced(backend,a,b);gate.connect(lab,a,b)
++        old_binary=(lab.args.xbt_prefix if profile==ci.PRIVKEYIO_XBT else lab.args.btc_prefix)/'bin/lightningd'
++        version_before=lab.rpc(a['cli'],'getinfo')['version'];sha_before=hashlib.sha256(old_binary.read_bytes()).hexdigest()
++        before={n['name']:(n['identity'],hg.channel_pin(gate.channel(lab,n),profile)) for n in (a,b)}
++        gate.ordinary_payment(lab,a,b,label+'-before-setup')
++        lab.checkpoint(label+'-atomic-setup-and-same-volume-restart')
++        snapshots={}
++        for n in (a,b):
++            cmd=[NODE,'--disposable-regtest','--profile',profile,'--root',str(n['root']),'prepare']
++            def prepare():
++                p=subprocess.run(list(map(str,cmd)),input='{"confirmed":true}',capture_output=True,text=True,timeout=60)
++                engine.require(p.returncode==0 and not p.stderr,'bootstrap_prepare_failed')
++                return json.loads(p.stdout)
++            engine.require(prepare()['initialized'] is True,'bootstrap_not_initialized')
++            namespace=n['root']/'regtest'/boot.DIRECTORY
++            saved={str(p.relative_to(namespace)):p.read_bytes() for p in namespace.rglob('*') if p.is_file()}
++            engine.require(prepare()['existing_records'] is True,'bootstrap_lost_reply_changed')
++            engine.require(saved=={str(p.relative_to(namespace)):p.read_bytes() for p in namespace.rglob('*') if p.is_file()},'bootstrap_repeat_modified_state')
++            snapshots[n['name']]=saved
++        for n in (b,a):lab.stop(n['proc']);engine.require(n['proc'].returncode in (0,-15),'bootstrap_shutdown_not_graceful')
++        for n in (a,b):
++            for journal in boot.JOURNALS:
++                def released(n=n,journal=journal):
++                    j=hg.Journal(n['root']/'regtest'/boot.DIRECTORY/journal);j.close();return True
++                lab.wait(released,timeout=15)
++        if profile==ci.PRIVKEYIO_XBT:
++            lab.before_xbt=False;lab.args.xbt_prefix=Path('/opt/xbt')
++        a=lab.lightning(a['name'],profile,backend);b=lab.lightning(b['name'],profile,backend)
++        gate.connect(lab,a,b)
++        for n in (a,b):
++            methods={row['command'].split()[0] for row in lab.rpc(n['cli'],'help')['help']}
++            engine.require({'swap-gate-status','swap-customer-call','swap-customer-credential'}<=methods,'bootstrap_plugins_missing')
++            engine.require((n['identity'],hg.channel_pin(gate.channel(lab,n),profile))==before[n['name']],'bootstrap_channel_or_identity_changed')
++            engine.require(lab.rpc(n['cli'],'listclosedchannels')['closedchannels']==[],'bootstrap_closed_channel')
++            for rel,raw in snapshots[n['name']].items():
++                engine.require((n['root']/'regtest'/boot.DIRECTORY/rel).read_bytes()==raw,'bootstrap_restart_rewrote_state')
++        gate.ordinary_payment(lab,a,b,label+'-after-setup')
++        new_binary=(lab.args.xbt_prefix if profile==ci.PRIVKEYIO_XBT else lab.args.btc_prefix)/'bin/lightningd'
++        result.append(dict(profile=profile,version_before=version_before,version_after=lab.rpc(a['cli'],'getinfo')['version'],
++                           engine_before=sha_before,engine_after=hashlib.sha256(new_binary.read_bytes()).hexdigest(),payments=2,original_channel=True,original_identity=True,closed_channels=0,
++                           repeated_setup_unchanged=True,static_plugins_ready=True,regtest_only=True))
++    lab.checkpoint('complete')
++    (lab.root/'bootstrap-result.json').write_text(json.dumps(dict(schema=1,fixture='0102-bootstrap',cases=result),indent=2)+'\n')
++    print('BOOTSTRAP PASSED: both native engines; funded channels retained, four payments; regtest only',flush=True)
++
++
++if __name__=='__main__':
++    p=argparse.ArgumentParser();p.add_argument('--disposable-regtest',required=True,action='store_true')
++    p.add_argument('--bitcoind',type=Path,required=True);p.add_argument('--bitcoin-cli',type=Path,default=Path('/usr/bin/bitcoin-cli'))
++    p.add_argument('--btc-prefix',type=Path,default=Path('/opt/btc'));p.add_argument('--xbt-prefix',type=Path,default=Path('/opt/xbt'))
++    p.add_argument('--results-parent',type=Path,required=True);args=p.parse_args()
++    lab=Lab(args)
++    try:run(lab)
++    finally:lab.close()
+diff --git a/tools/swap/test_live_policy.py b/tools/swap/test_live_policy.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2605282b68645f693247a7418eb7edde6aea6379
+--- /dev/null
++++ b/tools/swap/test_live_policy.py
+@@ -0,0 +1,145 @@
++"""Mainnet policy and synthetic recovery; these are not funded mainnet tests."""
++import copy
++import json
++import os
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++import unittest
++from unittest.mock import patch
++
++import chain_identity as ci
++import cross_contract as cc
++import cross_worker as cw
++import held_gate as hg
++import node_bootstrap as boot
++import package_runtime
++import package_verify
++import service
++from test_cross_worker import Remote
++from test_route_plan import NOW
++from test_customer_invoice import CustomerNode
++
++SWAP=Path(__file__).parent
++CONTROLLER=Path(os.environ['PACKAGE_CONTROLLER_SOURCE'])
++
++
++class MainnetRemote(Remote):
++    def __init__(self,direction):
++        super().__init__(direction)
++        for kind in ('incoming','outgoing'):
++            g=self.c['grants'][kind]
++            c=ci.binding(g['chain']['profile'],'mainnet',g['chain']['node_id'])
++            g['chain']=c;self.c[kind]['chain']=copy.deepcopy(c)
++            self.obs[kind]['info']['grant']=copy.deepcopy(g)
++            self.obs[kind]['info']['regtest_only']=False
++        self.c['outgoing']['invoice']='lnbc20n1'+'q'*150
++        cc.validate(self.c)
++    def status(self,kind):
++        return dict(super().status(kind),regtest_only=False)
++    def __call__(self,kind,gid,op,body):
++        result=super().__call__(kind,gid,op,body)
++        if op=='invoice':result['invoice']='lnbc20n1'+'q'*150
++        return result
++
++
++class Live(unittest.TestCase):
++    def setUp(self):
++        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
++    def node(self,profile):
++        n=CustomerNode(profile);n.chain=ci.binding(profile,'mainnet',n.chain['node_id'])
++        n.info['network']='bitcoin'
++        return n
++    def test_fresh_explicit_setup_lost_reply_and_missing_journal_never_repaired(self):
++        for profile in (ci.BTC,ci.PRIVKEYIO_XBT):
++            root=self.root/profile/'bitcoin';root.mkdir(parents=True)
++            n=self.node(profile)
++            with self.assertRaises(ValueError):boot.prepare(root,profile,n)
++            self.assertFalse((root/boot.DIRECTORY).exists())
++            reply=boot.prepare(root,profile,n,confirmed=True);self.assertTrue(reply['restart_required'])
++            state=root/boot.DIRECTORY
++            before={str(p.relative_to(state)):p.read_bytes() for p in state.rglob('*') if p.is_file()}
++            self.assertEqual(boot.activation(state,profile),n.chain)
++            self.assertTrue(boot.prepare(root,profile,n,confirmed=True)['existing_records'])
++            self.assertEqual(before,{str(p.relative_to(state)):p.read_bytes() for p in state.rglob('*') if p.is_file()})
++            (state/'customer-invoices-v1/state.json').unlink()
++            with self.assertRaises(FileNotFoundError):boot.prepare(root,profile,n,confirmed=True)
++            self.assertFalse((state/'customer-invoices-v1/state.json').exists())
++    def test_partial_setup_is_unpublished_and_restore_fence_covers_nested_namespace(self):
++        root=self.root/'bitcoin';root.mkdir();n=self.node(ci.BTC)
++        with patch.object(boot.os,'rename',side_effect=OSError('interrupted')):
++            with self.assertRaises(OSError):boot.prepare(root,ci.BTC,n,confirmed=True)
++        self.assertFalse((root/boot.DIRECTORY).exists());self.assertEqual(len(list(root.glob('.swap-setup-*'))),1)
++        boot.prepare(root,ci.BTC,n,confirmed=True)
++        (self.root/'node-restored.json').write_text('{}')
++        with self.assertRaisesRegex(ValueError,'restored'):boot.prepare(root,ci.BTC,n,confirmed=True)
++        self.assertTrue(hg.restore_barrier.blocked(root/boot.DIRECTORY/'swap-gate-v1'))
++    def test_wrong_network_profile_and_existing_flat_authority_refused(self):
++        root=self.root/'bitcoin';root.mkdir();n=CustomerNode(ci.BTC)
++        with self.assertRaises(ValueError):boot.prepare(root,ci.BTC,n,confirmed=True)
++        n=self.node(ci.PRIVKEYIO_XBT)
++        with self.assertRaises(ValueError):boot.prepare(root,ci.BTC,n,confirmed=True)
++        (root/'bounded-authority-v1').mkdir()
++        with self.assertRaisesRegex(ValueError,'foreign_authority'):boot.prepare(root,ci.PRIVKEYIO_XBT,n,confirmed=True)
++    def test_mainnet_invoice_prefix_and_shared_hrp_require_protocol_features(self):
++        n=self.node(ci.BTC)
++        self.assertTrue(ci.invoice_text('lnbc20n1'+'q'*100,n.chain))
++        for value in ('lnbcrt20n1'+'q'*100,'lnxbt20n1'+'q'*100,'lnbc1'+'q'*100):self.assertFalse(ci.invoice_text(value,n.chain))
++        for profile in (ci.BTC,ci.PRIVKEYIO_XBT):
++            n=self.node(profile);ci.node(n.info,profile,'mainnet')
++            with self.assertRaises(ValueError):ci.node(n.info,ci.BTC if profile==ci.PRIVKEYIO_XBT else ci.PRIVKEYIO_XBT,'mainnet')
++    def test_cross_environment_and_changed_grant_do_not_gain_authority(self):
++        remote=MainnetRemote('forward');c=remote.c
++        old=cc.digest(c)
++        c['grants']['incoming']['chain']['environment']='regtest'
++        c['grants']['incoming']['chain']['network']='regtest'
++        with self.assertRaises(ValueError):cc.validate(c)
++        with self.assertRaises(ValueError):cc.confirm(c,old,remote.obs,now=NOW)
++        service.initialize(self.root/'regtest')
++        j=hg.Journal(self.root/'regtest')
++        try:
++            s=service.Service(j,factory=lambda _:self.fail('cross-network transport was attempted'))
++            from test_customer_https import PEM
++            config={k:dict(url='https://'+k+'.example',ca_pem=PEM,rune='A'*50,grant=MainnetRemote('forward').c['grants'][k]) for k in ('incoming','outgoing')}
++            with self.assertRaisesRegex(ValueError,'environment'):s.pair(dict(direction='forward',nodes=config),confirmed=True)
++        finally:j.close()
++    def test_both_mainnet_directions_synthetic_failure_and_lost_send_restart(self):
++        for direction in ('forward','reverse'):
++            for failed in (False,True):
++                with self.subTest(direction=direction,failed=failed):
++                    root=self.root/(direction+str(failed));cw.initialize_fixture(root);remote=MainnetRemote(direction)
++                    j=hg.Journal(root)
++                    def opened():return cw.Worker(j,remote,lambda:NOW)
++                    try:
++                        w=opened();cid=w.prepare(remote.c);w.confirm(cid,cid)
++                        for _ in range(3):w.step(cid)
++                        issued=w.payment_invoice(cid);self.assertTrue(issued['invoice'].startswith('lnbc20n'))
++                        remote.hold();remote.lost=('outgoing','send')
++                        with self.assertRaises(TimeoutError):w.step(cid)
++                        saved=copy.deepcopy(j.read()['swaps'][cid]['send']);j.close();j=hg.Journal(root)
++                        w=opened();w.step(cid);remote.complete(failed)
++                        for _ in range(4):w=opened();w.step(cid)
++                        self.assertEqual(w.status(cid)['state'],'failed' if failed else 'settled')
++                        self.assertIs(w.status(cid)['regtest_only'],False)
++                        self.assertEqual(j.read()['swaps'][cid]['send'],saved)
++                        self.assertEqual(w.payment_invoice(cid),issued)
++                        self.assertEqual(sum(op=='send' for _,op,_ in remote.calls),1)
++                    finally:j.close()
++    def test_packaged_modes_pin_environment_without_migrating_old_service(self):
++        target=self.root/'runtime';package_runtime.stage(SWAP,CONTROLLER,target,'controller','a',live=True)
++        def call(path,mode,env):
++            return subprocess.run([sys.executable,'-I',str(target/'package_service.py'),env,str(path),mode],
++                input='{"action":"status"}',text=True,capture_output=True,timeout=10)
++        for environment,flag,other in [('mainnet','--mainnet','--disposable-regtest'),('regtest','--disposable-regtest','--mainnet')]:
++            path=self.root/environment
++            self.assertEqual(call(path,'init',flag).returncode,0)
++            before=(path/'state.json').read_bytes()
++            self.assertNotEqual(call(path,'action',other).returncode,0)
++            self.assertEqual((path/'state.json').read_bytes(),before)
++            self.assertEqual(call(path,'action',flag).returncode,0)
++        old=self.root/'old';package_runtime.stage(SWAP,CONTROLLER,old,'controller','a')
++        p=subprocess.run([sys.executable,'-I',str(old/'package_service.py'),'--mainnet',str(self.root/'blocked'),'init'],capture_output=True)
++        self.assertNotEqual(p.returncode,0);self.assertFalse((self.root/'blocked').exists())
++
++if __name__=='__main__':unittest.main()
+diff --git a/tools/swap/test_package_runtime.py b/tools/swap/test_package_runtime.py
+index 7c032a4536a15ee988a09ecb23135c54a7831b49..05999f69177567aecaa886f6f1f6642a60082fd5 100644
+--- a/tools/swap/test_package_runtime.py
++++ b/tools/swap/test_package_runtime.py
+@@ -65,7 +65,7 @@ class Packaged(unittest.TestCase):
+         self.assertEqual(p.returncode,0,p.stdout+p.stderr);self.assertNotIn('VOLUME_',p.stdout+p.stderr)
+     def test_network_guard_and_restored_state_stay_blocked(self):
+         import authority_plugin, chain_identity as ci
+-        with self.assertRaisesRegex(ValueError,'static_regtest_required'):
++        with self.assertRaisesRegex(ValueError,'static_network_required'):
+             authority_plugin.Service(dict(network='bitcoin',startup=True),ci.BTC)
+         path=self.root/'service';self.cmd(self.controller/'package_service.py',['--disposable-regtest',path,'init'])
+         saved=(path/'state.json').read_bytes();(self.root/'swap-restored.json').write_text('{}')
+diff --git a/tools/swap/test_remote_authority.py b/tools/swap/test_remote_authority.py
+index 8fcc09fa336b099460a1d58eb18525b79fa3f793..2f72880d4575d3291c82737b7f7bc38af57a35e2 100644
+--- a/tools/swap/test_remote_authority.py
++++ b/tools/swap/test_remote_authority.py
+@@ -199,7 +199,7 @@ class Tests(unittest.TestCase):
+ 
+     def test_plugin_static_guard_and_rpc_allowlist(self):
+         for config in (dict(network='bitcoin', startup=True), dict(network='regtest', startup=False)):
+-            with self.assertRaisesRegex(ValueError, 'static_regtest_required'):
++            with self.assertRaisesRegex(ValueError, 'static_network_required'):
+                 plugin.Service(config, ba.ci.BTC)
+         rpc = plugin.RPC(dict(**{'rpc-file':'lightning-rpc', 'lightning-dir':str(self.root)}))
+         for method in ('close', 'pay', 'xpay', 'sendonion', 'blacklistrune', 'getroutes'):
+diff --git a/tools/swap/test_startos_actions.py b/tools/swap/test_startos_actions.py
+index bd2ac2babe9dd8d02d901befc596a8610cf0058e..e4c6be9d3bf7fc863b3057d88ebaac958fe61553 100644
+--- a/tools/swap/test_startos_actions.py
++++ b/tools/swap/test_startos_actions.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""0100: compiled StartOS SDK action handlers around the accepted 0098 runtimes.
++"""0102: compiled regression SDK handlers around the new sealed runtimes.
+ 
+ The OS effects boundary is supplied by a disposable subprocess adapter. This
+ does not claim StartOS host installation, lifecycle or mainnet acceptance.
+@@ -81,8 +81,8 @@ class Client(base.Client):
+ original_scenario=base.scenario
+ def scenario(lab,topologies,direction,name):
+     r=original_scenario(lab,topologies,direction,name)
+-    receipt=dict(schema=1,fixture='startos-sdk-actions-0100',startos_host_acceptance=False,regtest_only=True,
+-        actual_sdk_forms=True,compiled_handlers=True,unchanged_runtime=True,closed_channels=0,installer=False,
++    receipt=dict(schema=1,fixture='startos-sdk-actions-0102',startos_host_acceptance=False,regtest_only=True,
++        actual_sdk_forms=True,compiled_handlers=True,unchanged_runtime=False,closed_channels=0,installer=False,
+         counts=copy.deepcopy(COUNTS))
+     (lab.root/'action-result.json').write_text(json.dumps(receipt,indent=2)+'\n')
+     return r
+diff --git a/tools/swap/worker_pairing.py b/tools/swap/worker_pairing.py
+index 4cdd474bd65d0a992ccfa4ace8971635f83b8bbb..658bff8088289b12bc206b552640c85686782909 100644
+--- a/tools/swap/worker_pairing.py
++++ b/tools/swap/worker_pairing.py
+@@ -102,7 +102,7 @@ class Pairing:
+     def status(self):
+         return dict(format=FORMAT,paired=self.record['binding'] is not None,
+             blocked=self.blocked or restore_barrier.blocked(self.journal.directory),
+-            read_only=True,regtest_only=True)
++            read_only=True,regtest_only=self.record['binding'] is None or hg.regtest(self.record['binding']['nodes']['incoming']['grant']['chain']))
+ 
+ 
+ class BoundWorker(cw.Worker):

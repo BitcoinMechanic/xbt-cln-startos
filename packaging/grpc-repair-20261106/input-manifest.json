@@ -1,0 +1,79 @@
+{
+  "id": "xbt-cln",
+  "title": "XBT Core Lightning",
+  "license": "mit",
+  "packageRepo": "https://github.com/BitcoinMechanic/xbt-cln-startos",
+  "upstreamRepo": "https://github.com/BitcoinMechanic/lightning",
+  "marketingUrl": "https://blockstream.com/lightning",
+  "donationUrl": null,
+  "description": {
+    "short": {
+      "en_US": "XBT Lightning node with wallet and channel dashboard"
+    },
+    "long": {
+      "en_US": "Core Lightning on the BLAKE2b chain, with the CLN Application dashboard. Requires synced, unpruned BLAKE2b Knots. Fresh-wallet candidate; importing existing Lightning state and migrating installed experimental XBT channels are not supported. Bounded swap coordinator support requires explicit setup and reviewed grants."
+    }
+  },
+  "volumes": [
+    "main"
+  ],
+  "images": {
+    "lightning": {
+      "source": {
+        "ociLayout": {
+          "path": "/home/start9packaging/code/cln-blake/privkeyio-migration/build-results/grpc-repair-20261106/lightning-image.tar"
+        }
+      },
+      "arch": [
+        "x86_64"
+      ],
+      "emulateMissingAs": null,
+      "nvidiaContainer": false
+    },
+    "ui": {
+      "source": {
+        "ociLayout": {
+          "path": "/home/start9packaging/code/cln-blake/privkeyio-migration/build-results/grpc-repair-20261106/ui-image.tar"
+        }
+      },
+      "arch": [
+        "x86_64"
+      ],
+      "emulateMissingAs": null,
+      "nvidiaContainer": false
+    }
+  },
+  "dependencies": {
+    "bitcoind": {
+      "description": {
+        "en_US": "Synced, unpruned BLAKE2b Knots with the pinned activation checkpoint. The bitcoind package ID alone does not identify the chain."
+      },
+      "optional": false,
+      "metadata": {
+        "title": "Bitcoin Knots (BLAKE2b)",
+        "icon": "https://raw.githubusercontent.com/Start9Labs/bitcoin-core-startos/feec0b1dae42961a257948fe39b40caf8672fce1/dep-icon.svg"
+      }
+    }
+  },
+  "gitHash": null,
+  "osVersion": "0.4.0-beta.10",
+  "sdkVersion": "2.0.9",
+  "version": "#privkeyio:26.6.9:3",
+  "releaseNotes": {
+    "en_US": "Restore the bundled native gRPC plugin and explicitly load gRPC and CLNrest as required by the node configuration. Preserve the existing wallet, channels, UI and swap journals during a normal update."
+  },
+  "satisfies": [],
+  "canMigrateTo": "=#privkeyio:26.6.9:3",
+  "canMigrateFrom": "=#privkeyio:26.6.9:1 || =#privkeyio:26.6.9:2 || =#privkeyio:26.6.9:3",
+  "hardwareRequirements": {
+    "device": [],
+    "ram": null,
+    "arch": [
+      "x86_64"
+    ]
+  },
+  "hardwareAcceleration": false,
+  "userspaceFilesystems": false,
+  "virtualNetworking": false,
+  "plugins": []
+}

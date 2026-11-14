@@ -1,0 +1,34 @@
+0099 local checkpoint-tool validation — 2026-10-14
+
+The operator reported READY: 0098a with all six packaged cases completed at
+/tmp/privkeyio-0098a-results.r2pjegti. The actual VM results are not locally
+available. Export validates them on the VM; READY text alone is not substituted
+for the raw receipts or runtime inventories.
+
+Workflow integration passed using actual expected Git source trees, isolated
+local clones/remotes, synthetic annotated history and synthetic fixture receipts.
+Synthetic receipts are validation inputs only and are not shipped as funded
+evidence. The tests exercised the real exporter, validators, tower workflow and
+sync workflow without contacting GitHub, Docker or any live node.
+
+Verified exact 0098a source export, 177-unit/no-skip requirement, six-case scope,
+runtime/native hash and file-mode bindings, image generations and original
+historical provenance. Corrupted case/outcome/type, closed-channel claims,
+unproven StartOS acceptance, skipped units, altered native/runtime files,
+altered extraction/source, omitted historical controls, repeated replacement
+images and mismatched base commits were refused. Required raw receipts and
+image IDs cannot be omitted; a symlinked receipt is refused.
+
+Export is repeatable and preserves source, real indexes, stashes and results.
+Unlisted operator files are excluded. Tower worktrees reuse existing clones
+without changing dirty original checkouts. Four exact source commits and four
+annotated tags are created. Concurrent remote work and staged work refuse
+before mutation. A partial push resumes with the same original commits.
+
+Sync checks all repositories before stashing, refuses unexpected source or
+remote advancement, resumes after stash-before-merge interruption, retains
+older and new stashes, and is idempotent. Default branches are untouched.
+
+Python and JSON parsing, shell syntax and ZIP/checksum checks passed.
+No new funded test, runtime build, installation, backup/restore or live-channel
+operation is performed or claimed by this checkpoint tooling.

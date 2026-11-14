@@ -1,0 +1,7 @@
+XBT startup repair: #privkeyio:26.6.9:3
+
+Verify SHA256SUMS, then apply xbt-cln_x86_64.s9pk as a normal same-volume update to the existing privkeyio XBT test node. Do not uninstall or restore a backup.
+
+Verified on the packaging VM: generated config acceptance, both native gRPC and CLNrest startup, RPC readiness, unchanged disposable node identity after restart, migration guards and preserved journal sentinel, full typecheck and package tests, packed manifests and exact packed engine/runtime/UI files.
+
+Still pending: StartOS installation, synced backend, original live node identity and funding transaction, CHANNELD_NORMAL, existing UI login, and a separately authorized small ordinary payment. No real payment or funded swap was performed for this repair.

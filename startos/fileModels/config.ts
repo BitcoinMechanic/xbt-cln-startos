@@ -69,7 +69,7 @@ export const clbossZerobasefees = [
   'disallow',
 ] as const
 
-export const shape = z.object({
+export const shape = z.looseObject({
   // Enforced by StartOS
   network: z.literal('bitcoin').catch('bitcoin'),
   'bitcoin-rpcconnect': iniString,
@@ -89,6 +89,7 @@ export const shape = z.object({
   proxy: iniString,
 
   // User-configurable
+  'log-level': iniEnum(['io', 'trace', 'debug', 'info', 'unusual', 'broken']),
   'always-use-proxy': iniStringBoolean,
   alias: iniString,
   rgb: iniString,
@@ -102,7 +103,8 @@ export const shape = z.object({
   'min-capacity-sat': iniNumber,
   'funding-confirms': iniNumber,
   'xpay-handle-pay': iniStringBoolean,
-  plugin: iniStringArray,
+  plugin: z.array(z.string()).max(0).optional().catch(undefined),
+  'disable-plugin': z.array(z.string()).catch([]),
   'funder-lease-requests-only': iniStringBoolean,
   'funder-policy': iniEnum([...funderPolicies]),
   'lease-fee-base-sat': iniNumber,
@@ -129,6 +131,20 @@ export const shape = z.object({
   'clboss-zerobasefee': iniEnum([...clbossZerobasefees]),
   'clboss-min-channel': iniNumber,
   'clboss-max-channel': iniNumber,
+})
+
+export const clbossPlugin = '/usr/local/libexec/c-lightning/plugins/clboss'
+
+// CLBOSS buys inbound liquidity through a submarine swap service that settles on
+// the SHA256d chain, so the binary is no longer shipped. Strip it from configs
+// that enabled it, otherwise lightningd exits on a plugin it cannot find.
+export const dropClboss = (plugins: string[]) => ({
+  plugin: plugins.filter((p) => p !== clbossPlugin),
+  'clboss-min-onchain': undefined,
+  'clboss-auto-close': undefined,
+  'clboss-zerobasefee': undefined,
+  'clboss-min-channel': undefined,
+  'clboss-max-channel': undefined,
 })
 
 const { InputSpec, Value } = sdk
@@ -182,7 +198,7 @@ export const fullConfigSpec = InputSpec.of({
     description: i18n(
       'Only use tor connections.  This increases privacy, at the cost of some performance and reliability.  <b>Default: False</b>',
     ),
-    footnote: `${i18n('Default')}: false`,
+    footnote: `${i18n('Default')}: true`,
   }),
   'clams-remote-websocket': Value.toggle({
     name: i18n('Clams Remote'),
@@ -283,10 +299,9 @@ export const fullConfigSpec = InputSpec.of({
   'xpay-handle-pay': Value.triState({
     name: i18n('Xpay'),
     default: null,
-    description: i18n(
-      'Setting this makes xpay intercept simply pay commands (default false). Note that the response will be different from the normal pay command, however.  <b>Default: Disabled</b>',
-    ),
-    footnote: `${i18n('Default')}: false`,
+    description:
+      'Use Xpay for ordinary wallet payments. This candidate enables it by default. <b>Default: Enabled</b>',
+    footnote: `${i18n('Default')}: true`,
   }),
 
   // Plugins
@@ -390,11 +405,6 @@ function formToFile(
     clnrest,
   } = input
 
-  // Preserve plugin array from raw (managed externally by plugin actions)
-  const plugins = (raw?.plugin || []).filter(
-    (p): p is string => typeof p === 'string',
-  )
-
   return {
     ...raw,
 
@@ -438,13 +448,19 @@ function formToFile(
 
     // Payments
     'xpay-handle-pay':
-      xpayHandlePay == null ? undefined : xpayHandlePay ? 'true' : 'false',
+      xpayHandlePay == null ? 'true' : xpayHandlePay ? 'true' : 'false',
 
     // Plugins
-    plugin: plugins.length > 0 ? plugins : undefined,
-    'clnrest-host': clnrest ? '0.0.0.0' : undefined,
-    'clnrest-port': clnrest ? clnrestPort : undefined,
-    'clnrest-protocol': clnrest ? 'http' : undefined,
+    plugin: undefined,
+    'disable-plugin': [
+      'cln-currencyrate',
+      'cln-lsps-client',
+      'cln-lsps-service',
+      'cln-bip353',
+    ],
+    'clnrest-host': '0.0.0.0',
+    'clnrest-port': clnrestPort,
+    'clnrest-protocol': 'http',
   }
 }
 

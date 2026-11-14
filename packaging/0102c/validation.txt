@@ -1,0 +1,94 @@
+0102c PACKAGE MANIFEST CORRECTION — not a funded or installer receipt
+
+Reproduced using the actual installed SDK 2.0.9 and original compiled controller:
+omitting emulateMissingAs produces emulateMissingAs=x86_64 and package arch=null.
+The native-only policy must explicitly disable this in the packaging overlay.
+Actual SDK builds of all three corrected manifests pass the native x86_64 policy.
+The complete corrected controller also passes TypeScript, ncc compilation and
+the installed action registry/version/update-boundary check.
+The existing packed-image emulation/source/architecture restrictions are retained.
+
+The audit of StartOS pack.rs also identified dependency metadata relocation.
+Dependency requirements/descriptions are compared separately from embedded title
+and icon files. The expected SVG was retrieved from its existing pinned commit:
+SHA256 86cdf6d03ddd38ca949e8d8e3f34bbc87abed12baf48bf090ce9e5b2339b3542.
+
+Ten package-policy tests plus fifteen retained runner tests pass locally.
+Original source patches, source-manifest and prior provenance validators are
+unchanged. Native Docker packing and StartOS device acceptance are not claimed.
+Resume uses the original 0102a funded results with explicit reuse provenance.
+
+0102b WORKSPACE/RESUME VALIDATION RETAINED BELOW
+
+StartOS workspace discovery was checked against the current official packaging
+environment and CLI documentation. The runner now initializes/reuses a persistent
+ancestor workspace through the official command and packs below that workspace.
+An existing nearest workspace signing key must remain unchanged.
+
+Nine workspace/resume regression tests pass, plus the six retained receipt tests.
+The nine tests use isolated files and a mocked CLI; they check parent workspace
+selection, persistent initialization, signing-key preservation, exact already-bound
+manifest acceptance, different-image/source refusal, incomplete/changed receipts,
+and symlink refusal. They do not exercise native StartOS packaging.
+Complete resume orchestration was also exercised with mocked Docker/gate
+validation, checking output copying, original-file preservation and explicit
+reuse provenance. This was a synthetic control, not a funded test result.
+
+Resume revalidates the original raw gate receipts, prior provenance, source inputs,
+compiler outputs, six immutable runtime inventories and funded harness bytes.
+It recompiles with the pinned Node/dependencies, requires exact gated-handler bytes,
+and carries original test evidence with explicit reused/not-rerun provenance.
+All source patches and prior validators remain byte-identical to 0102a.
+Docker and start-cli are unavailable locally; actual VM packaging remains pending.
+
+0102a RUNNER VALIDATION RETAINED BELOW
+
+The retained 0094a receipt has a compiled_0094 envelope. The 0102 runner
+incorrectly looked for historical_evidence directly on 0094a, both in its
+old_candidate selector and again in pack(). The corrected shared selector
+follows 0100 -> 0098a -> 0096a -> 0094a -> compiled_0094 -> 0092a -> 0091 -> 0090b.
+That layout was checked against the unchanged bundled provenance validators.
+
+Six metadata regression tests passed locally. The original 0102 runner fails
+those tests (one failure, five errors), including the reproduced KeyError at
+the node/bootstrap and UI/packaging selection sites. Test image IDs are
+synthetic; these tests do not claim Docker, payment or installer acceptance.
+The runner executes these tests before reading the retained build receipt.
+
+Other retained receipt consumers were checked against those same validators:
+the 0100 fixture and compiler image, all six 0098a runtime images/inventories,
+the compiled_0094 backend hash, and the 0090b engine hash and node/UI images.
+The four source patches, source-manifest.json, apply.py and every prior/
+validator file remain byte-identical to 0102. The same idempotent apply path
+accepts the exact already-applied 0102 trees after this preflight failure.
+Python/shell syntax and bundle checksums passed. No application source,
+versions, engine selection, funded gates or package acceptance limits changed.
+
+0102 LOCAL VALIDATION RETAINED BELOW — not rerun for this runner-only repair
+
+184 Python tests: 0 failures, 0 errors, one local Unix-socket restriction skip.
+The packaging-VM runner requires all 184 tests with zero skips.
+Four synthetic packaged TLS process cases passed in that local test suite.
+Real SDK form/handler tests passed for both retained regtest and new mainnet adapters.
+All three complete packages typechecked and compiled with ncc locally.
+Installed registries, exact versions and update boundaries passed.
+XBT actual lifecycle-handler regression passed: recorded Knots response, 13 invalid
+backend responses, :1 -> :2 migration, identity/coordinator sentinel retained,
+restore/rescan flags and backup exclusions. Effects in that test are mocked.
+Patches applied and reversed to their exact trees in isolated checkouts.
+Bundle Python and shell syntax passed; runtime image binding checked for all packages.
+
+Local environment: Node 24.19.0; SDK 2.0.9; TypeScript 6.0.3; ncc 0.38.4.
+The VM runner independently uses the accepted digest-pinned Node 22 image and npm
+lockfiles. It does not reuse these local compilation outputs.
+
+Docker is unavailable here. The newly added funded bootstrap/engine-update fixture,
+the six updated funded swap cases, final runtime images, packed installer contents
+and actual StartOS host acceptance have NOT been executed locally. The runner must
+pass its unit/SDK/funded gates before packing and releasing the three test installers.
+
+The new funded bootstrap gate uses the exact earlier accepted XBT package engine
+for its pre-update channel and the exact accepted current engine after restart.
+BTC starts fresh. Both retain identity/funding and make ordinary payments before
+and after enabling coordinator plugins. Historical evidence is retained with its
+original scope and is not relabelled as a new mainnet or host result.

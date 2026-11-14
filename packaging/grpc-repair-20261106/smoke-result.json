@@ -1,0 +1,122 @@
+{
+  "daemon_ready": true,
+  "grpc_plugin_active": true,
+  "identity_preserved_on_restart": true,
+  "regtest_only": true,
+  "funded_payments": false,
+  "plugins": {
+    "command": "list",
+    "plugins": [
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/autoclean",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/chanbackup",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/bcli",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/cln-bwatch",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/commando",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/funder",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/topology",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/exposesecret",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/keysend",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/offers",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/pay",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/recklessrpc",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/recover",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/txprepare",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/cln-renepay",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/cln-xpay",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/spenderp",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/cln-askrene",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/sql",
+        "active": true,
+        "dynamic": true
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/bookkeeper",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/cln-grpc",
+        "active": true,
+        "dynamic": false
+      },
+      {
+        "name": "/opt/xbt/libexec/c-lightning/plugins/clnrest",
+        "active": true,
+        "dynamic": true
+      }
+    ]
+  }
+}
