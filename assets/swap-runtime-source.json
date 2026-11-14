@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "purpose": "Reviewed source snapshot; not a claim of compatibility with a replacement native engine",
+  "runtime_manifest_sha256": "003e4513ed4b215ec47fa515c7486abc014891ac074233d33fbd152b59dc978b",
+  "tested_package_version": "#privkeyio:26.6.9:26",
+  "source": "Exact sealed runtime from the tested package build context; no node state or credentials",
+  "upstream_engine_review": {
+    "repository": "https://github.com/privkeyio/lightning",
+    "commit": "69104ff71",
+    "release": "v26.06.10-blake2b.1",
+    "already_present": {
+      "important_hook_death": "bdbef46a07f6c71da00f276456361431cb6496c6",
+      "shutdown_htlc_replay": "3a1bf2d0fededfc4d82486c565c5d086441a9dad",
+      "anchor_witness_weight": "dadc4a315d82d9f9669f5601b1cb28039d8ff6dc"
+    },
+    "remaining_validation": [
+      "Our native closing replay allows only committed final HTLCs in specific closing states and rejects continue/forward replies; upstream replay is broader. Prove recovery behavior before replacing engine.",
+      "Our important-plugin teardown changes startup ordering and suppresses all pending callbacks; upstream suppresses hook continuation. Verify startup/shutdown regressions.",
+      "Run original/patched crash, replay and on-chain recovery fixtures against the exact new release before deploying."
+    ]
+  }
+}

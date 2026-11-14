@@ -1,3 +1,11 @@
+# Tested swap runtime source
+
+`assets/swap-node/` is an exact source snapshot of the tested sealed runtime, including its per-file SHA-256 manifest. `assets/swap-runtime-source.json` identifies the tested package and records native-engine reconciliation requirements. It contains code only, never wallet journals, keys or credentials. This snapshot replaces the need to reconstruct the runtime from successive locally named overlay images during review.
+
+Before staging, run `python3 -B` with `assets/swap-node` on the Python module path and call `package_verify.verify(path, "node")`. Copy the complete directory without changing its contents or creating `__pycache__`. Do not reapply the historical `patches/timelock-patches.json` chain to this already-patched snapshot. The production Dockerfile has not yet been migrated to consume this snapshot: a complete clean package build and engine recovery validation remain required before changing the release build.
+
+The native engine and service identity must be reconciled separately. Upstream privkeyio already fixes important-hook death, shutdown HTLC replay and anchor witness weight, but its replay and teardown semantics differ from our extra restrictions. Do not treat matching bug descriptions as proof of recovery compatibility. The UI proposal is independent of swap activation.
+
 # Updating the upstream version
 
 Core Lightning is built from a custom `Dockerfile` (the `lightning` image) that unpacks upstream's signed release tarball onto a `debian:bookworm-slim` base, plus a sidecar `ui` image pulled by tag. Several upstream components feed into the build, and a bump usually touches more than one.
