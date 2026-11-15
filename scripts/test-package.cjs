@@ -41,10 +41,23 @@ async function main() {
       assert.equal(connection.packageId, expected); assert.equal(connection.port,43123)
       assert.equal(connection.host,address.startsWith('[')?'fd00:3::1':'10.0.3.1')
     } else assert.equal(connection,null) // No fallback when preferred binding is missing.
-    const dependencies = load('startos/dependencies.ts', {'./sdk':{sdk:backendSdk},'./backend':backend})
-    assert.deepEqual(await dependencies.setDependencies({effects:{}}), {
-      [expected]: {healthChecks:installed?['node','chain']:['bitcoind','sync-progress'],kind:'running',versionRange:installed?'>=29.4.3:1':'*'},
+    const { Dependency, Dependencies } = require('@start9labs/start-sdk')
+    const choices=[]
+    backendSdk.Dependencies=Dependencies
+    backendSdk.Dependency={optional:(id,options)=>{
+      const dep=Dependency.optional(id,options);choices.push(dep);return dep
+    }}
+    const { dependencies } = load('startos/dependencies.ts', {
+      './sdk':{sdk:backendSdk},'./backend':backend,
+      './manifest/i18n':{depBitcoindDescription:{en_US:'XBT backend'}},
     })
+    const active=[]
+    for(const dep of choices)if(await dep.enabled({}))active.push(dep.id)
+    assert.deepEqual(active,[expected])
+    const published=dependencies.manifestDependencies()[expected]
+    assert.deepEqual(published.healthChecks,installed?['node','chain']:['bitcoind','sync-progress'])
+    assert.equal(published.kind,'running')
+    assert.equal(published.versionRange,installed?'>=29.4.3:1':'*')
   }
   const policy = load('startos/xbtPolicy.ts')
   const recovery = load('startos/recovery.ts', {'./xbtPolicy':policy})
@@ -91,8 +104,8 @@ async function main() {
       volumes:{main:{subpath:p=>path.join(root,p)}},
       setupMain:f=>f, setupBackups:f=>({createBackup:f,restoreInit:null}), setHealth:async()=>null,
       Backups:{ofVolumes:()=>backup}, action:{createOwnTask:async(...a)=>tasks.push(a)},
-      SubContainer:{of:()=>({rootfs:'/test', exec:async (args,_options,timeout)=>{
-        assert.equal(timeout,70000) // The host deadline must allow the proxy RPC's 60 seconds.
+      SubContainer:{of:()=>({rootfs:'/test', exec:async (args,options)=>{
+        assert.equal(options.timeout,70000) // The host deadline must allow the proxy RPC's 60 seconds.
         const method=args.find(x=>['getblockchaininfo','getdeploymentinfo','getblockhash','getblock'].includes(x))
         rpcCalls.push({method,args})
         return {exitCode:0,stdout:['getblockhash','getblock'].includes(method)?rpcReplies[method]:JSON.stringify(rpcReplies[method])}
@@ -197,9 +210,10 @@ async function main() {
     const from = ExtendedVersion.parse('#privkeyio:26.6.9:1')
     const to = ExtendedVersion.parse(current.options.version)
     const fromV2 = ExtendedVersion.parse('#privkeyio:26.6.9:2')
+    assert.ok(graph.canMigrateFrom().satisfiedBy(ExtendedVersion.parse('#privkeyio:26.6.9:26')))
     assert.ok(graph.canMigrateFrom().satisfiedBy(fromV2))
     assert.ok(graph.canMigrateFrom().satisfiedBy(from))
-    for (const version of ['26.6.9:0','#privkeyio:26.6.8:0','#privkeyio:26.6.9:0','#legacy:26.6.9:0']) {
+    for (const version of ['26.6.8:5','26.6.9:0','#privkeyio:26.6.8:0','#privkeyio:26.6.9:0','#legacy:26.6.9:0']) {
       assert.equal(graph.canMigrateFrom().satisfiedBy(ExtendedVersion.parse(version)),false)
     }
     assert.equal(graph.canMigrateTo().satisfiedBy(from),false)

@@ -58,7 +58,7 @@ export const nodeInfo = sdk.Action.withoutInput(
           ),
           copyable: true,
           masked: true,
-          qr: true,
+          qr: true, launchable: false,
           type: 'single',
           value: `${nodeInfo.id}@${url}`,
         }
@@ -81,7 +81,7 @@ export const nodeInfo = sdk.Action.withoutInput(
             copyable: true,
             value: nodeInfo.id,
             masked: true,
-            qr: true,
+            qr: true, launchable: false,
             type: 'single',
           },
           {

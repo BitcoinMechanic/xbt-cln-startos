@@ -373,3 +373,8 @@ Docker recipes are retained for provenance; they are not the default build path.
 
 CI builds and retains the installer as an Actions artifact. Deployment testing
 on StartOS is a separate step. Existing release tags and installers are unchanged.
+
+The XBT packaging layer uses SDK 3.1.1 for OCI archive inputs. Dependency
+selection, startup timeout, migrations, backup exclusions and restore behavior
+are covered by `npm run test:package`. Unknown stored fields are preserved across
+configuration writes. The packaged native engine and swap runtime are unchanged.

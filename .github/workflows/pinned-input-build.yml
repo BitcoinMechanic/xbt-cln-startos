@@ -26,6 +26,8 @@ jobs:
           printf '%s' "$DEV_KEY" > .startos/build.key.pem
       - name: Check input verification
         run: python3 -m unittest discover -s scripts -p test_build_inputs.py
+      - name: Check XBT package behavior
+        run: npm run test:package
       - name: Build from public pinned inputs
         run: make x86 FORMAT=true
       - name: Inspect installer and create checksums

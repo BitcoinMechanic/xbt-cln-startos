@@ -1,7 +1,7 @@
 import { FileHelper, z } from '@start9labs/start-sdk'
 import { sdk } from '../sdk'
 
-const shape = z.object({
+const shape = z.looseObject({
   rescan: z.number().optional().catch(undefined),
   watchtowerServer: z.boolean().catch(false),
   watchtowerClients: z.array(z.string()).max(0).catch([]),

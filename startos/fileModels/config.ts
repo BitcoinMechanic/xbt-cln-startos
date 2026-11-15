@@ -69,7 +69,7 @@ export const clbossZerobasefees = [
   'disallow',
 ] as const
 
-export const shape = z.object({
+export const shape = z.looseObject({
   // Enforced by StartOS
   network: z.literal('bitcoin').catch('bitcoin'),
   'bitcoin-rpcconnect': iniString,

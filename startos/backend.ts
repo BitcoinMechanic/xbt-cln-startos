@@ -1,5 +1,7 @@
 import { T } from '@start9labs/start-sdk'
-import { rpcHostId, rpcPort } from 'bitcoin-core-startos/startos/utils'
+// Bitcoin RPC contract verified at ec462fb2e463ab9f0fe924339a788d51b4d50ae5.
+const rpcHostId = 'rpc'
+const rpcPort = 8332
 import { sdk } from './sdk'
 
 // Published backend contract, checked against paulscode/knots-blake2b-startos

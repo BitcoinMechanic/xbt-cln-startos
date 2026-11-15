@@ -1,4 +1,6 @@
-import { socksHostId, socksPort } from 'tor-startos/startos/utils'
+// Tor SOCKS contract verified at 0ef9d2c06b49cb2ac5552bcffe29941817b2a1a7.
+const socksHostId = 'socks'
+const socksPort = 9050
 import { clnConfig } from '../fileModels/config'
 import { storeJson } from '../fileModels/store.json'
 import { peerHostId, peerInterfaceId } from '../interfaces'

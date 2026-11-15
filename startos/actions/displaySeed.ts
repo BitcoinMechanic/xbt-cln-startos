@@ -52,7 +52,7 @@ export const displaySeed = sdk.Action.withoutInput(
       result: {
         copyable: true,
         masked: true,
-        qr: false,
+        qr: false, launchable: false,
         type: 'single',
         value: hsmSecretContents!
           .replace(/\u0000/g, '')

@@ -110,7 +110,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         const rpc = async (method: string, ...args: string[]) => {
           const res = await lightningSub.exec(['bitcoin-cli',
             `-rpcconnect=${bitcoind.host}`, `-rpcport=${bitcoind.port}`,
-            '-rpccookiefile=/mnt/bitcoin/.cookie', '-rpcclienttimeout=60', method, ...args], undefined, 70000)
+            '-rpccookiefile=/mnt/bitcoin/.cookie', '-rpcclienttimeout=60', method, ...args], { timeout: 70000 })
           if (res.exitCode !== 0) throw new Error('BLAKE2b backend inspection unavailable')
           const text = String(res.stdout).trim()
           return method === 'getblockhash' || method === 'getblock' ? text : JSON.parse(text)
@@ -422,6 +422,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: lightningSub,
       exec: {
         fn: async (subcontainer, abort) => {
+          const controller = new AbortController()
+          abort.addEventListener('abort', () => controller.abort(abort.reason), { once: true })
+          if (abort.aborted) controller.abort(abort.reason)
           if (!watchtowerClientLoaded) return null
 
           const listtowersRes = await subcontainer.exec(
@@ -463,12 +466,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
                   JSON.stringify(tower.host),
                   String(tower.port),
                 ],
-                { cwd: rootDir },
-                undefined,
-                {
-                  abort: abort.reason,
-                  signal: abort,
-                },
+                { cwd: rootDir, abort: controller },
               )
 
               if (
@@ -495,6 +493,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: lightningSub,
       exec: {
         fn: async (subcontainer, abort) => {
+          const controller = new AbortController()
+          abort.addEventListener('abort', () => controller.abort(abort.reason), { once: true })
+          if (abort.aborted) controller.abort(abort.reason)
           if (!watchtowerClientLoaded) return null
 
           const listtowersRes = await subcontainer.exec(
@@ -520,12 +521,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
               console.log(`Watchtower client removing ${tower}`)
               const res = await subcontainer.exec(
                 ['lightning-cli', 'abandontower', id],
-                { cwd: rootDir },
-                undefined,
-                {
-                  abort: abort.reason,
-                  signal: abort,
-                },
+                { cwd: rootDir, abort: controller },
               )
 
               if (
