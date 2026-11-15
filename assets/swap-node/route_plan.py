@@ -47,7 +47,7 @@ def pubkey(value):
 def validate_route(route, source, destination, amount, final_cltv, bounds):
     limits(bounds)
     pubkey(source); pubkey(destination)
-    need(source != destination and integer(amount, 1, 10000010000)
+    need(source != destination and integer(amount, 1, 2**63-1)
          and integer(final_cltv, 1, bounds['max_delay_blocks']), 'route_endpoints_invalid')
     need(type(route) is list and 1 <= len(route) <= bounds['max_hops'], 'route_hop_limit')
     nodes, channels = {source}, set()
@@ -179,7 +179,7 @@ def validate_plan(plan):
     need(ci.invoice_text(plan['invoice'],plan['chain']),
          'plan_invoice_invalid')
     need(ci.hex_field(plan['payment_hash'], 64) and ci.hex_field(plan['payment_secret'], 64)
-         and integer(plan['amount_msat'], 1, 10000000000 if plan['chain']['profile']==ci.PRIVKEYIO_XBT else 1000000000)
+         and integer(plan['amount_msat'], 1, 2**63-1)
          and integer(plan['created_at'], 1, 2**35-1)
          and integer(plan['expires_at'], plan['created_at']+1, 2**35-1), 'plan_terms_invalid')
     validate_pin(plan['channel'], plan['chain']['profile'])
@@ -208,7 +208,7 @@ def plan(rpc, chain, invoice, approved_channels, bounds, *, clock=time.time):
     need(integer(decoded.get('created_at'), 1, now) and integer(decoded.get('expiry'), 1, 2**35-1)
          and now+120 <= decoded['created_at']+decoded['expiry'] < 2**35,
          'recipient_invoice_timing')
-    need(integer(decoded['amount_msat'], 1, 10000000000 if chain['profile']==ci.PRIVKEYIO_XBT else 1000000000), 'recipient_invoice_limits')
+    need(integer(decoded['amount_msat'], 1, 2**63-1), 'recipient_invoice_limits')
     need(integer(decoded.get('min_final_cltv_expiry'), 1, bounds['max_delay_blocks']),
          'recipient_invoice_cltv_limit')
     need(type(approved_channels) is list and 1 <= len(approved_channels) <= 8, 'approved_channels_invalid')

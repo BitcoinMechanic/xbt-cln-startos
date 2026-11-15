@@ -22,7 +22,6 @@ import restore_barrier
 
 DIRECTORY = 'local-controller-trust-v1'
 FORMAT = 'local-controller-trust-v1'
-PER_SWAP_MSAT = {ba.ci.BTC: 100000000, ba.ci.PRIVKEYIO_XBT: 10000000000}
 
 
 def initial(chain):
@@ -109,13 +108,13 @@ class Trust:
             except (ValueError,KeyError,TypeError):continue
             usable.append((available-fee,pin))
         if not usable:return None
-        amount=min(PER_SWAP_MSAT[self.auth.chain['profile']],max(n for n,_ in usable))//1000*1000
+        amount=max(n for n,_ in usable)//1000*1000
         # The per-swap ceiling is a maximum, not a minimum channel size.
         # Keep smaller channels eligible for smaller payments. Route admission
         # still checks actual spendable/receivable liquidity on the selected pin.
         selected=sorted(usable,key=lambda item:(-item[0],item[1]['channel_id']))[:8]
         pins=sorted((p for _,p in selected),key=lambda p:p['channel_id'])
-        limits=dict(max_swaps=4,max_amount_msat=amount,total_amount_msat=amount*3)
+        limits=dict(max_swaps=4,max_amount_msat=amount,total_amount_msat=min(amount*3,2**63-1))
         limits.update(dict(min_cltv_delta=350,max_cltv_delta=2016,close_before_blocks=72) if kind=='incoming'
                       else dict(max_fee_msat=fee,max_delay_blocks=576,max_hops=4))
         now=int(self.admin.clock())
@@ -166,20 +165,11 @@ class Trust:
                                                    for p in candidate['channels'])
                     if candidate and (retired or old_ids < new_ids or changed):
                         replacement=candidate
-                # Upgrade only our old XBT grants, once liquidity permits. Never
-                # replace manual authority, unpause it, or bypass active recovery.
-                if (gid in self.r['owned'] and self.auth.chain['profile']==ba.ci.PRIVKEYIO_XBT
-                        and not item['paused'] and (g['limits']['max_amount_msat']<=10000000 or g['limits']['max_amount_msat']==1000000000)):
+                # Grow idle automatic authority with available liquidity. Never
+                # rewrite active contracts, manual grants, or paused authority.
+                if gid in self.r['owned'] and not item['paused']:
                     candidate=self.plan(kind)
                     if candidate and candidate['limits']['max_amount_msat']>g['limits']['max_amount_msat']:
-                        replacement=candidate
-                # A liquidity-limited grant can otherwise remain too small for
-                # its whole lifetime. Promote once to the configured policy cap
-                # when a channel supports it, avoiding churn on small changes.
-                if (gid in self.r['owned'] and not item['paused']
-                        and g['limits']['max_amount_msat'] < PER_SWAP_MSAT[self.auth.chain['profile']]):
-                    candidate=self.plan(kind)
-                    if candidate and candidate['limits']['max_amount_msat']==PER_SWAP_MSAT[self.auth.chain['profile']]:
                         replacement=candidate
                 # Refresh only our idle outgoing grants. Earlier guards preserve
                 # active recovery and respect manual pauses and manual authority.

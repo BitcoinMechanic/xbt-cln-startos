@@ -348,3 +348,12 @@ Settlement also accepts the lowercase form Core Lightning stores for an uppercas
 Route planning distinguishes unknown route-hint entry nodes from hint fee, delay and hop limits. It reports hint counts and saved limits; an unresolved route search is not proof that a fee limit was exceeded. Private paths may require multiple hinted hops to reach a public node. No payment is sent during planning.
 
 Fiat estimates use Neoxa BTCB2/USDC and, for non-USD display, Frankfurter USD exchange rates. The node fetches fixed public rate endpoints and caches them for five minutes; the browser converts balances locally. No amounts, addresses, invoices or node identities are sent to either price service. USDC is treated as USD, so the display is an estimate. Invalid or stale quotes show “Fiat unavailable”, never Bitcoin/BTC prices. A failed FX request does not suppress the available USD price.
+
+## Swap amounts
+
+There is no fixed per-swap BTC or XBT amount ceiling. Automatic local-controller
+permissions follow available channel liquidity and grow while idle when liquidity
+increases. Existing active swaps and manually approved permissions are not
+rewritten. Fees, route checks, market depth, recovery checks and signed 64-bit
+millisatoshi validation still apply. Update the controller and both Lightning
+node packages together to remove the old limits throughout the payment path.

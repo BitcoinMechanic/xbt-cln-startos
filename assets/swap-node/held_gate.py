@@ -105,7 +105,7 @@ def terms(value, expected):
         'min_cltv_delta', 'max_cltv_delta', 'approved_channels'}, 'quote_fields_invalid')
     ci.same_binding(value['chain'], expected)
     need(ci.hex_field(value['payment_hash'], 64) and ci.hex_field(value['payment_secret'], 64), 'quote_hash_invalid')
-    need(integer(value['amount_msat'], 1, 10000000000 if expected['profile']==ci.PRIVKEYIO_XBT else 1000000000)
+    need(integer(value['amount_msat'], 1, 2**63-1)
          and integer(value['expires_at'], 1, 2**35-1)
          and integer(value['min_cltv_delta'], 1, 2016)
          and integer(value['max_cltv_delta'], value['min_cltv_delta'], 2016), 'quote_limits_invalid')

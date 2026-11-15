@@ -44,8 +44,8 @@ def limits(value, kind):
     protected = kind == 'incoming' and type(value) is dict and 'close_before_blocks' in value
     if protected: extra = extra | {'close_before_blocks'}
     hg.need(kind in KINDS and type(value) is dict and set(value) == common | extra, 'grant_limits_invalid')
-    hg.need(hg.integer(value['max_swaps'], 1, 10) and hg.integer(value['max_amount_msat'], 1, 10000010000)
-            and hg.integer(value['total_amount_msat'], value['max_amount_msat'], 100000100000), 'grant_limits_invalid')
+    hg.need(hg.integer(value['max_swaps'], 1, 10) and hg.integer(value['max_amount_msat'], 1, 2**63-1)
+            and hg.integer(value['total_amount_msat'], value['max_amount_msat'], 2**63-1), 'grant_limits_invalid')
     if kind == 'outgoing':
         rp.limits({k: value[k] for k in extra})
     else:
