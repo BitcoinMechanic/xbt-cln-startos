@@ -112,3 +112,19 @@ For each independent upstream source below: a link to its canonical repo, one co
 ### Sling
 
 - Update the `SLING_VERSION` ARG in `Dockerfile` to the new release tag (including the leading `v`).
+
+## Clean CI packaging
+
+`npm ci && make x86` downloads the published image archives listed in
+`build-inputs.json` and verifies their exact sizes and SHA-256 hashes before
+packing. No local Docker tags, server volumes or registry credentials are needed.
+Only x86_64 is supported by these image inputs; ARM builds are not advertised.
+
+These are prebuilt native/runtime and UI images from the tested installers, not
+a native compilation from source. The lock records their source commit and hashes
+of runtime source files. If those files change, the build refuses to package the
+old images: publish matching image inputs and update the lock. Existing archived
+Docker recipes are retained for provenance; they are not the default build path.
+
+CI builds and retains the installer as an Actions artifact. Deployment testing
+on StartOS is a separate step. Existing release tags and installers are unchanged.

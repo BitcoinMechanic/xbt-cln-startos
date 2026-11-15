@@ -13,24 +13,14 @@ export const manifest = setupManifest({
   volumes: ['main', 'public'],
   images: {
     lightning: {
-      source: {
-        dockerBuild: {
-          dockerfile: 'Dockerfile.live',
-          workdir: '.',
-        },
-      },
-      arch: ['x86_64', 'aarch64'],
-      emulateMissingAs: 'aarch64',
+      source: { ociLayout: { path: '.build-inputs/lightning-x86_64.tar' } },
+      arch: ['x86_64'],
+      emulateMissing: false,
     },
     ui: {
-      source: {
-        dockerBuild: {
-          dockerfile: 'Dockerfile.ui',
-          workdir: '.',
-        },
-      },
-      arch: ['x86_64', 'aarch64'],
-      emulateMissingAs: 'aarch64',
+      source: { ociLayout: { path: '.build-inputs/ui-x86_64.tar' } },
+      arch: ['x86_64'],
+      emulateMissing: false,
     },
   },
   dependencies: {
